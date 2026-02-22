@@ -115,7 +115,7 @@ app.get('/api/leaderboard', async (req, res) => {
 
 // --- FRONTEND FALLBACK ---
 // This ensures that if someone refreshes the page, it loads the HTML correctly
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
