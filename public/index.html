@@ -43,11 +43,13 @@
         .race-banner { background: linear-gradient(135deg, #2a2a35 0%, #1f1f27 100%); border-left: 5px solid var(--f1-red); padding: 20px; border-radius: 6px; margin-bottom: 25px; }
         .race-banner h2 { margin: 0 0 5px 0; font-size: 1.6em; color: #fff; border: none; }
         .race-banner p { margin: 0; color: #ff5252; font-weight: bold; font-size: 0.9em; }
+        .sprint-badge { background: #fbc02d; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 10px; display: none; }
 
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.85em; text-transform: uppercase; font-weight: bold; }
         input, select { width: 100%; padding: 12px; background: #111; border: 1px solid var(--border-color); color: white; border-radius: 6px; font-size: 1rem; outline: none; }
         input:focus, select:focus { border-color: var(--f1-red); }
+        select:disabled { background: #222; color: #555; cursor: not-allowed; }
 
         .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
@@ -118,7 +120,7 @@
             <div id="tab-predict" class="tab-content" style="display: block;">
                 <div class="race-banner">
                     <h3 style="color: var(--text-muted); margin: 0 0 5px 0; border: none;">CURRENT RACE WEEKEND</h3>
-                    <h2 id="nextRaceName">Loading Calendar...</h2>
+                    <h2 id="nextRaceName">Loading Calendar... <span id="sprintBadge" class="sprint-badge">SPRINT WEEKEND</span></h2>
                     <p>🔒 Locks: <span id="nextRaceLock">--</span></p>
                 </div>
 
@@ -152,13 +154,9 @@
                         
                         <h3>Bonus Wildcards</h3>
                         <div class="grid-3">
-                            <div class="form-group"><label>Race Winner (+50)</label><select id="w_driver" class="d"></select></div>
-                            <div class="form-group"><label>Constructor Win (+25)</label><select id="w_constructor" class="c"></select></div>
-                            <div class="form-group"><label>Biggest Loser (+5)</label><select id="w_race_loser" class="d"></select></div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="form-group"><label>Sprint Gainer (+5)</label><select id="w_sprint_gainer" class="d"></select></div>
-                            <div class="form-group"><label>Sprint Loser (+5)</label><select id="w_sprint_loser" class="d"></select></div>
+                            <div class="form-group"><label>Biggest Loser (+5)</label><select id="w_race_loser" class="w"></select></div>
+                            <div class="form-group"><label>Sprint Gainer (+5)</label><select id="w_sprint_gainer" class="w w-sprint"></select></div>
+                            <div class="form-group"><label>Sprint Loser (+5)</label><select id="w_sprint_loser" class="w w-sprint"></select></div>
                         </div>
                         
                         <button type="submit" class="primary" style="margin-top: 20px;">Lock In Strategy</button>
@@ -256,9 +254,12 @@
             const newForm = oldForm.cloneNode(true);
             parent.replaceChild(newForm, oldForm);
 
-            ['p1','p2','p3','p10','p11','p19','p20','w_driver','w_race_loser','w_sprint_gainer','w_sprint_loser'].forEach(i => fill(i, dr));
-            ['c1','c2','c5','c6','c10','w_constructor'].forEach(i => fill(i, co));
+            ['p1','p2','p3','p10','p11','p19','p20'].forEach(i => fill(i, dr));
+            ['c1','c2','c5','c6','c10'].forEach(i => fill(i, co));
+            ['w_race_loser', 'w_sprint_gainer', 'w_sprint_loser'].forEach(i => fill(i, dr));
 
+            // Only enforce uniqueness on the main grid (class d) and constructors (class c).
+            // Wildcards (class w) are safely ignored and will never grey out!
             enforceUniqueSelections('d');
             enforceUniqueSelections('c');
             
@@ -268,7 +269,8 @@
         function clearForm() {
             const form = document.getElementById('predictionForm');
             if (form) form.reset();
-            document.querySelectorAll('#predictionForm select').forEach(s => {
+            // Only reset options that aren't globally disabled by the Sprint Lock
+            document.querySelectorAll('#predictionForm select:not([disabled])').forEach(s => {
                 s.selectedIndex = 0;
                 s.value = "";
                 Array.from(s.options).forEach(opt => opt.disabled = false);
@@ -288,14 +290,34 @@
                 const res = await fetch('/api/next-race', { cache: 'no-store' });
                 const data = await res.json();
                 document.getElementById('nextRaceName').innerText = `Round ${data.round}: ${data.name}`;
+                
                 const dateObj = new Date(data.deadline);
                 document.getElementById('nextRaceLock').innerText = dateObj.toLocaleString([], {weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'});
+                
+                // Sprint Weekend Logic
+                const sprintSelects = document.querySelectorAll('.w-sprint');
+                const badge = document.getElementById('sprintBadge');
+                
+                if (data.hasSprint) {
+                    badge.style.display = 'inline-block';
+                    sprintSelects.forEach(s => {
+                        s.disabled = false;
+                        // Repopulate if they were previously locked
+                        if(s.options.length <= 1) fill(s.id, dr);
+                    });
+                } else {
+                    badge.style.display = 'none';
+                    sprintSelects.forEach(s => {
+                        s.innerHTML = '<option value="">-- No Sprint --</option>';
+                        s.disabled = true;
+                    });
+                }
+
             } catch (e) {
                 document.getElementById('nextRaceName').innerText = "Offline Mode";
             }
         }
 
-        // 💥 FIX: Adjusted to correctly parse the backend JSON response instead of raw text
         async function register() {
             const name = document.getElementById('regName').value; 
             const password = document.getElementById('regPass').value;
@@ -308,7 +330,6 @@
                 resBox.style.color = data.success ? 'var(--success-glow)' : '#ff5252'; 
                 resBox.innerText = data.message;
                 
-                // Clear form on success
                 if (data.success) {
                     document.getElementById('regForm').reset();
                 }
@@ -318,7 +339,6 @@
             }
         }
 
-        // 💥 FIX: Adjusted to correctly parse JSON and trigger the app view on success
         async function login() {
             const name = document.getElementById('loginName').value; 
             const password = document.getElementById('loginPass').value;
@@ -339,7 +359,7 @@
                     document.getElementById('userWelcome').innerText = sessionUser;
                     
                     rebuildPredictionForm();
-                    fetchNextRace(); 
+                    await fetchNextRace(); 
                     loadLiveScores(); 
                     loadSeasonLeaderboard(); 
                     loadF1Results();
@@ -384,11 +404,14 @@
                 document.getElementById('c5').value = myPred.c5 || "";
                 document.getElementById('c6').value = myPred.c6 || "";
                 document.getElementById('c10').value = myPred.c10 || "";
-                document.getElementById('w_driver').value = myPred.w_driver || "";
-                document.getElementById('w_constructor').value = myPred.w_constructor || "";
                 document.getElementById('w_race_loser').value = myPred.w_race_loser || "";
-                document.getElementById('w_sprint_gainer').value = myPred.w_sprint_gainer || "";
-                document.getElementById('w_sprint_loser').value = myPred.w_sprint_loser || "";
+                
+                // Only populate sprint values if the sprint dropdowns are active
+                const sprintGainer = document.getElementById('w_sprint_gainer');
+                if (!sprintGainer.disabled) {
+                    sprintGainer.value = myPred.w_sprint_gainer || "";
+                    document.getElementById('w_sprint_loser').value = myPred.w_sprint_loser || "";
+                }
                 
                 const firstD = document.querySelector('.d'); if (firstD) firstD.dispatchEvent(new Event('change'));
                 const firstC = document.querySelector('.c'); if (firstC) firstC.dispatchEvent(new Event('change'));
@@ -399,11 +422,18 @@
             }
         }
 
-        // 💥 FIX: Also updated the prediction submission to parse JSON smoothly
         async function submitPrediction() {
             const resBox = document.getElementById('predResult');
             const selects = document.querySelectorAll('#predictionForm select');
-            for(let s of selects) if(s.value === "") { resBox.style.color='#ff5252'; resBox.innerText="❌ Fill all dropdowns to lock strategy."; return; }
+            
+            // Only force the user to fill out dropdowns that are currently active
+            for(let s of selects) {
+                if(!s.disabled && s.value === "") { 
+                    resBox.style.color='#ff5252'; 
+                    resBox.innerText="❌ Fill all active dropdowns to lock strategy."; 
+                    return; 
+                }
+            }
 
             const payload = {
                 user_name: sessionUser, password: sessionPass, 
@@ -412,9 +442,10 @@
                 p19: document.getElementById('p19').value, p20: document.getElementById('p20').value,
                 c1: document.getElementById('c1').value, c2: document.getElementById('c2').value,
                 c5: document.getElementById('c5').value, c6: document.getElementById('c6').value, c10: document.getElementById('c10').value,
-                w_driver: document.getElementById('w_driver').value, w_constructor: document.getElementById('w_constructor').value,
-                w_race_loser: document.getElementById('w_race_loser').value, w_sprint_gainer: document.getElementById('w_sprint_gainer').value,
-                w_sprint_loser: document.getElementById('w_sprint_loser').value
+                w_race_loser: document.getElementById('w_race_loser').value, 
+                // If it's not a sprint weekend, pass empty strings to the database
+                w_sprint_gainer: document.getElementById('w_sprint_gainer').disabled ? "" : document.getElementById('w_sprint_gainer').value,
+                w_sprint_loser: document.getElementById('w_sprint_loser').disabled ? "" : document.getElementById('w_sprint_loser').value
             };
 
             try {
@@ -434,11 +465,17 @@
             const data = await res.json();
             document.getElementById('liveBody').innerHTML = data.map(r => {
                 const pClass = r.p1 === 'MISSED' ? 'color: #ff5252;' : '';
+                
+                // Formats the wildcards dynamically based on whether it was a sprint weekend
+                let wildcardHTML = `★ Loser: ${r.w_race_loser || 'N/A'}`;
+                if (r.w_sprint_gainer) wildcardHTML += `<br>★ Sprint Gainer: ${r.w_sprint_gainer}`;
+                if (r.w_sprint_loser) wildcardHTML += `<br>★ Sprint Loser: ${r.w_sprint_loser}`;
+
                 return `<tr>
                     <td><strong>${r.user_name}</strong></td>
                     <td class="score-val">${r.total_score}</td>
                     <td style="font-size:0.8em; ${pClass}">${r.p1}, ${r.p2} <br><span style="color:var(--text-muted);">${r.c1}, ${r.c2}</span></td>
-                    <td style="font-size:0.85em; color:#fbc02d;">★ ${r.w_driver} <br>★ ${r.w_race_loser}</td>
+                    <td style="font-size:0.85em; color:#fbc02d;">${wildcardHTML}</td>
                 </tr>`
             }).join('');
         }
@@ -467,7 +504,6 @@
             if(!confirm("⚠️ DANGER: This permanently bakes scores into the leaderboard and deletes the current predictions.")) return;
             try {
                 const res = await fetch('/api/finalize', { method: 'POST' });
-                // Attempt to parse JSON in case it was updated, otherwise fallback cleanly
                 const data = await res.json().catch(() => ({ success: res.ok, message: "Race finalized." }));
                 document.getElementById('adminResult').style.color = data.success ? 'var(--success-glow)' : '#ff5252';
                 document.getElementById('adminResult').innerText = data.message;
@@ -478,19 +514,11 @@
             }
         }
 
-        // --- UX IMPROVEMENT: Bind 'Enter' key to Auth forms ---
         document.getElementById('loginPass').addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                login();
-            }
+            if (event.key === 'Enter') { event.preventDefault(); login(); }
         });
-
         document.getElementById('regPass').addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                register();
-            }
+            if (event.key === 'Enter') { event.preventDefault(); register(); }
         });
     </script>
 </body>
