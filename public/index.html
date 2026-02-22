@@ -281,7 +281,6 @@
             btn.classList.add('active');
         }
 
-        // FIXED DOM BUG: Safely injects the badge without destroying it
         async function fetchNextRace() {
             try {
                 const res = await fetch('/api/next-race', { cache: 'no-store' });
@@ -339,7 +338,6 @@
             }
         }
 
-        // FIXED MEMORY BUG: No longer auto-fills the user's previous picks
         async function login() {
             const name = document.getElementById('loginName').value; 
             const password = document.getElementById('loginPass').value;
@@ -350,7 +348,12 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    sessionUser = name; sessionPass = password;
+                    sessionUser = name; 
+                    sessionPass = password;
+                    
+                    // MEMORY PERSISTENCE SAVED HERE
+                    localStorage.setItem('f1_user', name);
+                    localStorage.setItem('f1_pass', password);
                     
                     document.getElementById('authView').style.display = 'none';
                     document.getElementById('appViews').style.display = 'block';
@@ -374,6 +377,8 @@
         }
 
         function logout() {
+            // CLEARS PERSISTENCE SO ANOTHER USER CAN LOG IN
+            localStorage.clear();
             window.location.replace(window.location.pathname + '?_=' + Date.now());
         }
 
@@ -471,6 +476,17 @@
         });
         document.getElementById('regPass').addEventListener('keypress', function(event) {
             if (event.key === 'Enter') { event.preventDefault(); register(); }
+        });
+
+        // AUTO-LOGIN LISTENER
+        document.addEventListener("DOMContentLoaded", () => {
+            const savedUser = localStorage.getItem('f1_user');
+            const savedPass = localStorage.getItem('f1_pass');
+            if (savedUser && savedPass) {
+                document.getElementById('loginName').value = savedUser;
+                document.getElementById('loginPass').value = savedPass;
+                login(); 
+            }
         });
     </script>
 </body>

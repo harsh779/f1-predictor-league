@@ -162,13 +162,9 @@ app.get('/api/season-leaderboard', async (req, res) => {
 
 // --- SELF-HEALING CALENDAR ENDPOINT ---
 app.get('/api/next-race', (req, res) => {
-  // 🕰️ TIME TRAVEL OVERRIDE: Pretend today is March 10th
-  const now = new Date();
+  const now = new Date(); // Back to Real-Time
   
-  // Find the first race in the calendar that happens AFTER today
   let nextRace = f1Calendar2026.find(race => new Date(race.date) > now);
-  
-  // Failsafe: If the season is over, just show the last race
   if (!nextRace) nextRace = f1Calendar2026[23]; 
 
   res.json({ 
@@ -179,8 +175,30 @@ app.get('/api/next-race', (req, res) => {
   });
 });
 
-app.get('/api/season-results', (req, res) => {
-  res.json([{ round: "-", name: "Awaiting Lights Out", winner: "-", team: "-" }]);
+// --- LIVE API: FETCH REAL F1 RESULTS ---
+app.get('/api/season-results', async (req, res) => {
+  try {
+    const response = await fetch('http://api.jolpi.ca/ergast/f1/current/results/1.json');
+    const data = await response.json();
+    const races = data.MRData.RaceTable.Races;
+    
+    // If the season hasn't started yet or returned empty
+    if (!races || races.length === 0) {
+        return res.json([{ round: "-", name: "Awaiting Lights Out", winner: "-", team: "-" }]);
+    }
+
+    const formattedResults = races.map(race => ({
+      round: race.round,
+      name: race.raceName,
+      winner: race.Results[0].Driver.familyName,
+      team: race.Results[0].Constructor.name
+    }));
+    
+    res.json(formattedResults);
+  } catch (error) {
+    console.error("API Fetch Error:", error);
+    res.json([{ round: "ERR", name: "API Offline", winner: "-", team: "-" }]);
+  }
 });
 
 app.post('/api/finalize', async (req, res) => {
