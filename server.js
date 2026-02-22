@@ -214,7 +214,8 @@ app.get('/api/season-results', async (req, res) => {
 app.post('/api/finalize', async (req, res) => {
   try {
     // 1. Fetch live classification from Jolpica
-    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
+    // CHANGED 'current' TO '2025' FOR TESTING
+    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/2025/last/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
     if (!races || races.length === 0) return res.status(400).json({ success: false, message: "No official race data available yet." });
     
@@ -268,7 +269,8 @@ app.post('/api/finalize', async (req, res) => {
     let sprintGainers = [];
     let sprintLosers = [];
     try {
-        const sprintRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/sprint.json').then(r => r.json());
+        // CHANGED 'current' TO '2025' FOR TESTING
+        const sprintRes = await fetch('https://api.jolpi.ca/ergast/f1/2025/last/sprint.json').then(r => r.json());
         const sprintRaces = sprintRes.MRData.RaceTable.Races;
         if (sprintRaces && sprintRaces.length > 0 && sprintRaces[0].round === raceData.round) {
             const sprintResults = sprintRaces[0].SprintResults;
