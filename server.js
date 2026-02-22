@@ -11,17 +11,14 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'))); 
 
 // --- CLOUD DATABASE CONNECTION (TURSO) ---
-// This uses environment variables so your secrets stay off GitHub
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN
 });
 
 // --- DATABASE INITIALIZATION ---
-// This runs once when the server boots to ensure your tables exist
 async function setupDatabase() {
   try {
-    // 1. Create Drivers Table
     await db.execute(`
       CREATE TABLE IF NOT EXISTS drivers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +28,6 @@ async function setupDatabase() {
       )
     `);
     
-    // 2. Create Predictions Table
     await db.execute(`
       CREATE TABLE IF NOT EXISTS predictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,16 +49,18 @@ setupDatabase();
 
 // 1. Register a new Driver
 app.post('/register', async (req, res) => {
+  console.log("📥 Incoming Register Request:", req.body);
   const { username, password } = req.body;
+  
   try {
     const result = await db.execute({
       sql: "INSERT INTO drivers (username, password) VALUES (?, ?)",
-      args: [username, password]
+      args: [username || null, password || null] 
     });
-    // result.lastInsertRowid gives us the new user's ID
     res.json({ success: true, message: "Driver registered successfully!", id: result.lastInsertRowid.toString() });
   } catch (error) {
-    if (error.message.includes("UNIQUE")) {
+    console.error("❌ REGISTER ERROR:", error);
+    if (error.message && error.message.includes("UNIQUE")) {
       res.status(400).json({ success: false, message: "Username already taken. Please choose another." });
     } else {
       res.status(500).json({ success: false, message: "Server error during registration." });
@@ -72,11 +70,13 @@ app.post('/register', async (req, res) => {
 
 // 2. Login a Driver
 app.post('/login', async (req, res) => {
+  console.log("📥 Incoming Login Request:", req.body);
   const { username, password } = req.body;
+  
   try {
     const result = await db.execute({
       sql: "SELECT * FROM drivers WHERE username = ? AND password = ?",
-      args: [username, password]
+      args: [username || null, password || null]
     });
     
     if (result.rows.length > 0) {
@@ -85,20 +85,23 @@ app.post('/login', async (req, res) => {
       res.status(401).json({ success: false, message: "Invalid credentials." });
     }
   } catch (error) {
+    console.error("❌ LOGIN ERROR:", error);
     res.status(500).json({ success: false, message: "Server error during login." });
   }
 });
 
 // 3. Lock in a Prediction
 app.post('/predict', async (req, res) => {
+  console.log("📥 Incoming Predict Request:", req.body);
   const { driver_id, race_name, predicted_position } = req.body;
   try {
     await db.execute({
       sql: "INSERT INTO predictions (driver_id, race_name, predicted_position) VALUES (?, ?, ?)",
-      args: [driver_id, race_name, predicted_position]
+      args: [driver_id || null, race_name || null, predicted_position || null]
     });
     res.json({ success: true, message: "Prediction locked in!" });
   } catch (error) {
+    console.error("❌ PREDICT ERROR:", error);
     res.status(500).json({ success: false, message: "Failed to save prediction to cloud." });
   }
 });
@@ -109,12 +112,12 @@ app.get('/leaderboard', async (req, res) => {
     const result = await db.execute("SELECT username, total_points FROM drivers ORDER BY total_points DESC");
     res.json({ success: true, leaderboard: result.rows });
   } catch (error) {
+    console.error("❌ LEADERBOARD ERROR:", error);
     res.status(500).json({ success: false, message: "Failed to fetch leaderboard." });
   }
 });
 
 // --- FRONTEND FALLBACK ---
-// This ensures that if someone refreshes the page, it loads the HTML correctly
 app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
