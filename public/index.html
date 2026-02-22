@@ -295,35 +295,62 @@
             }
         }
 
+        // 💥 FIX: Adjusted to correctly parse the backend JSON response instead of raw text
         async function register() {
-            const name = document.getElementById('regName').value; const password = document.getElementById('regPass').value;
+            const name = document.getElementById('regName').value; 
+            const password = document.getElementById('regPass').value;
             const resBox = document.getElementById('regResult');
-            const res = await fetch('/register', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, password})});
-            resBox.style.color = res.ok ? 'var(--success-glow)' : '#ff5252'; resBox.innerText = await res.text();
+            
+            try {
+                const res = await fetch('/register', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, password})});
+                const data = await res.json();
+                
+                resBox.style.color = data.success ? 'var(--success-glow)' : '#ff5252'; 
+                resBox.innerText = data.message;
+                
+                // Clear form on success
+                if (data.success) {
+                    document.getElementById('regForm').reset();
+                }
+            } catch (error) {
+                resBox.style.color = '#ff5252'; 
+                resBox.innerText = "Connection Error: Could not reach the server.";
+            }
         }
 
+        // 💥 FIX: Adjusted to correctly parse JSON and trigger the app view on success
         async function login() {
-            const name = document.getElementById('loginName').value; const password = document.getElementById('loginPass').value;
+            const name = document.getElementById('loginName').value; 
+            const password = document.getElementById('loginPass').value;
             const resBox = document.getElementById('loginResult');
-            const res = await fetch('/login', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, password})});
             
-            if (res.ok) {
-                sessionUser = name; sessionPass = password;
+            try {
+                const res = await fetch('/login', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, password})});
+                const data = await res.json();
                 
-                document.getElementById('authView').style.display = 'none';
-                document.getElementById('appViews').style.display = 'block';
-                document.getElementById('tabsContainer').style.display = 'flex';
-                document.getElementById('userWelcome').style.display = 'block';
-                document.getElementById('logoutBtn').style.display = 'block';
-                document.getElementById('userWelcome').innerText = sessionUser;
-                
-                rebuildPredictionForm();
-                fetchNextRace(); 
-                loadLiveScores(); 
-                loadSeasonLeaderboard(); 
-                loadF1Results();
-                populateMyPrediction(); 
-            } else { resBox.innerText = await res.text(); }
+                if (data.success) {
+                    sessionUser = name; sessionPass = password;
+                    
+                    document.getElementById('authView').style.display = 'none';
+                    document.getElementById('appViews').style.display = 'block';
+                    document.getElementById('tabsContainer').style.display = 'flex';
+                    document.getElementById('userWelcome').style.display = 'block';
+                    document.getElementById('logoutBtn').style.display = 'block';
+                    document.getElementById('userWelcome').innerText = sessionUser;
+                    
+                    rebuildPredictionForm();
+                    fetchNextRace(); 
+                    loadLiveScores(); 
+                    loadSeasonLeaderboard(); 
+                    loadF1Results();
+                    populateMyPrediction(); 
+                } else { 
+                    resBox.innerText = data.message; 
+                }
+            } catch (error) {
+                resBox.style.color = '#ff5252'; 
+                resBox.innerText = "Connection Error: Could not reach the server.";
+            }
         }
 
         function logout() {
@@ -372,6 +399,7 @@
             }
         }
 
+        // 💥 FIX: Also updated the prediction submission to parse JSON smoothly
         async function submitPrediction() {
             const resBox = document.getElementById('predResult');
             const selects = document.querySelectorAll('#predictionForm select');
@@ -389,9 +417,16 @@
                 w_sprint_loser: document.getElementById('w_sprint_loser').value
             };
 
-            const res = await fetch('/predict', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-            resBox.style.color = res.ok ? '#64b5f6' : '#ff5252'; resBox.innerText = await res.text();
-            loadLiveScores();
+            try {
+                const res = await fetch('/predict', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+                const data = await res.json();
+                resBox.style.color = data.success ? '#64b5f6' : '#ff5252'; 
+                resBox.innerText = data.message;
+                loadLiveScores();
+            } catch (error) {
+                resBox.style.color = '#ff5252'; 
+                resBox.innerText = "Connection Error: Failed to save prediction.";
+            }
         }
 
         async function loadLiveScores() {
@@ -430,10 +465,17 @@
 
         async function finalizeRace() {
             if(!confirm("⚠️ DANGER: This permanently bakes scores into the leaderboard and deletes the current predictions.")) return;
-            const res = await fetch('/api/finalize', { method: 'POST' });
-            document.getElementById('adminResult').style.color = res.ok ? 'var(--success-glow)' : '#ff5252';
-            document.getElementById('adminResult').innerText = await res.text();
-            loadLiveScores(); loadSeasonLeaderboard();
+            try {
+                const res = await fetch('/api/finalize', { method: 'POST' });
+                // Attempt to parse JSON in case it was updated, otherwise fallback cleanly
+                const data = await res.json().catch(() => ({ success: res.ok, message: "Race finalized." }));
+                document.getElementById('adminResult').style.color = data.success ? 'var(--success-glow)' : '#ff5252';
+                document.getElementById('adminResult').innerText = data.message;
+                loadLiveScores(); loadSeasonLeaderboard();
+            } catch (error) {
+                document.getElementById('adminResult').style.color = '#ff5252';
+                document.getElementById('adminResult').innerText = "Network Error.";
+            }
         }
 
         // --- UX IMPROVEMENT: Bind 'Enter' key to Auth forms ---
