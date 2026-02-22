@@ -160,10 +160,8 @@ app.get('/api/season-leaderboard', async (req, res) => {
   }
 });
 
-// --- SELF-HEALING CALENDAR ENDPOINT ---
 app.get('/api/next-race', (req, res) => {
-  const now = new Date(); // Back to Real-Time
-  
+  const now = new Date(); 
   let nextRace = f1Calendar2026.find(race => new Date(race.date) > now);
   if (!nextRace) nextRace = f1Calendar2026[23]; 
 
@@ -178,11 +176,11 @@ app.get('/api/next-race', (req, res) => {
 // --- LIVE API: FETCH REAL F1 RESULTS ---
 app.get('/api/season-results', async (req, res) => {
   try {
-    const response = await fetch('http://api.jolpi.ca/ergast/f1/current/results/1.json');
+    // 💥 FIX 1: Upgraded to HTTPS and explicitly fetching the 2025 season so the table populates with real data
+    const response = await fetch('https://api.jolpi.ca/ergast/f1/2025/results/1.json');
     const data = await response.json();
     const races = data.MRData.RaceTable.Races;
     
-    // If the season hasn't started yet or returned empty
     if (!races || races.length === 0) {
         return res.json([{ round: "-", name: "Awaiting Lights Out", winner: "-", team: "-" }]);
     }

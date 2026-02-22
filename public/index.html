@@ -274,11 +274,15 @@
             document.getElementById('predResult').innerText = "";
         }
 
+        // 💥 FIX 2: Modified switchTab to save the user's active tab into the browser memory
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
             document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
             document.getElementById(tabId).style.display = 'block';
-            btn.classList.add('active');
+            if (btn) btn.classList.add('active');
+            
+            // Save current tab state
+            localStorage.setItem('activeTab', tabId);
         }
 
         async function fetchNextRace() {
@@ -351,7 +355,7 @@
                     sessionUser = name; 
                     sessionPass = password;
                     
-                    // MEMORY PERSISTENCE SAVED HERE
+                    // SAVE SESSION TO LOCAL STORAGE
                     localStorage.setItem('f1_user', name);
                     localStorage.setItem('f1_pass', password);
                     
@@ -361,6 +365,11 @@
                     document.getElementById('userWelcome').style.display = 'block';
                     document.getElementById('logoutBtn').style.display = 'block';
                     document.getElementById('userWelcome').innerText = sessionUser;
+                    
+                    // RESTORE ACTIVE TAB AFTER REFRESH
+                    const savedTab = localStorage.getItem('activeTab') || 'tab-predict';
+                    const activeBtn = document.querySelector(`.tab-btn[onclick*="${savedTab}"]`);
+                    switchTab(savedTab, activeBtn);
                     
                     rebuildPredictionForm();
                     await fetchNextRace(); 
@@ -377,7 +386,7 @@
         }
 
         function logout() {
-            // CLEARS PERSISTENCE SO ANOTHER USER CAN LOG IN
+            // WIPE SESSION MEMORY ON LOGOUT
             localStorage.clear();
             window.location.replace(window.location.pathname + '?_=' + Date.now());
         }
@@ -478,7 +487,7 @@
             if (event.key === 'Enter') { event.preventDefault(); register(); }
         });
 
-        // AUTO-LOGIN LISTENER
+        // 💥 FIX 2: Listens for page refresh and automatically logs the user back into the correct tab
         document.addEventListener("DOMContentLoaded", () => {
             const savedUser = localStorage.getItem('f1_user');
             const savedPass = localStorage.getItem('f1_pass');
