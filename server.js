@@ -162,7 +162,8 @@ app.get('/api/season-leaderboard', async (req, res) => {
 
 // --- SELF-HEALING CALENDAR ENDPOINT ---
 app.get('/api/next-race', (req, res) => {
-  const now = new Date();
+  // 🕰️ TIME TRAVEL OVERRIDE: Pretend today is March 10th
+  const now = new Date("2026-03-10T00:00:00Z");
   
   // Find the first race in the calendar that happens AFTER today
   let nextRace = f1Calendar2026.find(race => new Date(race.date) > now);

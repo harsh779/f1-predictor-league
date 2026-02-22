@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <title>F1 Predictor League</title>
-    <script>
-        window.addEventListener('pageshow', (e) => {
-            if (e.persisted) window.location.reload(); 
-        });
-    </script>
     <link href="https://fonts.googleapis.com/css2?family=Racing+Sans+One&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -43,7 +42,7 @@
         .race-banner { background: linear-gradient(135deg, #2a2a35 0%, #1f1f27 100%); border-left: 5px solid var(--f1-red); padding: 20px; border-radius: 6px; margin-bottom: 25px; }
         .race-banner h2 { margin: 0 0 5px 0; font-size: 1.6em; color: #fff; border: none; }
         .race-banner p { margin: 0; color: #ff5252; font-weight: bold; font-size: 0.9em; }
-        .sprint-badge { background: #fbc02d; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 10px; display: none; }
+        .sprint-badge { background: #fbc02d; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 10px; display: none; vertical-align: middle; }
 
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.85em; text-transform: uppercase; font-weight: bold; }
@@ -120,7 +119,7 @@
             <div id="tab-predict" class="tab-content" style="display: block;">
                 <div class="race-banner">
                     <h3 style="color: var(--text-muted); margin: 0 0 5px 0; border: none;">CURRENT RACE WEEKEND</h3>
-                    <h2 id="nextRaceName">Loading Calendar... <span id="sprintBadge" class="sprint-badge">SPRINT WEEKEND</span></h2>
+                    <h2 id="nextRaceName">Loading Calendar...</h2>
                     <p>🔒 Locks: <span id="nextRaceLock">--</span></p>
                 </div>
 
@@ -258,8 +257,6 @@
             ['c1','c2','c5','c6','c10'].forEach(i => fill(i, co));
             ['w_race_loser', 'w_sprint_gainer', 'w_sprint_loser'].forEach(i => fill(i, dr));
 
-            // Only enforce uniqueness on the main grid (class d) and constructors (class c).
-            // Wildcards (class w) are safely ignored and will never grey out!
             enforceUniqueSelections('d');
             enforceUniqueSelections('c');
             
@@ -269,7 +266,6 @@
         function clearForm() {
             const form = document.getElementById('predictionForm');
             if (form) form.reset();
-            // Only reset options that aren't globally disabled by the Sprint Lock
             document.querySelectorAll('#predictionForm select:not([disabled])').forEach(s => {
                 s.selectedIndex = 0;
                 s.value = "";
@@ -285,28 +281,27 @@
             btn.classList.add('active');
         }
 
+        // FIXED DOM BUG: Safely injects the badge without destroying it
         async function fetchNextRace() {
             try {
                 const res = await fetch('/api/next-race', { cache: 'no-store' });
+                if (!res.ok) throw new Error("Backend unavailable");
                 const data = await res.json();
-                document.getElementById('nextRaceName').innerText = `Round ${data.round}: ${data.name}`;
+                
+                const sprintBadgeHTML = data.hasSprint ? `<span class="sprint-badge" style="display: inline-block;">SPRINT WEEKEND</span>` : '';
+                document.getElementById('nextRaceName').innerHTML = `Round ${data.round}: ${data.name} ${sprintBadgeHTML}`;
                 
                 const dateObj = new Date(data.deadline);
                 document.getElementById('nextRaceLock').innerText = dateObj.toLocaleString([], {weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'});
                 
-                // Sprint Weekend Logic
                 const sprintSelects = document.querySelectorAll('.w-sprint');
-                const badge = document.getElementById('sprintBadge');
                 
                 if (data.hasSprint) {
-                    badge.style.display = 'inline-block';
                     sprintSelects.forEach(s => {
                         s.disabled = false;
-                        // Repopulate if they were previously locked
                         if(s.options.length <= 1) fill(s.id, dr);
                     });
                 } else {
-                    badge.style.display = 'none';
                     sprintSelects.forEach(s => {
                         s.innerHTML = '<option value="">-- No Sprint --</option>';
                         s.disabled = true;
@@ -314,7 +309,12 @@
                 }
 
             } catch (e) {
-                document.getElementById('nextRaceName').innerText = "Offline Mode";
+                console.error(e);
+                document.getElementById('nextRaceName').innerHTML = "Offline Mode";
+                document.querySelectorAll('.w-sprint').forEach(s => {
+                    s.innerHTML = '<option value="">-- No Sprint --</option>';
+                    s.disabled = true;
+                });
             }
         }
 
@@ -339,6 +339,7 @@
             }
         }
 
+        // FIXED MEMORY BUG: No longer auto-fills the user's previous picks
         async function login() {
             const name = document.getElementById('loginName').value; 
             const password = document.getElementById('loginPass').value;
@@ -363,7 +364,6 @@
                     loadLiveScores(); 
                     loadSeasonLeaderboard(); 
                     loadF1Results();
-                    populateMyPrediction(); 
                 } else { 
                     resBox.innerText = data.message; 
                 }
@@ -377,56 +377,10 @@
             window.location.replace(window.location.pathname + '?_=' + Date.now());
         }
 
-        async function populateMyPrediction() {
-            clearForm();
-            try {
-                const res = await fetch('/api/predictions/me', { 
-                    method: 'POST', 
-                    headers: {'Content-Type':'application/json'}, 
-                    body: JSON.stringify({user_name: sessionUser, password: sessionPass}),
-                    cache: 'no-store' 
-                });
-                
-                if (res.status === 404 || !res.ok) { clearForm(); return; }
-
-                const myPred = await res.json();
-                if (!myPred || myPred.p1 === 'MISSED') { clearForm(); return; }
-                
-                document.getElementById('p1').value = myPred.p1 || "";
-                document.getElementById('p2').value = myPred.p2 || "";
-                document.getElementById('p3').value = myPred.p3 || "";
-                document.getElementById('p10').value = myPred.p10 || "";
-                document.getElementById('p11').value = myPred.p11 || "";
-                document.getElementById('p19').value = myPred.p19 || "";
-                document.getElementById('p20').value = myPred.p20 || "";
-                document.getElementById('c1').value = myPred.c1 || "";
-                document.getElementById('c2').value = myPred.c2 || "";
-                document.getElementById('c5').value = myPred.c5 || "";
-                document.getElementById('c6').value = myPred.c6 || "";
-                document.getElementById('c10').value = myPred.c10 || "";
-                document.getElementById('w_race_loser').value = myPred.w_race_loser || "";
-                
-                // Only populate sprint values if the sprint dropdowns are active
-                const sprintGainer = document.getElementById('w_sprint_gainer');
-                if (!sprintGainer.disabled) {
-                    sprintGainer.value = myPred.w_sprint_gainer || "";
-                    document.getElementById('w_sprint_loser').value = myPred.w_sprint_loser || "";
-                }
-                
-                const firstD = document.querySelector('.d'); if (firstD) firstD.dispatchEvent(new Event('change'));
-                const firstC = document.querySelector('.c'); if (firstC) firstC.dispatchEvent(new Event('change'));
-                
-            } catch (e) {
-                clearForm();
-                console.error("Failed to load user history");
-            }
-        }
-
         async function submitPrediction() {
             const resBox = document.getElementById('predResult');
             const selects = document.querySelectorAll('#predictionForm select');
             
-            // Only force the user to fill out dropdowns that are currently active
             for(let s of selects) {
                 if(!s.disabled && s.value === "") { 
                     resBox.style.color='#ff5252'; 
@@ -443,7 +397,6 @@
                 c1: document.getElementById('c1').value, c2: document.getElementById('c2').value,
                 c5: document.getElementById('c5').value, c6: document.getElementById('c6').value, c10: document.getElementById('c10').value,
                 w_race_loser: document.getElementById('w_race_loser').value, 
-                // If it's not a sprint weekend, pass empty strings to the database
                 w_sprint_gainer: document.getElementById('w_sprint_gainer').disabled ? "" : document.getElementById('w_sprint_gainer').value,
                 w_sprint_loser: document.getElementById('w_sprint_loser').disabled ? "" : document.getElementById('w_sprint_loser').value
             };
@@ -466,7 +419,6 @@
             document.getElementById('liveBody').innerHTML = data.map(r => {
                 const pClass = r.p1 === 'MISSED' ? 'color: #ff5252;' : '';
                 
-                // Formats the wildcards dynamically based on whether it was a sprint weekend
                 let wildcardHTML = `★ Loser: ${r.w_race_loser || 'N/A'}`;
                 if (r.w_sprint_gainer) wildcardHTML += `<br>★ Sprint Gainer: ${r.w_sprint_gainer}`;
                 if (r.w_sprint_loser) wildcardHTML += `<br>★ Sprint Loser: ${r.w_sprint_loser}`;
