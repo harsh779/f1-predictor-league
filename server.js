@@ -95,28 +95,24 @@ function normalizeConstructor(c) {
 // --- MASTER SCORING LOGIC (The Core Engine) ---
 async function performFinalization() {
   try {
-    // 1. Fetch live classification
     const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
-    if (!races || races.length === 0) return { success: false, message: "No data." };
+    if (!races || races.length === 0) return { success: false, message: "No official race data available yet." };
     
     const raceData = races[0];
     const results = raceData.Results;
 
-    // Check if we actually have predictions to score
     const activePredictions = await db.execute("SELECT count(*) as count FROM f1_predictions");
     if (activePredictions.rows[0].count === 0) {
-        return { success: false, message: "No active predictions to process." };
+        return { success: false, message: "No active predictions found. Scoring skipped." };
     }
 
-    // 2. Parse Actual Driver Positions
     const actualDriverPositions = {};
     results.forEach(r => {
       const driverName = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
       actualDriverPositions[driverName] = parseInt(r.position);
     });
 
-    // 3. Calculate Constructor Ranks
     const constructorSums = {};
     results.forEach(r => {
       const cName = normalizeConstructor(r.Constructor.name);
@@ -134,7 +130,6 @@ async function performFinalization() {
         }
     }
 
-    // 4. Wildcards (Race Loser)
     let maxDrop = -999;
     let raceLosers = [];
     results.forEach(r => {
@@ -148,7 +143,6 @@ async function performFinalization() {
        }
     });
 
-    // 5. Evaluate Predictions
     const predictions = await db.execute("SELECT * FROM f1_predictions").then(r => r.rows);
     let scores = {};
     let lowestActiveScore = Infinity;
@@ -180,7 +174,6 @@ async function performFinalization() {
         if (score < lowestActiveScore) lowestActiveScore = score;
     });
 
-    // 6. Update Leaderboard & Reset
     if (lowestActiveScore === Infinity) lowestActiveScore = 0;
     const penalty = lowestActiveScore - 5;
     const allDrivers = await db.execute("SELECT * FROM f1_drivers").then(r => r.rows);
@@ -194,28 +187,29 @@ async function performFinalization() {
     }
 
     await db.execute("DELETE FROM f1_predictions");
+    console.log(`🏁 AUTOMATED FINALIZATION: Success for Round ${raceData.round}`);
     return { success: true, message: `Finalized Round ${raceData.round}` };
 
   } catch (error) {
-    console.error("Scoring failure:", error);
+    console.error("Scoring system error:", error);
     return { success: false, message: error.message };
   }
 }
 
-// --- 1. AUTH & PREDICTION ROUTES ---
+// --- AUTH & USER ROUTES ---
 app.post('/register', async (req, res) => {
   const { name, password } = req.body;
   try {
     await db.execute({ sql: "INSERT INTO f1_drivers (name, password) VALUES (?, ?)", args: [name, password] });
-    res.json({ success: true, message: "Contract signed!" });
-  } catch (e) { res.status(400).json({ success: false, message: "Registration failed." }); }
+    res.json({ success: true, message: "Welcome to the grid!" });
+  } catch (e) { res.status(400).json({ success: false, message: "Driver name already exists." }); }
 });
 
 app.post('/login', async (req, res) => {
   const { name, password } = req.body;
   const result = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [name, password] });
   if (result.rows.length > 0) res.json({ success: true, driver: result.rows[0] });
-  else res.status(401).json({ success: false, message: "Invalid credentials." });
+  else res.status(401).json({ success: false, message: "Incorrect credentials." });
 });
 
 app.post('/predict', async (req, res) => {
@@ -233,7 +227,7 @@ app.post('/predict', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// --- 2. DASHBOARD ROUTES ---
+// --- DASHBOARD API ---
 app.get('/api/predictions', async (req, res) => {
     const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions p JOIN f1_drivers d ON p.user_name = d.name");
     res.json(r.rows);
@@ -249,30 +243,35 @@ app.get('/api/next-race', (req, res) => {
   res.json(next);
 });
 
-// --- 3. THE ORGANIC WATCHER & BACKUP BUTTON ---
+// --- SECURE ADMIN FINALIZATION ---
 app.post('/api/finalize', async (req, res) => {
+    const { user_name, password } = req.body;
+
+    // MANDATORY ADMIN SECURITY CHECK
+    if (user_name !== 'admin' || password !== 'Open@0761') {
+        return res.status(403).json({ success: false, message: "🚨 Unauthorized: Stewards Only!" });
+    }
+
     const result = await performFinalization();
     res.status(result.success ? 200 : 400).json(result);
 });
 
-// Watcher: Runs every 15 minutes to check for finished races
+// --- ORGANIC BACKGROUND WATCHER ---
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
     const now = new Date();
-    // Check if we are within 48 hours of a scheduled race start
     const activeRound = f1Calendar2026.find(r => {
         const d = new Date(r.date);
         return now > d && now - d < (48 * 60 * 60 * 1000);
     });
 
     if (activeRound) {
-        console.log(`🧐 Organic Watcher: Results check for ${activeRound.name}...`);
+        console.log(`🧐 Organic Watcher checking for ${activeRound.name}...`);
         await performFinalization();
     }
-    // Keep engine warm
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
 }, 15 * 60 * 1000);
 
 app.get('/{*splat}', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(port, () => console.log(`🏁 Engine hot on port ${port}`));
+app.listen(port, () => console.log(`🏁 Engine active on port ${port}`));
