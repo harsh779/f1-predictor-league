@@ -52,7 +52,7 @@ setupDatabase();
 // --- API ROUTES ---
 
 // 1. Register a new Driver
-app.post('/api/register', async (req, res) => {
+app.post('/register', async (req, res) => {
   const { username, password } = req.body;
   try {
     const result = await db.execute({
@@ -71,7 +71,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // 2. Login a Driver
-app.post('/api/login', async (req, res) => {
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const result = await db.execute({
@@ -90,7 +90,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // 3. Lock in a Prediction
-app.post('/api/predict', async (req, res) => {
+app.post('/predict', async (req, res) => {
   const { driver_id, race_name, predicted_position } = req.body;
   try {
     await db.execute({
@@ -104,7 +104,7 @@ app.post('/api/predict', async (req, res) => {
 });
 
 // 4. Fetch the Leaderboard
-app.get('/api/leaderboard', async (req, res) => {
+app.get('/leaderboard', async (req, res) => {
   try {
     const result = await db.execute("SELECT username, total_points FROM drivers ORDER BY total_points DESC");
     res.json({ success: true, leaderboard: result.rows });
