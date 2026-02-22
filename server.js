@@ -25,7 +25,6 @@ async function setupDatabase() {
       )
     `);
     
-    // Removed the w_driver and w_constructor columns
     await db.execute(`
       CREATE TABLE IF NOT EXISTS f1_predictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +40,34 @@ async function setupDatabase() {
   }
 }
 setupDatabase();
+
+// --- 2026 CALENDAR MEMORY ---
+const f1Calendar2026 = [
+  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-08T00:00:00Z" },
+  { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-15T00:00:00Z" },
+  { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-29T00:00:00Z" },
+  { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-12T00:00:00Z" },
+  { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-19T00:00:00Z" },
+  { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-03T00:00:00Z" },
+  { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-24T00:00:00Z" },
+  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-07T00:00:00Z" },
+  { round: 9, name: "Spanish Grand Prix (Barcelona)", hasSprint: false, date: "2026-06-14T00:00:00Z" },
+  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-28T00:00:00Z" },
+  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-05T00:00:00Z" },
+  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-19T00:00:00Z" },
+  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-26T00:00:00Z" },
+  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-23T00:00:00Z" },
+  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-06T00:00:00Z" },
+  { round: 16, name: "Spanish Grand Prix (Madrid)", hasSprint: false, date: "2026-09-13T00:00:00Z" },
+  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-26T00:00:00Z" },
+  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-11T00:00:00Z" },
+  { round: 19, name: "United States Grand Prix (Austin)", hasSprint: false, date: "2026-10-25T00:00:00Z" },
+  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-11-01T00:00:00Z" },
+  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-08T00:00:00Z" },
+  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-21T00:00:00Z" },
+  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-29T00:00:00Z" },
+  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-06T00:00:00Z" }
+];
 
 // --- 1. AUTHENTICATION ROUTES ---
 app.post('/register', async (req, res) => {
@@ -79,7 +106,6 @@ app.post('/login', async (req, res) => {
 
 // --- 2. PREDICTION LOGIC ---
 app.post('/predict', async (req, res) => {
-  // Removed redundant wildcards from incoming payload
   const { user_name, password, p1, p2, p3, p10, p11, p19, p20, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser } = req.body;
   
   try {
@@ -134,13 +160,21 @@ app.get('/api/season-leaderboard', async (req, res) => {
   }
 });
 
-// Added hasSprint flag to handle Sprint Weekend logic
+// --- SELF-HEALING CALENDAR ENDPOINT ---
 app.get('/api/next-race', (req, res) => {
+  const now = new Date();
+  
+  // Find the first race in the calendar that happens AFTER today
+  let nextRace = f1Calendar2026.find(race => new Date(race.date) > now);
+  
+  // Failsafe: If the season is over, just show the last race
+  if (!nextRace) nextRace = f1Calendar2026[23]; 
+
   res.json({ 
-    round: 1, 
-    name: "Australian Grand Prix", 
-    hasSprint: false, 
-    deadline: new Date(Date.now() + 86400000 * 5).toISOString() 
+    round: nextRace.round, 
+    name: nextRace.name, 
+    hasSprint: nextRace.hasSprint, 
+    deadline: nextRace.date 
   });
 });
 
@@ -157,6 +191,7 @@ app.post('/api/finalize', async (req, res) => {
   }
 });
 
+// --- FRONTEND FALLBACK ---
 app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
