@@ -54,6 +54,10 @@
         .modal-box { background:#222; padding:40px; border-radius:8px; width:90%; max-width:400px; text-align:center; border:1px solid #444; }
         .hidden { display:none; }
         .sprint-badge { background: #e10600; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px; text-transform: uppercase; }
+        
+        /* Session Grid */
+        .session-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: #ccc; margin-top: 10px; background: #1a1a1f; padding: 10px; border-radius: 4px;}
+        .session-grid div strong { color: #fff; display: inline-block; width: 65px;}
     </style>
 </head>
 <body>
@@ -144,17 +148,16 @@
     </div>
 
     <div id="calendar" class="tab">
-        <h2>2026 Schedule</h2>
+        <h2>2026 Schedule (IST)</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Round</th>
-                    <th>Date (IST)</th>
-                    <th>Grand Prix</th>
+                    <th style="width: 10%;">Round</th>
+                    <th>Grand Prix & Session Times</th>
                 </tr>
             </thead>
             <tbody id="cal-body">
-                <tr><td colspan="3" style="text-align:center; color: #888;">Loading calendar...</td></tr>
+                <tr><td colspan="2" style="text-align:center; color: #888;">Loading calendar...</td></tr>
             </tbody>
         </table>
     </div>
@@ -167,32 +170,26 @@
                 <li>Predictions are <strong>strictly locked</strong> the exact minute that <strong>Practice 1 (P1)</strong> begins on Friday (or Sprint Qualifying on Sprint weekends).</li>
                 <li>Once cars are on track, no changes can be made.</li>
             </ul>
-
             <h3>🏎️ 2. Driver Scoring (P1, P2, P3, P11, P12, P19, P20)</h3>
             <ul>
                 <li><strong>Baseline:</strong> Everyone starts the race at 0 points.</li>
                 <li><strong>Exact Match Bonus:</strong> If you guess the driver's exact finishing position, you get <strong>+2 Points</strong>.</li>
-                <li><strong>Miss Penalty:</strong> You lose <strong>-1 Point</strong> for every position your prediction is away from the actual result. (e.g., If you guess P1, and they finish P3, you lose -2 points).</li>
+                <li><strong>Miss Penalty:</strong> You lose <strong>-1 Point</strong> for every position your prediction is away from the actual result.</li>
             </ul>
-
             <h3>💥 3. The DNF Rule (Did Not Finish)</h3>
             <ul>
                 <li>If a driver retires, crashes, or fails to finish the race (DNF), they are automatically scored as finishing in <strong>P20</strong> for our math.</li>
-                <li><em>Example:</em> You predict Alonso to finish P12. His engine blows up and he DNFs. He is scored as P20. Your math is |12 - 20| = <strong>-8 Points</strong>.</li>
             </ul>
-
             <h3>🛠️ 4. Constructor Scoring (1st, 2nd, 5th, 6th, 10th)</h3>
             <ul>
-                <li>Constructor ranks are based on the combined finishing positions of their two cars in <em>that specific race</em>, not the World Championship standings.</li>
-                <li><strong>Exact Match Bonus:</strong> +2 Points.</li>
-                <li><strong>Miss Penalty:</strong> -1 Point for every rank off.</li>
+                <li>Constructor ranks are based on the combined finishing positions of their two cars in <em>that specific race</em>.</li>
+                <li><strong>Exact Match Bonus:</strong> +2 Points. <strong>Miss Penalty:</strong> -1 Point for every rank off.</li>
             </ul>
-
             <h3>🃏 5. Wildcards & Penalties</h3>
             <ul>
-                <li><strong>Biggest Race Loser:</strong> Correctly guessing the driver who drops the most positions from their grid start to the finish line earns <strong>+5 Points</strong>. (No penalty for guessing wrong).</li>
+                <li><strong>Biggest Race Loser:</strong> Correctly guessing the driver who drops the most positions from grid to finish earns <strong>+5 Points</strong>.</li>
                 <li><strong>Sprint Weekends:</strong> On Sprint weekends, two extra wildcards activate: Sprint Gainer and Sprint Loser (<strong>+5 Points each</strong>).</li>
-                <li><strong>Missed Race:</strong> If you forget to submit a prediction before the deadline, you will receive the lowest score of the week, minus an additional 5 points.</li>
+                <li><strong>Missed Race:</strong> You receive the lowest score of the week, minus an additional 5 points.</li>
             </ul>
         </div>
     </div>
@@ -251,13 +248,11 @@
 </div>
 
 <script>
-    // --- CONFIGURATION ---
     const drivers = ["Max Verstappen", "Lando Norris", "Oscar Piastri", "Lewis Hamilton", "Charles Leclerc", "George Russell", "Carlos Sainz", "Alex Albon", "Liam Lawson", "Yuki Tsunoda", "Kimi Antonelli", "Jack Doohan", "Gabriel Bortoleto", "Isack Hadjar", "Franco Colapinto", "Oliver Bearman", "Esteban Ocon", "Pierre Gasly", "Lance Stroll", "Fernando Alonso"].sort();
     const teams = ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", "Alpine", "Williams", "RB", "Haas", "Audi"].sort();
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
-    // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
         fillDrops();
         if(!user) {
@@ -275,7 +270,6 @@
         setupSmartDrops();
     }
 
-    // --- 1. DROPDOWNS & SMART LOGIC ---
     function fillDrops() {
         const d = '<option value="">Select...</option>' + drivers.map(x=>`<option value="${x}">${x}</option>`).join('');
         const t = '<option value="">Select...</option>' + teams.map(x=>`<option value="${x}">${x}</option>`).join('');
@@ -286,17 +280,12 @@
     function setupSmartDrops() {
         const ds = document.querySelectorAll('.s-driver');
         const ts = document.querySelectorAll('.s-team');
-
         function update(group) {
             const picked = Array.from(group).map(s => s.value).filter(v => v);
             group.forEach(s => {
                 const current = s.value;
                 Array.from(s.options).forEach(o => {
-                    if (o.value && picked.includes(o.value) && o.value !== current) {
-                        o.disabled = true;
-                    } else {
-                        o.disabled = false;
-                    }
+                    o.disabled = (o.value && picked.includes(o.value) && o.value !== current) ? true : false;
                 });
             });
         }
@@ -304,7 +293,6 @@
         ts.forEach(s => s.addEventListener('change', () => update(ts)));
     }
 
-    // --- 2. RACE DATA & SPRINT ---
     async function loadRace() {
         try {
             const r = await fetch('/api/next-race').then(res=>res.json());
@@ -331,17 +319,15 @@
         }
     }
 
-    // --- 3. TAB SWITCHING ---
     async function tab(t) {
         document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
         document.getElementById(t).classList.add('active');
-        
         if(t==='live') loadLive();
         if(t==='standings') loadBoard();
         if(t==='calendar') loadCalendar();
     }
 
-    // --- 4. DATA FETCHING ---
+    // --- FULL LIVE DATA DISPLAY ---
     async function loadLive() {
         const d = await fetch('/api/predictions').then(r=>r.json());
         const list = document.getElementById('live-list');
@@ -349,9 +335,33 @@
             list.innerHTML = "<p>No predictions submitted yet for this race.</p>";
         } else {
             list.innerHTML = d.map(x=>`
-                <div style="background:#2a2a2f; padding:15px; margin-bottom:10px; border-left:4px solid var(--red); border-radius:4px;">
-                    <h3 style="margin:0 0 5px 0; color:var(--red)">${x.user_name}</h3>
-                    <div style="font-size:0.9rem">P1: <b>${x.p1}</b> | Wildcard: <b>${x.w_race_loser}</b></div>
+                <div style="background:#2a2a2f; padding:20px; margin-bottom:15px; border-left:4px solid var(--red); border-radius:4px;">
+                    <h3 style="margin:0 0 15px 0; color:var(--red); text-transform:uppercase; font-size: 1.3rem;">🏎️ ${x.user_name}</h3>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+                        <div style="background:#1a1a1f; padding: 15px; border-radius: 4px;">
+                            <strong style="color:#aaa; display:block; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">DRIVERS</strong>
+                            <div style="line-height:1.6; font-size:0.95rem;">
+                                <b>P1:</b> ${x.p1} | <b>P2:</b> ${x.p2} | <b>P3:</b> ${x.p3}<br>
+                                <b>P11:</b> ${x.p11} | <b>P12:</b> ${x.p12}<br>
+                                <b>P19:</b> ${x.p19} | <b>P20:</b> ${x.p20}
+                            </div>
+                        </div>
+                        <div style="background:#1a1a1f; padding: 15px; border-radius: 4px;">
+                            <strong style="color:#aaa; display:block; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">TEAMS</strong>
+                            <div style="line-height:1.6; font-size:0.95rem;">
+                                <b>1st:</b> ${x.c1} | <b>2nd:</b> ${x.c2}<br>
+                                <b>5th:</b> ${x.c5} | <b>6th:</b> ${x.c6}<br>
+                                <b>10th:</b> ${x.c10}
+                            </div>
+                        </div>
+                        <div style="background:#1a1a1f; padding: 15px; border-radius: 4px;">
+                            <strong style="color:#aaa; display:block; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">WILDCARDS</strong>
+                            <div style="line-height:1.6; font-size:0.95rem;">
+                                <b>Race Loser:</b> <span style="color:var(--red)">${x.w_race_loser}</span>
+                                ${x.w_sprint_gainer ? `<br><b>Sprint Gainer:</b> <span style="color:#00e160">${x.w_sprint_gainer}</span><br><b>Sprint Loser:</b> <span style="color:var(--red)">${x.w_sprint_loser}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `).join('');
         }
@@ -363,30 +373,61 @@
         if (d.length === 0) {
             board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">No players registered yet.</td></tr>';
         } else {
-            board.innerHTML = d.map((x,i)=>`<tr><td>${i+1}</td><td>${x.name}</td><td><b>${x.total_score}</b></td></tr>`).join('');
+            board.innerHTML = d.map((x,i)=>`<tr><td>${i+1}</td><td>${x.name}</td><td><b style="font-size:1.1rem">${x.total_score}</b></td></tr>`).join('');
         }
     }
 
+    // --- FULL SESSION CALENDAR DISPLAY ---
     async function loadCalendar() {
         const d = await fetch('/api/calendar').then(r=>r.json());
         const body = document.getElementById('cal-body');
+        
         body.innerHTML = d.map(x => {
-            const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-            const date = new Date(x.date).toLocaleString('en-IN', options);
+            const formatTime = (isoString) => {
+                if(!isoString) return 'TBC';
+                return new Date(isoString).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            };
+
+            let sessionHTML = '';
+            if (x.hasSprint) {
+                sessionHTML = `
+                    <div class="session-grid">
+                        <div><strong>FP1:</strong> ${formatTime(x.sessions?.fp1)}</div>
+                        <div><strong>SQ:</strong> ${formatTime(x.sessions?.sprintQuali)}</div>
+                        <div><strong>Sprint:</strong> ${formatTime(x.sessions?.sprint)}</div>
+                        <div><strong>Quali:</strong> ${formatTime(x.sessions?.quali)}</div>
+                        <div style="grid-column: 1 / -1; margin-top: 5px; color: white;">
+                            <strong style="color:var(--red)">RACE:</strong> ${formatTime(x.sessions?.race)}
+                        </div>
+                    </div>
+                `;
+            } else {
+                sessionHTML = `
+                    <div class="session-grid">
+                        <div><strong>FP1:</strong> ${formatTime(x.sessions?.fp1)}</div>
+                        <div><strong>FP2:</strong> ${formatTime(x.sessions?.fp2)}</div>
+                        <div><strong>FP3:</strong> ${formatTime(x.sessions?.fp3)}</div>
+                        <div><strong>Quali:</strong> ${formatTime(x.sessions?.quali)}</div>
+                        <div style="grid-column: 1 / -1; margin-top: 5px; color: white;">
+                            <strong style="color:var(--red)">RACE:</strong> ${formatTime(x.sessions?.race)}
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
                 <tr>
-                    <td>${x.round}</td>
-                    <td>${date}</td>
+                    <td style="vertical-align: top; font-size: 1.2rem; font-weight: bold;">${x.round}</td>
                     <td>
-                        ${x.name}
-                        ${x.hasSprint ? '<span class="sprint-badge">Sprint</span>' : ''}
+                        <strong style="font-size:1.2rem; display:inline-block; margin-bottom: 5px;">${x.name}</strong> 
+                        ${x.hasSprint ? '<span class="sprint-badge">Sprint Weekend</span>' : ''}
+                        ${sessionHTML}
                     </td>
                 </tr>
             `;
         }).join('');
     }
 
-    // --- 5. SUBMIT & ADMIN ---
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
         const body = {
@@ -419,7 +460,6 @@
         }
     }
 
-    // --- 6. AUTH ---
     async function login() {
         const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
         const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
