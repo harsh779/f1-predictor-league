@@ -13,13 +13,13 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN
 });
 
-// --- 1. DATABASE SETUP (ALL FIELDS) ---
+// --- 1. DATABASE SETUP ---
 async function setupDatabase() {
   try {
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0)`);
     
-    // Updated Schema: Includes P11, P12, and Sprint Wildcards
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions (
+    // UPDATED: Changed table name to 'f1_predictions_v2' to fix the column error
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         user_name TEXT UNIQUE, 
         p1 TEXT, p2 TEXT, p3 TEXT, 
@@ -29,12 +29,12 @@ async function setupDatabase() {
         w_race_loser TEXT, 
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
-    console.log("✅ Database Synced: Full 2026 Schema Ready.");
+    console.log("✅ Database Synced: v2 Table Ready.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
 
-// --- 2. 2026 CALENDAR (OFFICIAL START TIMES) ---
+// --- 2. 2026 CALENDAR ---
 const f1Calendar2026 = [
   { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-08T05:00:00Z" },
   { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-15T08:00:00Z" },
@@ -96,7 +96,7 @@ async function performFinalization() {
     
     const raceData = races[0];
     const results = raceData.Results;
-    const check = await db.execute("SELECT count(*) as count FROM f1_predictions");
+    const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v2");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions." };
 
     // Parse Results
@@ -126,7 +126,7 @@ async function performFinalization() {
     });
 
     // Score Calculations
-    const predictions = await db.execute("SELECT * FROM f1_predictions").then(r => r.rows);
+    const predictions = await db.execute("SELECT * FROM f1_predictions_v2").then(r => r.rows);
     let scores = {}; let lowest = Infinity;
 
     predictions.forEach(p => {
@@ -150,7 +150,6 @@ async function performFinalization() {
         
         evalC(p.c1, 1); evalC(p.c2, 2); evalC(p.c5, 5); evalC(p.c6, 6); evalC(p.c10, 10);
         if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) score += 5;
-        // NOTE: Sprint scoring would need Sprint Results API, usually separate. For now, we assume +5 manual bonus if needed or expand API call.
 
         scores[p.user_name] = score;
         if (score < lowest) lowest = score;
@@ -163,7 +162,7 @@ async function performFinalization() {
         await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
     }
 
-    await db.execute("DELETE FROM f1_predictions");
+    await db.execute("DELETE FROM f1_predictions_v2");
     await sendDiscordNotification(`🏁 **${raceData.raceName}** Finalized! Standings Updated.`);
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
@@ -172,27 +171,25 @@ async function performFinalization() {
 // --- 5. ROUTES ---
 app.get('/api/next-race', (req, res) => {
     const now = new Date();
-    const next = f1Calendar2026.find(r => new Date(r.date) > now) || f1Calendar2026[23];
+    const next = f1Calendar2026.find(r => new Date(r.date) > now) || f1Calendar2026[f1Calendar2026.length-1];
     res.json(next);
 });
 
 app.post('/predict', async (req, res) => {
     const d = req.body;
     const auth = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [d.user_name, d.password] });
-    if (auth.rows.length === 0) return res.status(401).json({ success: false });
+    if (auth.rows.length === 0) return res.status(401).json({ success: false, message: "Login failed" });
 
     // LOCK CHECK
     const now = new Date();
-    const next = f1Calendar2026.find(r => new Date(r.date) > now); // Strictly future races
-    // If the "next race" in the calendar is basically "now" or we are past the start time of the target race:
-    // Ideally pass the round number from frontend to be safer, but time check works:
-    // If user tries to submit, and we find the closest race is in the past, block.
-    // For simplicity: Frontend handles disabling, Backend accepts if valid user. 
-    // *Production Note: Strict backend timestamp check recommended.*
+    const next = f1Calendar2026.find(r => new Date(r.date) > now); 
+    // If NO future race is found, or we are currently in "Post-Race" limbo before finalization:
+    if (!next) return res.status(403).json({ success: false, message: "Season Over" });
 
+    // DATABASE SAVE
     try {
         await db.execute({
-            sql: `INSERT INTO f1_predictions (user_name, p1, p2, p3, p11, p12, p19, p20, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser) 
+            sql: `INSERT INTO f1_predictions_v2 (user_name, p1, p2, p3, p11, p12, p19, p20, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser) 
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
                   ON CONFLICT(user_name) DO UPDATE SET 
                   p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p11=excluded.p11, p12=excluded.p12, p19=excluded.p19, p20=excluded.p20, 
@@ -201,7 +198,10 @@ app.post('/predict', async (req, res) => {
             args: [d.user_name, d.p1, d.p2, d.p3, d.p11, d.p12, d.p19, d.p20, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
         });
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false }); }
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ success: false, message: e.message }); 
+    }
 });
 
 app.post('/api/finalize', async (req, res) => {
@@ -212,7 +212,7 @@ app.post('/api/finalize', async (req, res) => {
 
 app.post('/register', async (req, res) => {
     try { await db.execute({ sql: "INSERT INTO f1_drivers (name, password) VALUES (?, ?)", args: [req.body.name, req.body.password] }); res.json({ success: true, message: "Registered!" }); } 
-    catch (e) { res.status(400).json({ success: false, message: "Taken." }); }
+    catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
 });
 
 app.post('/login', async (req, res) => {
@@ -222,7 +222,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/api/predictions', async (req, res) => {
-    const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions p JOIN f1_drivers d ON p.user_name = d.name");
+    const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v2 p JOIN f1_drivers d ON p.user_name = d.name");
     res.json(r.rows);
 });
 
@@ -231,7 +231,6 @@ app.get('/api/season-leaderboard', async (req, res) => {
     res.json(r.rows);
 });
 
-// Organic Watcher (15 mins)
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
     const now = new Date();

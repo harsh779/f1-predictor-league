@@ -8,127 +8,198 @@
     <style>
         :root { --red: #e10600; --bg: #15151e; --card: #1f1f23; --text: #fff; }
         body { margin:0; font-family:'Titillium Web',sans-serif; background:var(--bg); color:var(--text); }
-        header { background:var(--red); padding:15px; display:flex; justify-content:space-between; align-items:center; }
-        nav button { background:none; border:none; color:white; font-weight:bold; cursor:pointer; font-size:1rem; margin-left:10px; }
+        
+        /* Navigation */
+        header { background:var(--red); padding:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap;}
+        h1 { margin: 0; font-size: 1.5rem; font-style: italic; }
+        nav { display: flex; gap: 10px; }
+        nav button { background:rgba(0,0,0,0.2); border:none; color:white; font-weight:bold; cursor:pointer; padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; }
+        nav button:hover { background:rgba(255,255,255,0.3); }
+        
+        /* Layout */
         main { padding:20px; max-width:900px; margin:0 auto; }
-        .tab { display:none; } .active { display:block; }
+        .tab { display:none; animation: fadeIn 0.3s; } 
+        .active { display:block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Forms */
         .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:30px; }
-        select, input { width:100%; padding:10px; margin:5px 0 15px; background:#2a2a2f; border:1px solid #444; color:white; border-radius:4px; }
-        label { font-size:0.9rem; color:#aaa; font-weight:bold; display:block; text-transform:uppercase; }
-        .btn { background:var(--red); color:white; border:none; padding:15px; width:100%; font-weight:bold; cursor:pointer; border-radius:4px; margin-top:20px; }
-        .admin-box { margin-top:40px; border:2px solid var(--red); padding:20px; background:rgba(225,6,0,0.1); border-radius:8px; display:none; }
-        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:none; justify-content:center; align-items:center; z-index:999; }
-        .modal-box { background:#222; padding:30px; border-radius:8px; width:90%; max-width:400px; text-align:center; border:1px solid #444; }
-        .hidden { display:none; }
-        /* Disabled option style */
+        @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
+        
+        select, input { width:100%; padding:12px; margin:5px 0 15px; background:#2a2a2f; border:1px solid #444; color:white; border-radius:4px; box-sizing: border-box; }
+        select:focus { border-color: var(--red); outline: none; }
         option:disabled { color: #555; background: #1a1a1a; }
+        
+        label { font-size:0.9rem; color:#aaa; font-weight:bold; display:block; text-transform:uppercase; margin-top: 10px; }
+        
+        /* Buttons */
+        .btn { background:var(--red); color:white; border:none; padding:15px; width:100%; font-weight:bold; cursor:pointer; border-radius:4px; margin-top:20px; font-size: 1.1rem; }
+        .btn:hover { background: #b30000; }
+        
+        /* Admin Box */
+        .admin-box { margin-top:40px; border:2px solid var(--red); padding:20px; background:rgba(225,6,0,0.1); border-radius:8px; display:none; text-align: center; }
+        
+        /* Tables */
+        table { width:100%; border-collapse:collapse; background: var(--card); border-radius: 8px; overflow: hidden; margin-top: 20px; }
+        th { background:#2a2a2f; color:var(--red); padding:15px; text-align:left; text-transform: uppercase; font-size: 0.85rem; }
+        td { padding:15px; border-bottom:1px solid #333; }
+        
+        /* Rules List */
+        .rules-list { line-height: 1.6; background: var(--card); padding: 20px 40px; border-radius: 8px; border-left: 4px solid var(--red); }
+        .rules-list li { margin-bottom: 15px; }
+        
+        /* Login Modal */
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:999; }
+        .modal-box { background:#222; padding:40px; border-radius:8px; width:90%; max-width:400px; text-align:center; border:1px solid #444; }
+        .hidden { display:none; }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>🏁 F1 2026</h1>
+    <h1>🏎️ F1 2026</h1>
     <nav>
         <button onclick="tab('predict')">Predict</button>
         <button onclick="tab('live')">Live</button>
         <button onclick="tab('standings')">Standings</button>
-        <button onclick="logout()">Exit</button>
+        <button onclick="tab('rules')">📜 Rules</button>
+        <button onclick="logout()">Logout</button>
     </nav>
 </header>
 
 <main>
     <div id="predict" class="tab active">
-        <h2>Next: <span id="r-name" style="color:var(--red)">Loading...</span></h2>
-        <div id="locked-msg" style="display:none; background:var(--red); padding:10px; text-align:center;">🚫 RACE LOCKED</div>
+        <h2>Next Race: <span id="r-name" style="color:var(--red)">Loading...</span></h2>
+        <div id="locked-msg" style="display:none; background:var(--red); padding:15px; text-align:center; font-weight: bold; border-radius: 4px;">🚫 PREDICTIONS LOCKED</div>
         
         <form id="p-form">
             <div class="form-grid">
                 <div>
-                    <h3>Drivers</h3>
+                    <h3 style="border-bottom: 1px solid #444; padding-bottom: 10px;">Driver Positions</h3>
                     <label>P1 Winner</label><select id="p1" class="s-driver" required></select>
                     <label>P2 Runner Up</label><select id="p2" class="s-driver" required></select>
                     <label>P3 Third</label><select id="p3" class="s-driver" required></select>
-                    <hr style="border-color:#333">
-                    <label>P11 (Missed Points)</label><select id="p11" class="s-driver" required></select>
+                    
+                    <hr style="border-color:#333; margin: 20px 0;">
+                    
+                    <label>P11 (Just Missed Points)</label><select id="p11" class="s-driver" required></select>
                     <label>P12</label><select id="p12" class="s-driver" required></select>
-                    <hr style="border-color:#333">
+                    
+                    <hr style="border-color:#333; margin: 20px 0;">
+                    
                     <label>P19</label><select id="p19" class="s-driver" required></select>
-                    <label>P20 Last</label><select id="p20" class="s-driver" required></select>
+                    <label>P20 Last Place</label><select id="p20" class="s-driver" required></select>
                 </div>
 
                 <div>
-                    <h3>Constructors</h3>
+                    <h3 style="border-bottom: 1px solid #444; padding-bottom: 10px;">Constructors & Bonus</h3>
                     <label>1st Team</label><select id="c1" class="s-team" required></select>
                     <label>2nd Team</label><select id="c2" class="s-team" required></select>
                     <label>5th Team</label><select id="c5" class="s-team" required></select>
                     <label>6th Team</label><select id="c6" class="s-team" required></select>
                     <label>10th Team</label><select id="c10" class="s-team" required></select>
 
-                    <h3>Wildcards</h3>
+                    <h3 style="margin-top: 30px; border-bottom: 1px solid #444; padding-bottom: 10px;">Wildcards</h3>
                     <label style="color:var(--red)">Race: Biggest Loser</label>
                     <select id="wl" class="s-wildcard" required></select>
 
-                    <div id="sprint-box" class="hidden" style="border:1px solid var(--red); padding:10px; margin-top:10px; border-radius:4px;">
-                        <h4 style="margin:0 0 10px; color:var(--red)">⚡ SPRINT WEEKEND</h4>
-                        <label>Sprint Gainer</label><select id="sg" class="s-wildcard"></select>
-                        <label>Sprint Loser</label><select id="sl" class="s-wildcard"></select>
+                    <div id="sprint-box" class="hidden" style="border:1px solid var(--red); padding:15px; margin-top:20px; border-radius:4px; background: rgba(225, 6, 0, 0.05);">
+                        <h4 style="margin:0 0 10px; color:var(--red); text-transform: uppercase;">⚡ Sprint Weekend Bonus</h4>
+                        <label>Sprint: Biggest Gainer</label><select id="sg" class="s-wildcard"></select>
+                        <label>Sprint: Biggest Loser</label><select id="sl" class="s-wildcard"></select>
                     </div>
                 </div>
             </div>
-            <button type="submit" class="btn" id="sub-btn">LOCK STRATEGY</button>
+            <button type="submit" class="btn" id="sub-btn">🔒 LOCK IN STRATEGY</button>
         </form>
     </div>
 
     <div id="live" class="tab">
         <h2>Live Predictions</h2>
-        <div id="live-list"></div>
+        <p style="color: #888; font-size: 0.9rem;">Strategies locked for this weekend:</p>
+        <div id="live-list">Loading...</div>
+        
         <div id="admin-panel" class="admin-box">
             <h3>⚠️ STEWARDS CONTROL</h3>
-            <button onclick="finalize()" style="background:var(--red); color:white; padding:10px; cursor:pointer;">Finalize Weekend</button>
-            <p id="adm-stat"></p>
+            <p>Calculate scores and reset grid.</p>
+            <button onclick="finalize()" style="background:var(--red); color:white; padding:12px 24px; cursor:pointer; border: none; font-weight: bold; border-radius: 4px;">Finalize Race Weekend</button>
+            <p id="adm-stat" style="margin-top: 10px; font-weight: bold;"></p>
         </div>
     </div>
 
     <div id="standings" class="tab">
-        <h2>Championship</h2>
-        <table style="width:100%; border-collapse:collapse;">
-            <thead><tr style="background:#333; color:var(--red);"><th style="padding:10px; text-align:left;">Pos</th><th>Driver</th><th>Points</th></tr></thead>
-            <tbody id="leaderboard"></tbody>
+        <h2>Season Standings</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 10%;">Pos</th>
+                    <th>Driver</th>
+                    <th style="width: 20%;">Points</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard">
+                <tr><td colspan="3" style="text-align:center; color: #888;">Loading data...</td></tr>
+            </tbody>
         </table>
+    </div>
+
+    <div id="rules" class="tab">
+        <h2>📜 Official 2026 Regulations</h2>
+        <ul class="rules-list">
+            <li><strong>The Baseline:</strong> Every driver starts the weekend with 0 points.</li>
+            <li><strong>Position Scoring (P1, P2, P3, P11, P12, P19, P20):</strong>
+                <br>• <strong>Exact Match:</strong> +2 Points.
+                <br>• <strong>Missed:</strong> -1 Point for every position you are off.
+            </li>
+            <li><strong>Constructor Scoring (1st, 2nd, 5th, 6th, 10th):</strong>
+                <br>• <strong>Exact Match:</strong> +2 Points.
+                <br>• <strong>Missed:</strong> -1 Point for every rank you are off.
+            </li>
+            <li><strong>Wildcards:</strong>
+                <br>• <strong>Race Loser:</strong> +5 Points (Correctly guess most positions lost).
+                <br>• <strong>Sprint Gainer/Loser:</strong> +5 Points each (Only on Sprint Weekends).
+            </li>
+            <li><strong>Missed Race Penalty:</strong> You receive the lowest score of the week minus 5 points.</li>
+        </ul>
     </div>
 </main>
 
-<div id="auth" class="modal" style="display:flex;">
+<div id="auth" class="modal">
     <div class="modal-box">
-        <h2>Login</h2>
-        <input type="text" id="u-name" placeholder="Name">
+        <h2>Paddock Entry</h2>
+        <input type="text" id="u-name" placeholder="Driver Name">
         <input type="password" id="u-pass" placeholder="Password">
-        <button onclick="login()" class="btn">Enter</button>
-        <button onclick="reg()" class="btn" style="background:#444;">Register</button>
+        <button onclick="login()" class="btn">Enter Garage</button>
+        <button onclick="reg()" class="btn" style="background:#444; margin-top: 10px;">Register New Driver</button>
     </div>
 </div>
 
 <script>
-    // DATA
+    // --- CONFIGURATION ---
     const drivers = ["Max Verstappen", "Lando Norris", "Oscar Piastri", "Lewis Hamilton", "Charles Leclerc", "George Russell", "Carlos Sainz", "Alex Albon", "Liam Lawson", "Yuki Tsunoda", "Kimi Antonelli", "Jack Doohan", "Gabriel Bortoleto", "Isack Hadjar", "Franco Colapinto", "Oliver Bearman", "Esteban Ocon", "Pierre Gasly", "Lance Stroll", "Fernando Alonso"].sort();
     const teams = ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", "Alpine", "Williams", "RB", "Haas", "Audi"].sort();
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
-    // INIT
+    // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
         fillDrops();
-        if(user) { document.getElementById('auth').style.display='none'; start(); }
+        if(!user) {
+            document.getElementById('auth').style.display='flex';
+        } else {
+            document.getElementById('auth').style.display='none';
+            start();
+        }
     });
 
     function start() {
         checkAdm();
         loadRace();
-        loadBoard();
-        setupSmartDrops(); // Enable anti-repetition logic
+        loadBoard(); // Load standings immediately
+        setupSmartDrops();
     }
 
-    // 1. DROPDOWNS & SMART LOGIC
+    // --- 1. DROPDOWNS & SMART LOGIC ---
     function fillDrops() {
         const d = '<option value="">Select...</option>' + drivers.map(x=>`<option value="${x}">${x}</option>`).join('');
         const t = '<option value="">Select...</option>' + teams.map(x=>`<option value="${x}">${x}</option>`).join('');
@@ -137,15 +208,20 @@
     }
 
     function setupSmartDrops() {
-        const ds = document.querySelectorAll('.s-driver'); // Only race positions
+        const ds = document.querySelectorAll('.s-driver');
         const ts = document.querySelectorAll('.s-team');
 
         function update(group) {
             const picked = Array.from(group).map(s => s.value).filter(v => v);
             group.forEach(s => {
+                const current = s.value;
                 Array.from(s.options).forEach(o => {
-                    if (o.value && picked.includes(o.value) && o.value !== s.value) o.disabled = true;
-                    else o.disabled = false;
+                    // Disable if picked elsewhere AND not currently selected here
+                    if (o.value && picked.includes(o.value) && o.value !== current) {
+                        o.disabled = true;
+                    } else {
+                        o.disabled = false;
+                    }
                 });
             });
         }
@@ -153,50 +229,76 @@
         ts.forEach(s => s.addEventListener('change', () => update(ts)));
     }
 
-    // 2. RACE & SPRINT LOGIC
+    // --- 2. RACE DATA & SPRINT ---
     async function loadRace() {
-        const r = await fetch('/api/next-race').then(res=>res.json());
-        document.getElementById('r-name').innerText = r.name;
-        raceLock = new Date(r.date);
+        try {
+            const r = await fetch('/api/next-race').then(res=>res.json());
+            document.getElementById('r-name').innerText = r.name;
+            raceLock = new Date(r.date);
+            
+            // Sprint Toggle
+            const sp = document.getElementById('sprint-box');
+            if (r.hasSprint) {
+                sp.classList.remove('hidden');
+                document.getElementById('sg').required = true;
+                document.getElementById('sl').required = true;
+            } else {
+                sp.classList.add('hidden');
+                document.getElementById('sg').required = false;
+                document.getElementById('sl').required = false;
+            }
+            
+            // Lock Check
+            if (new Date() > raceLock) {
+                document.getElementById('p-form').style.display = 'none';
+                document.getElementById('locked-msg').style.display = 'block';
+            }
+        } catch (e) {
+            console.log("API Error");
+        }
+    }
+
+    // --- 3. TAB SWITCHING ---
+    async function tab(t) {
+        document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+        document.getElementById(t).classList.add('active');
         
-        // Sprint Toggle
-        const sp = document.getElementById('sprint-box');
-        if (r.hasSprint) {
-            sp.classList.remove('hidden');
-            document.getElementById('sg').required = true;
-            document.getElementById('sl').required = true;
+        if(t==='live') loadLive();
+        if(t==='standings') loadBoard();
+    }
+
+    // --- 4. DATA FETCHING ---
+    async function loadLive() {
+        const d = await fetch('/api/predictions').then(r=>r.json());
+        const list = document.getElementById('live-list');
+        if (d.length === 0) {
+            list.innerHTML = "<p>No predictions submitted yet for this race.</p>";
         } else {
-            sp.classList.add('hidden');
-            document.getElementById('sg').required = false;
-            document.getElementById('sl').required = false;
-        }
-        
-        // Lock Check
-        if (new Date() > raceLock) {
-            document.getElementById('p-form').style.display = 'none';
-            document.getElementById('locked-msg').style.display = 'block';
+            list.innerHTML = d.map(x=>`
+                <div style="background:#2a2a2f; padding:15px; margin-bottom:10px; border-left:4px solid var(--red); border-radius:4px;">
+                    <h3 style="margin:0 0 5px 0; color:var(--red)">${x.user_name}</h3>
+                    <div style="font-size:0.9rem">P1: <b>${x.p1}</b> | Wildcard: <b>${x.w_race_loser}</b></div>
+                </div>
+            `).join('');
         }
     }
 
-    // 3. AUTH & ADMIN
-    async function login() {
-        const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
-        const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
-        if(res.ok) { localStorage.setItem('f1_user', JSON.stringify({name, password})); location.reload(); }
-        else alert('Fail');
-    }
-    async function reg() {
-        const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
-        await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
-        alert('Registered');
-    }
-    function logout() { localStorage.clear(); location.reload(); }
-    
-    function checkAdm() {
-        if(user && user.name === 'admin') document.getElementById('admin-panel').style.display = 'block';
+    async function loadBoard() {
+        const d = await fetch('/api/season-leaderboard').then(r=>r.json());
+        const board = document.getElementById('leaderboard');
+        if (d.length === 0) {
+            board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">No drivers registered yet.</td></tr>';
+        } else {
+            board.innerHTML = d.map((x,i)=>`
+                <tr>
+                    <td>${i+1}</td>
+                    <td>${x.name}</td>
+                    <td><b>${x.total_score}</b></td>
+                </tr>`).join('');
+        }
     }
 
-    // 4. SUBMIT & DATA
+    // --- 5. SUBMIT & ADMIN ---
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
         const body = {
@@ -208,28 +310,44 @@
             w_sprint_loser: document.getElementById('sl').value
         };
         const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-        if(res.ok) alert('Locked!'); else alert('Error or Locked');
+        if(res.ok) alert('✅ Strategy Locked!'); 
+        else {
+            const err = await res.json();
+            alert('Error: ' + (err.message || 'Locked or Failed'));
+        }
     });
     function val(id) { return document.getElementById(id).value; }
 
-    async function tab(t) {
-        document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
-        document.getElementById(t).classList.add('active');
-        if(t==='live') {
-            const d = await fetch('/api/predictions').then(r=>r.json());
-            document.getElementById('live-list').innerHTML = d.map(x=>`<div style="background:#333; padding:10px; margin:5px; border-left:3px solid var(--red)"><b>${x.user_name}</b> | P1: ${x.p1}</div>`).join('');
+    async function finalize() {
+        if(!confirm('⚠️ Are you sure? This ends the race weekend.')) return;
+        document.getElementById('adm-stat').innerText = 'Processing scores...';
+        const res = await fetch('/api/finalize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_name:user.name, password:user.password}) });
+        const d = await res.json();
+        if(res.ok) {
+            document.getElementById('adm-stat').innerText = '✅ Success!';
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            document.getElementById('adm-stat').innerText = '❌ Error: ' + d.message;
         }
     }
-    async function loadBoard() {
-        const d = await fetch('/api/season-leaderboard').then(r=>r.json());
-        document.getElementById('leaderboard').innerHTML = d.map((x,i)=>`<tr><td style="padding:10px; border-bottom:1px solid #444">${i+1}</td><td style="border-bottom:1px solid #444">${x.name}</td><td style="border-bottom:1px solid #444">${x.total_score}</td></tr>`).join('');
-    }
 
-    async function finalize() {
-        if(!confirm('Finalize?')) return;
-        document.getElementById('adm-stat').innerText = 'Processing...';
-        const res = await fetch('/api/finalize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_name:user.name, password:user.password}) });
-        if(res.ok) location.reload(); else alert('Error');
+    // --- 6. AUTH ---
+    async function login() {
+        const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
+        const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
+        if(res.ok) { localStorage.setItem('f1_user', JSON.stringify({name, password})); location.reload(); }
+        else alert('Invalid Credentials');
+    }
+    async function reg() {
+        const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
+        const res = await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
+        if(res.ok) alert('Registered! Please Login.');
+        else alert('Username taken.');
+    }
+    function logout() { localStorage.clear(); location.reload(); }
+    
+    function checkAdm() {
+        if(user && user.name === 'admin') document.getElementById('admin-panel').style.display = 'block';
     }
 </script>
 </body>
