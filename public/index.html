@@ -12,7 +12,7 @@
         /* Navigation */
         header { background:var(--red); padding:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap;}
         h1 { margin: 0; font-size: 1.5rem; font-style: italic; }
-        nav { display: flex; gap: 10px; }
+        nav { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;}
         nav button { background:rgba(0,0,0,0.2); border:none; color:white; font-weight:bold; cursor:pointer; padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; }
         nav button:hover { background:rgba(255,255,255,0.3); }
         
@@ -47,6 +47,7 @@
         /* Rules List */
         .rules-list { line-height: 1.6; background: var(--card); padding: 20px 40px; border-radius: 8px; border-left: 4px solid var(--red); }
         .rules-list li { margin-bottom: 15px; }
+        .rules-list h3 { color: var(--red); margin-bottom: 5px; margin-top: 20px;}
         
         /* Login Modal */
         .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:999; }
@@ -58,13 +59,14 @@
 <body>
 
 <header>
-    <h1>🏎️ F1 2026</h1>
+    <h1>🏎️ F1 2026 LEAGUE</h1>
     <nav>
         <button onclick="tab('predict')">Predict</button>
         <button onclick="tab('live')">Live</button>
         <button onclick="tab('standings')">Standings</button>
         <button onclick="tab('calendar')">📅 Calendar</button>
         <button onclick="tab('rules')">📜 Rules</button>
+        <button onclick="tab('archive')">🏆 2025 Archive</button>
         <button onclick="logout()">Logout</button>
     </nav>
 </header>
@@ -72,7 +74,7 @@
 <main>
     <div id="predict" class="tab active">
         <h2>Next Race: <span id="r-name" style="color:var(--red)">Loading...</span></h2>
-        <div id="locked-msg" style="display:none; background:var(--red); padding:15px; text-align:center; font-weight: bold; border-radius: 4px;">🚫 PREDICTIONS LOCKED</div>
+        <div id="locked-msg" style="display:none; background:var(--red); padding:15px; text-align:center; font-weight: bold; border-radius: 4px;">🚫 PREDICTIONS LOCKED (CARS ON TRACK)</div>
         
         <form id="p-form">
             <div class="form-grid">
@@ -126,12 +128,12 @@
     </div>
 
     <div id="standings" class="tab">
-        <h2>Season Standings</h2>
+        <h2>2026 Season Standings</h2>
         <table>
             <thead>
                 <tr>
                     <th style="width: 10%;">Pos</th>
-                    <th>Driver</th>
+                    <th>Player</th>
                     <th style="width: 20%;">Points</th>
                 </tr>
             </thead>
@@ -147,7 +149,7 @@
             <thead>
                 <tr>
                     <th>Round</th>
-                    <th>Date</th>
+                    <th>Date (IST)</th>
                     <th>Grand Prix</th>
                 </tr>
             </thead>
@@ -158,23 +160,83 @@
     </div>
 
     <div id="rules" class="tab">
-        <h2>📜 Official 2026 Regulations</h2>
-        <ul class="rules-list">
-            <li><strong>The Baseline:</strong> Every driver starts the weekend with 0 points.</li>
-            <li><strong>Position Scoring (P1, P2, P3, P11, P12, P19, P20):</strong>
-                <br>• <strong>Exact Match:</strong> +2 Points.
-                <br>• <strong>Missed:</strong> -1 Point for every position you are off.
-            </li>
-            <li><strong>Constructor Scoring (1st, 2nd, 5th, 6th, 10th):</strong>
-                <br>• <strong>Exact Match:</strong> +2 Points.
-                <br>• <strong>Missed:</strong> -1 Point for every rank you are off.
-            </li>
-            <li><strong>Wildcards:</strong>
-                <br>• <strong>Race Loser:</strong> +5 Points (Correctly guess most positions lost).
-                <br>• <strong>Sprint Gainer/Loser:</strong> +5 Points each (Only on Sprint Weekends).
-            </li>
-            <li><strong>Missed Race Penalty:</strong> You receive the lowest score of the week minus 5 points.</li>
-        </ul>
+        <h2>📜 Official League Regulations</h2>
+        <div class="rules-list">
+            <h3>⏰ 1. The Deadline</h3>
+            <ul>
+                <li>Predictions are <strong>strictly locked</strong> the exact minute that <strong>Practice 1 (P1)</strong> begins on Friday (or Sprint Qualifying on Sprint weekends).</li>
+                <li>Once cars are on track, no changes can be made.</li>
+            </ul>
+
+            <h3>🏎️ 2. Driver Scoring (P1, P2, P3, P11, P12, P19, P20)</h3>
+            <ul>
+                <li><strong>Baseline:</strong> Everyone starts the race at 0 points.</li>
+                <li><strong>Exact Match Bonus:</strong> If you guess the driver's exact finishing position, you get <strong>+2 Points</strong>.</li>
+                <li><strong>Miss Penalty:</strong> You lose <strong>-1 Point</strong> for every position your prediction is away from the actual result. (e.g., If you guess P1, and they finish P3, you lose -2 points).</li>
+            </ul>
+
+            <h3>💥 3. The DNF Rule (Did Not Finish)</h3>
+            <ul>
+                <li>If a driver retires, crashes, or fails to finish the race (DNF), they are automatically scored as finishing in <strong>P20</strong> for our math.</li>
+                <li><em>Example:</em> You predict Alonso to finish P12. His engine blows up and he DNFs. He is scored as P20. Your math is |12 - 20| = <strong>-8 Points</strong>.</li>
+            </ul>
+
+            <h3>🛠️ 4. Constructor Scoring (1st, 2nd, 5th, 6th, 10th)</h3>
+            <ul>
+                <li>Constructor ranks are based on the combined finishing positions of their two cars in <em>that specific race</em>, not the World Championship standings.</li>
+                <li><strong>Exact Match Bonus:</strong> +2 Points.</li>
+                <li><strong>Miss Penalty:</strong> -1 Point for every rank off.</li>
+            </ul>
+
+            <h3>🃏 5. Wildcards & Penalties</h3>
+            <ul>
+                <li><strong>Biggest Race Loser:</strong> Correctly guessing the driver who drops the most positions from their grid start to the finish line earns <strong>+5 Points</strong>. (No penalty for guessing wrong).</li>
+                <li><strong>Sprint Weekends:</strong> On Sprint weekends, two extra wildcards activate: Sprint Gainer and Sprint Loser (<strong>+5 Points each</strong>).</li>
+                <li><strong>Missed Race:</strong> If you forget to submit a prediction before the deadline, you will receive the lowest score of the week, minus an additional 5 points.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="archive" class="tab">
+        <h2>🏆 2025 Final Standings</h2>
+        <div class="form-grid">
+            <div>
+                <h3 style="color: var(--red);">Drivers' Championship</h3>
+                <table>
+                    <thead><tr><th>Pos</th><th>Driver</th><th>Pts</th></tr></thead>
+                    <tbody>
+                        <tr><td>1</td><td>Lando Norris</td><td>423</td></tr>
+                        <tr><td>2</td><td>Max Verstappen</td><td>421</td></tr>
+                        <tr><td>3</td><td>Oscar Piastri</td><td>410</td></tr>
+                        <tr><td>4</td><td>George Russell</td><td>319</td></tr>
+                        <tr><td>5</td><td>Charles Leclerc</td><td>242</td></tr>
+                        <tr><td>6</td><td>Lewis Hamilton</td><td>156</td></tr>
+                        <tr><td>7</td><td>Andrea Kimi Antonelli</td><td>150</td></tr>
+                        <tr><td>8</td><td>Alexander Albon</td><td>73</td></tr>
+                        <tr><td>9</td><td>Carlos Sainz</td><td>64</td></tr>
+                        <tr><td>10</td><td>Fernando Alonso</td><td>56</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h3 style="color: var(--red);">Constructors' Championship</h3>
+                <table>
+                    <thead><tr><th>Pos</th><th>Team</th><th>Pts</th></tr></thead>
+                    <tbody>
+                        <tr><td>1</td><td>McLaren</td><td>833</td></tr>
+                        <tr><td>2</td><td>Mercedes</td><td>469</td></tr>
+                        <tr><td>3</td><td>Red Bull Racing</td><td>451</td></tr>
+                        <tr><td>4</td><td>Ferrari</td><td>398</td></tr>
+                        <tr><td>5</td><td>Williams</td><td>137</td></tr>
+                        <tr><td>6</td><td>Racing Bulls</td><td>92</td></tr>
+                        <tr><td>7</td><td>Aston Martin</td><td>89</td></tr>
+                        <tr><td>8</td><td>Haas</td><td>79</td></tr>
+                        <tr><td>9</td><td>Kick Sauber</td><td>70</td></tr>
+                        <tr><td>10</td><td>Alpine</td><td>22</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -276,7 +338,7 @@
         
         if(t==='live') loadLive();
         if(t==='standings') loadBoard();
-        if(t==='calendar') loadCalendar(); // NEW
+        if(t==='calendar') loadCalendar();
     }
 
     // --- 4. DATA FETCHING ---
@@ -299,7 +361,7 @@
         const d = await fetch('/api/season-leaderboard').then(r=>r.json());
         const board = document.getElementById('leaderboard');
         if (d.length === 0) {
-            board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">No drivers registered yet.</td></tr>';
+            board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">No players registered yet.</td></tr>';
         } else {
             board.innerHTML = d.map((x,i)=>`<tr><td>${i+1}</td><td>${x.name}</td><td><b>${x.total_score}</b></td></tr>`).join('');
         }
@@ -309,7 +371,8 @@
         const d = await fetch('/api/calendar').then(r=>r.json());
         const body = document.getElementById('cal-body');
         body.innerHTML = d.map(x => {
-            const date = new Date(x.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            const date = new Date(x.date).toLocaleString('en-IN', options);
             return `
                 <tr>
                     <td>${x.round}</td>
