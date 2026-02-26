@@ -33,32 +33,82 @@ async function setupDatabase() {
 }
 setupDatabase();
 
-// --- 2. 2026 CALENDAR ---
+// --- 2. 2026 CALENDAR (LOCKED TO P1 START - IN IST) ---
+// The format is: YYYY-MM-DDTHH:mm:ss+05:30
+// This tells the server: "These times are in IST."
+
 const f1Calendar2026 = [
-  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-08T05:00:00Z" },
-  { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-15T08:00:00Z" },
-  { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-29T06:00:00Z" },
-  { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-12T15:00:00Z" },
-  { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-19T17:00:00Z" },
-  { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-03T20:00:00Z" },
-  { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-24T18:00:00Z" },
-  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-07T13:00:00Z" },
-  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-14T13:00:00Z" },
-  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-28T13:00:00Z" },
-  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-05T14:00:00Z" },
-  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-19T13:00:00Z" },
-  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-26T13:00:00Z" },
-  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-23T13:00:00Z" },
-  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-06T13:00:00Z" },
-  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-13T13:00:00Z" },
-  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-26T12:00:00Z" },
-  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-11T12:00:00Z" },
-  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-25T19:00:00Z" },
-  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-11-01T20:00:00Z" },
-  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-08T17:00:00Z" },
-  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-21T06:00:00Z" },
-  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-29T16:00:00Z" },
-  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-06T13:00:00Z" }
+  // Round 1: Australia (12:30 PM Local -> 07:00 AM IST)
+  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-06T07:00:00+05:30" },
+  
+  // Round 2: China (11:30 AM Local -> 09:00 AM IST) - Sprint
+  { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-13T09:00:00+05:30" },
+  
+  // Round 3: Japan (11:30 AM Local -> 08:00 AM IST)
+  { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-27T08:00:00+05:30" },
+  
+  // Round 4: Bahrain (2:30 PM Local -> 5:00 PM IST)
+  { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-10T17:00:00+05:30" },
+  
+  // Round 5: Saudi Arabia (4:30 PM Local -> 7:00 PM IST)
+  { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-17T19:00:00+05:30" },
+  
+  // Round 6: Miami (12:30 PM Local -> 10:00 PM IST) - Sprint
+  { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-01T22:00:00+05:30" },
+  
+  // Round 7: Canada (1:30 PM Local -> 11:00 PM IST) - Sprint
+  { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-22T23:00:00+05:30" },
+  
+  // Round 8: Monaco (1:30 PM Local -> 5:00 PM IST)
+  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-05T17:00:00+05:30" },
+  
+  // Round 9: Spain (1:30 PM Local -> 5:00 PM IST)
+  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-12T17:00:00+05:30" },
+  
+  // Round 10: Austria (12:30 PM Local -> 4:00 PM IST)
+  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-26T16:00:00+05:30" },
+  
+  // Round 11: Britain (12:30 PM Local -> 5:00 PM IST) - Sprint
+  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-03T17:00:00+05:30" },
+  
+  // Round 12: Belgium (1:30 PM Local -> 5:00 PM IST)
+  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-17T17:00:00+05:30" },
+  
+  // Round 13: Hungary (1:30 PM Local -> 5:00 PM IST)
+  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-24T17:00:00+05:30" },
+  
+  // Round 14: Dutch (12:30 PM Local -> 4:00 PM IST) - Sprint
+  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-21T16:00:00+05:30" },
+  
+  // Round 15: Italy (1:30 PM Local -> 5:00 PM IST)
+  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-04T17:00:00+05:30" },
+  
+  // Round 16: Madrid (1:30 PM Local -> 5:00 PM IST)
+  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-11T17:00:00+05:30" },
+  
+  // Round 17: Azerbaijan (1:30 PM Local -> 3:00 PM IST)
+  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-25T15:00:00+05:30" },
+  
+  // Round 18: Singapore (5:30 PM Local -> 3:00 PM IST) - Sprint
+  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-09T15:00:00+05:30" },
+  
+  // Round 19: Austin (12:30 PM Local -> 11:00 PM IST)
+  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-23T23:00:00+05:30" },
+  
+  // Round 20: Mexico (1:00 PM Local -> 12:30 AM IST next day)
+  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-10-31T00:30:00+05:30" },
+  
+  // Round 21: Brazil (11:30 AM Local -> 8:00 PM IST)
+  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-06T20:00:00+05:30" },
+  
+  // Round 22: Las Vegas (6:30 PM Thursday Local -> 8:00 AM Friday IST)
+  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-20T08:00:00+05:30" },
+  
+  // Round 23: Qatar (4:30 PM Local -> 7:00 PM IST)
+  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-27T19:00:00+05:30" },
+  
+  // Round 24: Abu Dhabi (1:30 PM Local -> 3:00 PM IST)
+  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-04T15:00:00+05:30" }
 ];
 
 // --- 3. HELPERS ---
