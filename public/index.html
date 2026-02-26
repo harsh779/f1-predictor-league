@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>F1 Predictor League 2026</title>
+    <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;700&display=swap" rel="stylesheet">
     <style>
         /* --- CSS STYLES --- */
         :root { --f1-red: #e10600; --bg: #15151e; --card-bg: #1f1f23; --text: #ffffff; }
@@ -11,43 +12,52 @@
         
         /* Layout */
         header { background: var(--f1-red); padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        h1 { margin: 0; font-size: 1.5rem; font-style: italic; }
-        nav button { background: none; border: none; color: white; font-weight: bold; cursor: pointer; padding: 10px; font-size: 1rem; }
-        nav button:hover { text-decoration: underline; }
+        h1 { margin: 0; font-size: 1.5rem; font-style: italic; text-transform: uppercase; letter-spacing: 1px; }
+        nav button { background: none; border: none; color: white; font-weight: bold; cursor: pointer; padding: 10px; font-size: 1rem; margin-left: 10px; }
+        nav button:hover { background: rgba(255,255,255,0.2); border-radius: 4px; }
         
-        main { padding: 20px; max-width: 800px; margin: 0 auto; }
-        .tab-content { display: none; animation: fadeIn 0.3s; }
+        main { padding: 20px; max-width: 900px; margin: 0 auto; }
+        .tab-content { display: none; animation: fadeIn 0.4s; }
         .active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Forms */
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+        /* Forms & Dropdowns */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; gap: 20px; } }
         
-        input { width: 100%; padding: 12px; margin: 8px 0; background: #2a2a2f; border: 1px solid #444; color: white; border-radius: 4px; box-sizing: border-box; }
-        input:focus { border-color: var(--f1-red); outline: none; }
-        label { font-size: 0.9rem; color: #ccc; font-weight: bold; display: block; margin-top: 10px; }
+        /* THE DROPDOWN STYLING */
+        select, input { width: 100%; padding: 12px; margin: 8px 0; background: #2a2a2f; border: 1px solid #444; color: white; border-radius: 4px; font-family: inherit; font-size: 1rem; appearance: none; }
+        select { cursor: pointer; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right .7em top 50%; background-size: .65em auto; }
+        select:focus, input:focus { border-color: var(--f1-red); outline: none; box-shadow: 0 0 5px rgba(225, 6, 0, 0.5); }
+        
+        label { font-size: 0.9rem; color: #aaa; font-weight: bold; display: block; margin-top: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
 
         /* Buttons */
-        .btn-submit { background: var(--f1-red); color: white; border: none; padding: 15px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 20px; }
+        .btn-submit { background: var(--f1-red); color: white; border: none; padding: 15px; width: 100%; font-size: 1.2rem; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 30px; transition: background 0.2s; }
         .btn-submit:hover { background: #b30000; }
 
         /* Admin & Cards */
-        .prediction-card { background: var(--card-bg); padding: 15px; margin-bottom: 10px; border-left: 4px solid var(--f1-red); border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #444; }
-        th { background: #2a2a2f; color: var(--f1-red); }
+        .prediction-card { background: var(--card-bg); padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--f1-red); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .prediction-card h3 { margin: 0 0 10px 0; color: var(--f1-red); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--card-bg); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #333; }
+        th { background: #2a2a2f; color: var(--f1-red); text-transform: uppercase; font-size: 0.9rem; }
+        
         .admin-box { margin-top: 40px; border: 2px solid var(--f1-red); padding: 20px; background: rgba(225, 6, 0, 0.1); border-radius: 8px; text-align: center; }
         .admin-btn { background: var(--f1-red); color: white; padding: 12px 24px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
 
         /* Modals */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 8px; width: 90%; max-width: 500px; border: 1px solid #444; position: relative; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+        .modal-content { background: #222; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; border: 1px solid #444; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .close-btn { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 1.5rem; color: #888; }
-        .auth-btn { margin: 10px 5px; padding: 10px 20px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; }
+        .close-btn:hover { color: white; }
+        
+        .auth-btn { margin: 10px 5px; padding: 10px 20px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; font-weight: bold; }
         .auth-btn.primary { background: var(--f1-red); }
         
-        ul.rules-list { text-align: left; padding-left: 20px; line-height: 1.6; }
+        ul.rules-list { text-align: left; padding-left: 20px; line-height: 1.6; color: #ddd; }
+        ul.rules-list b { color: var(--f1-red); }
     </style>
 </head>
 <body>
@@ -65,36 +75,53 @@
 
     <main>
         <div id="predict" class="tab-content active">
-            <h2>Race Strategy: <span id="race-name" style="color:var(--f1-red)">Loading...</span></h2>
+            <h2>Strategy for: <span id="race-name" style="color:var(--f1-red)">Loading...</span></h2>
             <form id="prediction-form">
                 <div class="form-grid">
                     <div>
-                        <h3>Driver Positions</h3>
-                        <label>The Podium</label>
-                        <input type="text" id="p1" placeholder="P1 Winner" required>
-                        <input type="text" id="p2" placeholder="P2 Runner Up" required>
-                        <input type="text" id="p3" placeholder="P3 Third" required>
+                        <h3 style="border-bottom: 1px solid #444; padding-bottom: 5px;">Driver Positions</h3>
                         
-                        <label>Mid-Field Battle (Points Cutoff)</label>
-                        <input type="text" id="p11" placeholder="P11 (Just missed points)" required>
-                        <input type="text" id="p12" placeholder="P12" required>
+                        <label>P1 Winner</label>
+                        <select id="p1" class="driver-select" required><option value="">Select Driver...</option></select>
                         
-                        <label>Backmarkers</label>
-                        <input type="text" id="p19" placeholder="P19" required>
-                        <input type="text" id="p20" placeholder="P20 Last Place" required>
+                        <label>P2 Runner Up</label>
+                        <select id="p2" class="driver-select" required><option value="">Select Driver...</option></select>
+                        
+                        <label>P3 Third</label>
+                        <select id="p3" class="driver-select" required><option value="">Select Driver...</option></select>
+                        
+                        <label>P11 (Just missed points)</label>
+                        <select id="p11" class="driver-select" required><option value="">Select Driver...</option></select>
+                        
+                        <label>P12</label>
+                        <select id="p12" class="driver-select" required><option value="">Select Driver...</option></select>
+                        
+                        <label>P19</label>
+                        <select id="p19" class="driver-select" required><option value="">Select Driver...</option></select>
+                        
+                        <label>P20 Last Place</label>
+                        <select id="p20" class="driver-select" required><option value="">Select Driver...</option></select>
                     </div>
                     <div>
-                        <h3>Constructor Ranks</h3>
-                        <label>Team Performance (Sum of Drivers)</label>
-                        <input type="text" id="c1" placeholder="1st Place Team" required>
-                        <input type="text" id="c2" placeholder="2nd Place Team" required>
-                        <input type="text" id="c5" placeholder="5th Place Team" required>
-                        <input type="text" id="c6" placeholder="6th Place Team" required>
-                        <input type="text" id="c10" placeholder="10th Place Team" required>
+                        <h3 style="border-bottom: 1px solid #444; padding-bottom: 5px;">Constructors & Wildcards</h3>
                         
-                        <h3>Wildcard</h3>
-                        <label>Biggest Loser (Most Positions Dropped)</label>
-                        <input type="text" id="wl" placeholder="Driver Name" required>
+                        <label>1st Place Team</label>
+                        <select id="c1" class="team-select" required><option value="">Select Team...</option></select>
+                        
+                        <label>2nd Place Team</label>
+                        <select id="c2" class="team-select" required><option value="">Select Team...</option></select>
+                        
+                        <label>5th Place Team</label>
+                        <select id="c5" class="team-select" required><option value="">Select Team...</option></select>
+                        
+                        <label>6th Place Team</label>
+                        <select id="c6" class="team-select" required><option value="">Select Team...</option></select>
+                        
+                        <label>10th Place Team</label>
+                        <select id="c10" class="team-select" required><option value="">Select Team...</option></select>
+                        
+                        <label style="color: var(--f1-red);">WILDCARD: Biggest Loser</label>
+                        <select id="wl" class="driver-select" required><option value="">Select Driver...</option></select>
                     </div>
                 </div>
                 <button type="submit" class="btn-submit">🔒 Lock In Strategy</button>
@@ -103,12 +130,11 @@
 
         <div id="live" class="tab-content">
             <h2>Live Paddock Status</h2>
-            <p style="color:#888;">Strategies locked in for this weekend:</p>
             <div id="live-list"></div>
 
             <div id="admin-controls" style="display: none;" class="admin-box">
                 <h3>⚠️ STEWARDS CONTROL</h3>
-                <p>Calculates scores based on official results and resets the grid.</p>
+                <p>Verify results and commit scores to database.</p>
                 <button id="finalize-btn" class="admin-btn">Finalize Race Weekend</button>
                 <p id="admin-status" style="margin-top:10px; font-weight:bold;"></p>
             </div>
@@ -132,21 +158,21 @@
     <div id="rules-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeRules()">&times;</span>
-            <h2>📜 Official 2026 Regulations</h2>
+            <h2>📜 2026 Regulations</h2>
             <ul class="rules-list">
-                <li><strong>Scoring Basis:</strong> You start at 0. Points are deducted for errors and added for exact matches.</li>
+                <li><strong>Scoring:</strong> Start at 0. Deductions for errors, Bonus for exact matches.</li>
                 <li><strong>Drivers (P1, P2, P3, P11, P12, P19, P20):</strong>
                     <br>• Exact Match: <b>+2 Points</b>
-                    <br>• Miss: <b>-1 Point</b> per position difference.
+                    <br>• Miss: <b>-1 Point</b> per position off.
                 </li>
                 <li><strong>Constructors (Rank 1, 2, 5, 6, 10):</strong>
                     <br>• Exact Match: <b>+2 Points</b>
-                    <br>• Miss: <b>-1 Point</b> per rank difference.
+                    <br>• Miss: <b>-1 Point</b> per rank off.
                 </li>
                 <li><strong>Wildcard (Biggest Loser):</strong>
-                    <br>• Correctly identify the driver who drops the most places from grid to finish: <b>+5 Points</b>.
+                    <br>• Correct Driver: <b>+5 Points</b>.
                 </li>
-                <li><strong>Missed Race:</strong> Lowest score of the week - 5 points.</li>
+                <li><strong>Penalty:</strong> Missed race = Lowest score - 5.</li>
             </ul>
         </div>
     </div>
@@ -164,9 +190,26 @@
     </div>
 
     <script>
+        // --- 1. CONFIGURATION ---
+        // 2026 Grid Data for Dropdowns
+        const drivers2026 = [
+            "Max Verstappen", "Lando Norris", "Oscar Piastri", "Lewis Hamilton", "Charles Leclerc",
+            "George Russell", "Carlos Sainz", "Alex Albon", "Liam Lawson", "Yuki Tsunoda",
+            "Kimi Antonelli", "Jack Doohan", "Gabriel Bortoleto", "Isack Hadjar", "Franco Colapinto",
+            "Oliver Bearman", "Esteban Ocon", "Pierre Gasly", "Lance Stroll", "Fernando Alonso"
+        ].sort();
+
+        const teams2026 = [
+            "Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin",
+            "Alpine", "Williams", "RB (Racing Bulls)", "Haas", "Audi (Sauber)"
+        ].sort();
+
         let currentUser = JSON.parse(localStorage.getItem('f1_user'));
 
+        // --- 2. INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
+            populateDropdowns(); // Fill the Select menus
+            
             if (!currentUser) {
                 document.getElementById('login-modal').style.display = 'flex';
             } else {
@@ -175,17 +218,47 @@
             }
         });
 
+        function populateDropdowns() {
+            const driverSelects = document.querySelectorAll('.driver-select');
+            const teamSelects = document.querySelectorAll('.team-select');
+
+            driverSelects.forEach(sel => {
+                drivers2026.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d;
+                    opt.innerText = d;
+                    sel.appendChild(opt);
+                });
+            });
+
+            teamSelects.forEach(sel => {
+                teams2026.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.innerText = t;
+                    sel.appendChild(opt);
+                });
+            });
+        }
+
         function initApp() {
             fetchNextRace();
             checkAdmin();
             loadLeaderboard();
         }
 
-        // --- RULES UI ---
+        // --- 3. UI HELPERS ---
         function openRules() { document.getElementById('rules-modal').style.display = 'flex'; }
         function closeRules() { document.getElementById('rules-modal').style.display = 'none'; }
+        
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (tabId === 'live') loadLivePredictions();
+            if (tabId === 'standings') loadLeaderboard();
+        }
 
-        // --- AUTH ---
+        // --- 4. AUTHENTICATION ---
         async function login() {
             const name = document.getElementById('auth-name').value;
             const password = document.getElementById('auth-pass').value;
@@ -226,14 +299,7 @@
             }
         }
 
-        // --- TABS & DATA ---
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            if (tabId === 'live') loadLivePredictions();
-            if (tabId === 'standings') loadLeaderboard();
-        }
-
+        // --- 5. DATA FETCHING ---
         async function fetchNextRace() {
             try {
                 const res = await fetch('/api/next-race');
@@ -242,7 +308,6 @@
             } catch (e) {}
         }
 
-        // --- PREDICT ---
         document.getElementById('prediction-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const payload = {
@@ -267,14 +332,15 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
-            if (res.ok) alert("Strategy Locked!");
+            if (res.ok) alert("✅ Strategy Locked In!");
+            else alert("Error submitting prediction.");
         });
 
         async function loadLivePredictions() {
             const res = await fetch('/api/predictions');
             const data = await res.json();
             const list = document.getElementById('live-list');
-            if (data.length === 0) list.innerHTML = "<p>No predictions yet.</p>";
+            if (data.length === 0) list.innerHTML = "<p>No predictions locked yet.</p>";
             else {
                 list.innerHTML = data.map(p => `
                     <div class="prediction-card">
