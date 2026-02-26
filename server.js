@@ -226,8 +226,10 @@ app.get('/api/predictions', async (req, res) => {
     res.json(r.rows);
 });
 
+// Fetch Leaderboard (EXCLUDING ADMIN)
 app.get('/api/season-leaderboard', async (req, res) => {
-    const r = await db.execute("SELECT name, total_score FROM f1_drivers ORDER BY total_score DESC");
+    // added WHERE name != 'admin'
+    const r = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
     res.json(r.rows);
 });
 
