@@ -1,11 +1,13 @@
 const express = require('express');
 const { createClient } = require('@libsql/client');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(cors());
 app.use(express.static(path.join(__dirname, 'public'))); 
 
 const db = createClient({
@@ -17,7 +19,6 @@ const db = createClient({
 async function setupDatabase() {
   try {
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0)`);
-    // TABLE v2: Includes P11, P12, Sprint Wildcards
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         user_name TEXT UNIQUE, 
@@ -28,86 +29,40 @@ async function setupDatabase() {
         w_race_loser TEXT, 
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
-    console.log("✅ Database Synced: v2 Ready.");
+    try {
+        await db.execute({ sql: "INSERT INTO f1_drivers (name, password) VALUES ('admin', 'Open@0761') ON CONFLICT(name) DO NOTHING" });
+        console.log("✅ Admin Ready.");
+    } catch (e) {}
+    console.log("✅ Database Synced.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
 
-// --- 2. 2026 CALENDAR (LOCKED TO P1 START - IN IST) ---
-// The format is: YYYY-MM-DDTHH:mm:ss+05:30
-// This tells the server: "These times are in IST."
-
+// --- 2. 2026 CALENDAR (IST DEADLINES) ---
 const f1Calendar2026 = [
-  // Round 1: Australia (12:30 PM Local -> 07:00 AM IST)
   { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-06T07:00:00+05:30" },
-  
-  // Round 2: China (11:30 AM Local -> 09:00 AM IST) - Sprint
   { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-13T09:00:00+05:30" },
-  
-  // Round 3: Japan (11:30 AM Local -> 08:00 AM IST)
   { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-27T08:00:00+05:30" },
-  
-  // Round 4: Bahrain (2:30 PM Local -> 5:00 PM IST)
   { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-10T17:00:00+05:30" },
-  
-  // Round 5: Saudi Arabia (4:30 PM Local -> 7:00 PM IST)
   { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-17T19:00:00+05:30" },
-  
-  // Round 6: Miami (12:30 PM Local -> 10:00 PM IST) - Sprint
   { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-01T22:00:00+05:30" },
-  
-  // Round 7: Canada (1:30 PM Local -> 11:00 PM IST) - Sprint
   { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-22T23:00:00+05:30" },
-  
-  // Round 8: Monaco (1:30 PM Local -> 5:00 PM IST)
   { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-05T17:00:00+05:30" },
-  
-  // Round 9: Spain (1:30 PM Local -> 5:00 PM IST)
   { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-12T17:00:00+05:30" },
-  
-  // Round 10: Austria (12:30 PM Local -> 4:00 PM IST)
   { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-26T16:00:00+05:30" },
-  
-  // Round 11: Britain (12:30 PM Local -> 5:00 PM IST) - Sprint
   { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-03T17:00:00+05:30" },
-  
-  // Round 12: Belgium (1:30 PM Local -> 5:00 PM IST)
   { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-17T17:00:00+05:30" },
-  
-  // Round 13: Hungary (1:30 PM Local -> 5:00 PM IST)
   { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-24T17:00:00+05:30" },
-  
-  // Round 14: Dutch (12:30 PM Local -> 4:00 PM IST) - Sprint
   { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-21T16:00:00+05:30" },
-  
-  // Round 15: Italy (1:30 PM Local -> 5:00 PM IST)
   { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-04T17:00:00+05:30" },
-  
-  // Round 16: Madrid (1:30 PM Local -> 5:00 PM IST)
   { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-11T17:00:00+05:30" },
-  
-  // Round 17: Azerbaijan (1:30 PM Local -> 3:00 PM IST)
   { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-25T15:00:00+05:30" },
-  
-  // Round 18: Singapore (5:30 PM Local -> 3:00 PM IST) - Sprint
   { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-09T15:00:00+05:30" },
-  
-  // Round 19: Austin (12:30 PM Local -> 11:00 PM IST)
   { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-23T23:00:00+05:30" },
-  
-  // Round 20: Mexico (1:00 PM Local -> 12:30 AM IST next day)
   { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-10-31T00:30:00+05:30" },
-  
-  // Round 21: Brazil (11:30 AM Local -> 8:00 PM IST)
   { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-06T20:00:00+05:30" },
-  
-  // Round 22: Las Vegas (6:30 PM Thursday Local -> 8:00 AM Friday IST)
   { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-20T08:00:00+05:30" },
-  
-  // Round 23: Qatar (4:30 PM Local -> 7:00 PM IST)
   { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-27T19:00:00+05:30" },
-  
-  // Round 24: Abu Dhabi (1:30 PM Local -> 3:00 PM IST)
   { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-04T15:00:00+05:30" }
 ];
 
@@ -136,7 +91,7 @@ async function sendDiscordNotification(msg) {
     } catch (e) { console.error("Discord Error:", e); }
 }
 
-// --- 4. SCORING ENGINE ---
+// --- 4. SCORING ENGINE (UPDATED TO MATCH IMAGE) ---
 async function performFinalization() {
   try {
     const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
@@ -148,66 +103,112 @@ async function performFinalization() {
     const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v2");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions." };
 
-    // Scoring Logic
+    // 1. Parse Driver Results (DNF = 20)
     const actualDriverPositions = {};
-    results.forEach(r => { actualDriverPositions[normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`)] = parseInt(r.position); });
+    results.forEach(r => {
+        const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+        let pos = parseInt(r.position);
+        
+        // DNF LOGIC: If status is not "Finished" or "+1 Lap" etc, treat as DNF -> 20
+        // The API returns 'R' in positionText for retirements often, but 'position' might be the classified rank.
+        // To strictly follow "DNF -> 20":
+        if (r.positionText === 'R' || r.positionText === 'D' || r.status.startsWith('Retired') || r.status.startsWith('Collision') || r.status.startsWith('Accident')) {
+            pos = 20; 
+        }
+        
+        actualDriverPositions[name] = pos;
+    });
 
+    // 2. Parse Constructor Results
     const constructorSums = {};
     results.forEach(r => {
       const c = normalizeConstructor(r.Constructor.name);
-      constructorSums[c] = (constructorSums[c] || 0) + parseInt(r.position);
+      // For constructors, we use the official classified position.
+      // If a driver DNF'd, we still use their classified rank for team summation if available, 
+      // otherwise, we use 20 for the calculation to punish DNF teams.
+      let pos = parseInt(r.position);
+       if (r.positionText === 'R' || r.positionText === 'D') pos = 20; 
+      constructorSums[c] = (constructorSums[c] || 0) + pos;
     });
 
     const sortedC = Object.keys(constructorSums).sort((a, b) => constructorSums[a] - constructorSums[b]);
     const actualCRanks = {};
     for (let i = 0; i < sortedC.length; i++) {
+        // Handle ties: if sums are equal, give same rank
         actualCRanks[sortedC[i]] = (i > 0 && constructorSums[sortedC[i]] === constructorSums[sortedC[i-1]]) ? actualCRanks[sortedC[i-1]] : i + 1;
     }
 
+    // 3. Parse Biggest Loser
     let raceLosers = []; let maxDrop = -999;
     results.forEach(r => {
        if (parseInt(r.grid) > 0) {
-           const drop = parseInt(r.position) - parseInt(r.grid);
+           // For biggest loser, we use actual finishing position vs grid.
+           // If DNF, we treat finish as 20.
+           let finish = parseInt(r.position);
+           if (r.positionText === 'R' || r.positionText === 'D') finish = 20;
+           
+           const drop = finish - parseInt(r.grid);
            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
            if (drop > maxDrop) { maxDrop = drop; raceLosers = [name]; }
            else if (drop === maxDrop) raceLosers.push(name);
        }
     });
 
+    // 4. Calculate Scores
     const predictions = await db.execute("SELECT * FROM f1_predictions_v2").then(r => r.rows);
     let scores = {}; let lowest = Infinity;
 
     predictions.forEach(p => {
         let score = 0;
-        const evalP = (pr, t) => {
-            const act = actualDriverPositions[normalizeStr(pr)];
-            if (!act) return;
-            const diff = Math.abs(t - act);
-            score -= diff; if (diff === 0) score += 2;
-        };
-        const evalC = (pr, t) => {
-            const act = actualCRanks[normalizeConstructor(pr)];
-            if (!act) return;
-            const diff = Math.abs(t - act);
-            score -= diff; if (diff === 0) score += 2;
+        
+        // Helper: Diff Logic (+2 if 0, else -Diff)
+        const calc = (pred, actual) => {
+            if (!actual) return 0; // Should not happen if data is complete
+            const diff = Math.abs(pred - actual);
+            if (diff === 0) return 2;
+            return -diff;
         };
 
-        evalP(p.p1, 1); evalP(p.p2, 2); evalP(p.p3, 3); 
-        evalP(p.p11, 11); evalP(p.p12, 12); 
-        evalP(p.p19, 19); evalP(p.p20, 20);
+        // Drivers
+        const driversToScore = [
+            { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
+            { pred: p.p11, rank: 11 }, { pred: p.p12, rank: 12 },
+            { pred: p.p19, rank: 19 }, { pred: p.p20, rank: 20 }
+        ];
         
-        evalC(p.c1, 1); evalC(p.c2, 2); evalC(p.c5, 5); evalC(p.c6, 6); evalC(p.c10, 10);
+        driversToScore.forEach(item => {
+            const act = actualDriverPositions[normalizeStr(item.pred)];
+            if (act) score += calc(item.rank, act);
+        });
+
+        // Constructors
+        const teamsToScore = [
+            { pred: p.c1, rank: 1 }, { pred: p.c2, rank: 2 },
+            { pred: p.c5, rank: 5 }, { pred: p.c6, rank: 6 }, { pred: p.c10, rank: 10 }
+        ];
+        
+        teamsToScore.forEach(item => {
+            const act = actualCRanks[normalizeConstructor(item.pred)];
+            if (act) score += calc(item.rank, act);
+        });
+
+        // Wildcard
         if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) score += 5;
 
         scores[p.user_name] = score;
         if (score < lowest) lowest = score;
     });
 
+    // 5. Update Leaderboard
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
     const allDrivers = await db.execute("SELECT * FROM f1_drivers").then(r => r.rows);
+    
     for (const d of allDrivers) {
         let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
-        await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
+        // Don't update admin score
+        if (d.name !== 'admin') {
+            await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
+        }
     }
 
     await db.execute("DELETE FROM f1_predictions_v2");
@@ -223,7 +224,6 @@ app.get('/api/next-race', (req, res) => {
     res.json(next);
 });
 
-// NEW: Calendar Route
 app.get('/api/calendar', (req, res) => {
     res.json(f1Calendar2026);
 });
@@ -233,7 +233,7 @@ app.post('/predict', async (req, res) => {
     const auth = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [d.user_name, d.password] });
     if (auth.rows.length === 0) return res.status(401).json({ success: false, message: "Login failed" });
 
-    // LOCK CHECK
+    // LOCK CHECK (IST)
     const now = new Date();
     const next = f1Calendar2026.find(r => new Date(r.date) > now); 
     if (!next) return res.status(403).json({ success: false, message: "Season Over" });
@@ -276,9 +276,7 @@ app.get('/api/predictions', async (req, res) => {
     res.json(r.rows);
 });
 
-// Fetch Leaderboard (EXCLUDING ADMIN)
 app.get('/api/season-leaderboard', async (req, res) => {
-    // added WHERE name != 'admin'
     const r = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
     res.json(r.rows);
 });
