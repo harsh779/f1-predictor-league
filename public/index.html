@@ -6,7 +6,7 @@
     <title>F1 2026 Strategy League</title>
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        /* 1. CSS VARIABLES: The Carbon & Neon Palette */
+        /* 1. CSS VARIABLES */
         :root { 
             --red: #e10600; 
             --red-glow: rgba(225, 6, 0, 0.4);
@@ -16,163 +16,82 @@
             --text-main: #f3f3f3;
             --text-muted: #8b8b99;
             --border: #2a2a35;
+            --gold: #FFD700;
         }
 
-        /* 2. GLOBAL RESET & TYPOGRAPHY */
-        body { 
-            margin: 0; 
-            font-family: 'Titillium Web', sans-serif; 
-            background: var(--bg-dark); 
-            color: var(--text-main); 
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
-
+        /* 2. GLOBAL RESET */
+        body { margin: 0; font-family: 'Titillium Web', sans-serif; background: var(--bg-dark); color: var(--text-main); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-dark); }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
-        /* 3. BROADCAST NAVIGATION */
-        header { 
-            background: rgba(10, 10, 12, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 15px 30px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            flex-wrap: wrap;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
+        /* 3. NAVIGATION */
+        header { background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
         h1 { margin: 0; font-size: 1.8rem; font-weight: 900; font-style: italic; letter-spacing: 1px; }
         h1 span { color: var(--red); }
-        
         nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-        nav button { 
-            background: transparent; 
-            border: 1px solid transparent; 
-            color: var(--text-muted); 
-            font-family: 'Titillium Web', sans-serif;
-            font-weight: 600; 
-            cursor: pointer; 
-            padding: 8px 16px; 
-            border-radius: 20px; 
-            font-size: 0.95rem; 
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-        }
+        nav button { background: transparent; border: 1px solid transparent; color: var(--text-muted); font-family: 'Titillium Web', sans-serif; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 20px; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.3s ease; }
         nav button:hover { color: var(--text-main); background: var(--surface-hover); }
-        nav button.active-nav { 
-            background: var(--surface); 
-            color: var(--text-main); 
-            border: 1px solid var(--border);
-            box-shadow: 0 0 15px rgba(225, 6, 0, 0.15);
-        }
+        nav button.active-nav { background: var(--surface); color: var(--text-main); border: 1px solid var(--border); box-shadow: 0 0 15px rgba(225, 6, 0, 0.15); }
+        
+        .btn-support { background: rgba(255, 215, 0, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
+        .btn-support:hover { background: var(--gold) !important; color: #000 !important; box-shadow: 0 0 15px rgba(255,215,0,0.4); }
 
-        /* 4. LAYOUT & TABS */
+        /* 4. LAYOUT */
         main { padding: 30px 20px; max-width: 1000px; margin: 0 auto; min-height: 80vh; }
         .tab { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); } 
         .active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 5. FORM ELEMENTS (CUSTOM SELECTS) */
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        /* 5. PREDICT FORM CARDS (UX Upgrade) */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; gap: 20px; } }
         
+        .predict-group { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .predict-group h3 { margin: 0 0 20px 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
+        
         label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; display: block; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; letter-spacing: 1px;}
-        
-        select, input { 
-            width: 100%; 
-            padding: 14px 16px; 
-            background: var(--surface); 
-            border: 1px solid var(--border); 
-            color: white; 
-            border-radius: 8px; 
-            font-family: 'Titillium Web', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            box-sizing: border-box; 
-            transition: all 0.2s ease;
-            appearance: none;
-            -webkit-appearance: none;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%23e10600" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-            background-repeat: no-repeat;
-            background-position-x: 96%;
-            background-position-y: 50%;
-        }
+        select, input { width: 100%; padding: 14px 16px; background: #0a0a0c; border: 1px solid var(--border); color: white; border-radius: 8px; font-family: 'Titillium Web', sans-serif; font-size: 1rem; font-weight: 600; box-sizing: border-box; transition: all 0.2s ease; appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg fill="%23e10600" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); background-repeat: no-repeat; background-position-x: 96%; background-position-y: 50%; }
         select:focus, input:focus { border-color: var(--red); outline: none; box-shadow: 0 0 0 3px var(--red-glow); background-color: #1a1a24;}
-        option:disabled { color: #555; background: #0a0a0c; }
         
-        /* 6. BUTTONS */
-        .btn { 
-            background: linear-gradient(45deg, #e10600, #ff2a2a); 
-            color: white; 
-            border: none; 
-            padding: 16px; 
-            width: 100%; 
-            font-family: 'Titillium Web', sans-serif;
-            font-weight: 900; 
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            cursor: pointer; 
-            border-radius: 8px; 
-            margin-top: 30px; 
-            font-size: 1.1rem; 
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(225, 6, 0, 0.3);
-        }
+        .btn { background: linear-gradient(45deg, #e10600, #ff2a2a); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.3); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.5); }
-        .btn:active { transform: translateY(1px); }
         
-        /* 7. CARDS & BROADCAST WIDGETS */
-        .broadcast-header {
-            background: linear-gradient(135deg, var(--surface) 0%, #0a0a0c 100%);
-            padding: 25px; 
-            border-radius: 12px; 
-            border: 1px solid var(--border);
-            border-left: 6px solid var(--red); 
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 1.2rem;}
+        /* 6. HEADERS & TABLES */
+        .broadcast-header { background: linear-gradient(135deg, var(--surface) 0%, #0a0a0c 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
         
-        /* 8. TABLES */
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); margin-top: 20px;}
         table { width: 100%; border-collapse: collapse; }
         th { background: #1a1a24; color: var(--text-muted); padding: 16px; text-align: left; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; font-weight: 700; border-bottom: 2px solid var(--border);}
-        td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 1.05rem; }
+        td { padding: 18px 16px; border-bottom: 1px solid var(--border); font-size: 1.05rem; }
         tbody tr:hover { background: rgba(255,255,255,0.02); }
-        
-        /* 9. GRID CARDS (Interactive Hover states) */
-        .team-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 20px;
-            border-radius: 12px;
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            position: relative;
-            overflow: hidden;
-        }
-        .team-card::before { content: ''; position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: var(--team-color); }
-        .team-card:hover { transform: translateY(-5px); box-shadow: 0 12px 30px var(--team-glow); border-color: var(--team-color); z-index: 10; }
-        .driver-pill { background: #0a0a0c; padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
 
-        /* 10. MODAL & UTILS */
+        /* 7. VIP GOLD STYLING */
+        .vip-gold { background: linear-gradient(45deg, #FFDF00, #D4AF37); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900 !important; text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3); }
+        .vip-badge { background: rgba(255, 215, 0, 0.1); border: 1px solid var(--gold); color: var(--gold); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; vertical-align: middle; margin-left: 8px; text-transform: uppercase; letter-spacing: 1px;}
+
+        /* 8. SKELETON LOADERS */
+        .skeleton { background: linear-gradient(90deg, #1a1a24 25%, #2a2a35 50%, #1a1a24 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; height: 20px; }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+        /* 9. CUSTOM TOAST NOTIFICATIONS */
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: var(--surface); border-left: 5px solid var(--red); color: white; padding: 16px 24px; border-radius: 8px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-family: 'Titillium Web'; font-size: 1rem; letter-spacing: 0.5px; animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); min-width: 250px; }
+        .toast.success { border-left-color: #00e160; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+
+        /* Utilities */
         .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter: blur(10px); display:flex; justify-content:center; align-items:center; z-index:999; }
         .modal-box { background:var(--surface); padding:40px; border-radius:12px; width:90%; max-width:400px; text-align:center; border:1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5);}
         .hidden { display:none; }
-        .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px;}
-        .session-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: #0a0a0c; padding: 12px; border-radius: 8px; border: 1px solid var(--border);}
-        .session-grid div strong { color: var(--text-main); display: inline-block; width: 65px;}
-        .admin-box { margin-top:40px; border:1px solid var(--red); padding:30px; background:rgba(225,6,0,0.05); border-radius:12px; text-align: center; }
     </style>
 </head>
 <body>
+
+<div id="toast-container"></div>
 
 <header>
     <h1><span>F1</span> 2026 LEAGUE</h1>
@@ -182,8 +101,7 @@
         <button onclick="tab('standings', this)">Standings</button>
         <button onclick="tab('calendar', this)">📅 Calendar</button>
         <button onclick="tab('grid', this)">🏎️ The Grid</button>
-        <button onclick="tab('rules', this)">📜 Rules</button>
-        <button onclick="tab('archive', this)">🏆 Archive</button>
+        <button onclick="showSupportModal()" class="btn-support">☕ Support</button>
         <button onclick="logout()" style="color: #ff4444;">Logout</button>
     </nav>
 </header>
@@ -191,139 +109,124 @@
 <main>
     <div id="predict" class="tab active">
         <div class="broadcast-header">
-            <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading...</p>
-            <h2 id="r-header" style="margin: 0 0 10px 0; font-size: 2rem; font-weight: 900; text-transform: uppercase;">Loading Circuit...</h2>
-            <p id="r-record" style="margin: 0; color: var(--text-muted); font-size: 1rem;">⏱️ <b style="color: var(--text-main)">Lap Record:</b> Loading...</p>
+            <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
+            <h2 id="r-header" style="margin: 0 0 10px 0; font-size: 2.2rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
+            <p id="r-record" style="margin: 0; color: var(--text-muted); font-size: 1rem;"><div class="skeleton" style="width: 40%; margin-top: 10px;"></div></p>
         </div>
 
-        <div id="locked-msg" style="display:none; background:rgba(225,6,0,0.1); border: 1px solid var(--red); padding:20px; text-align:center; font-weight: 900; border-radius: 8px; margin-bottom: 20px; letter-spacing: 1px;">🚫 PREDICTIONS LOCKED (CARS ON TRACK)</div>
+        <div id="locked-msg" class="hidden" style="background:rgba(225,6,0,0.1); border: 1px solid var(--red); padding:20px; text-align:center; font-weight: 900; border-radius: 8px; margin-bottom: 25px; letter-spacing: 1px;">🚫 PARC FERMÉ: PREDICTIONS LOCKED</div>
         
         <form id="p-form">
             <div class="form-grid">
                 <div>
-                    <h3 class="section-title">Driver Strategy</h3>
-                    <label>P1 Winner</label><select id="p1" class="s-driver" required></select>
-                    <label>P2 Runner Up</label><select id="p2" class="s-driver" required></select>
-                    <label>P3 Third</label><select id="p3" class="s-driver" required></select>
-                    
-                    <div style="height: 1px; background: var(--border); margin: 25px 0;"></div>
-                    
-                    <label>P11 (Just Missed Points)</label><select id="p11" class="s-driver" required></select>
-                    <label>P12</label><select id="p12" class="s-driver" required></select>
-                    
-                    <div style="height: 1px; background: var(--border); margin: 25px 0;"></div>
-                    
-                    <label>P19</label><select id="p19" class="s-driver" required></select>
-                    <label>P20 Last Place</label><select id="p20" class="s-driver" required></select>
+                    <div class="predict-group">
+                        <h3>🏆 The Podium</h3>
+                        <label>P1 Winner</label><select id="p1" class="s-driver" required></select>
+                        <label>P2 Runner Up</label><select id="p2" class="s-driver" required></select>
+                        <label>P3 Third</label><select id="p3" class="s-driver" required></select>
+                    </div>
+
+                    <div class="predict-group">
+                        <h3>🎯 The Points Bubble</h3>
+                        <label>P11 (Heartbreak)</label><select id="p11" class="s-driver" required></select>
+                        <label>P12</label><select id="p12" class="s-driver" required></select>
+                    </div>
+
+                    <div class="predict-group">
+                        <h3>⚠️ The Backmarkers</h3>
+                        <label>P19</label><select id="p19" class="s-driver" required></select>
+                        <label>P20 Last Place</label><select id="p20" class="s-driver" required></select>
+                    </div>
                 </div>
 
                 <div>
-                    <h3 class="section-title">Constructor Targets</h3>
-                    <label>1st Team</label><select id="c1" class="s-team" required></select>
-                    <label>2nd Team</label><select id="c2" class="s-team" required></select>
-                    <label>5th Team</label><select id="c5" class="s-team" required></select>
-                    <label>6th Team</label><select id="c6" class="s-team" required></select>
-                    <label>10th Team</label><select id="c10" class="s-team" required></select>
+                    <div class="predict-group">
+                        <h3>🏭 Constructor Targets</h3>
+                        <label>1st Team</label><select id="c1" class="s-team" required></select>
+                        <label>2nd Team</label><select id="c2" class="s-team" required></select>
+                        <label>5th Team</label><select id="c5" class="s-team" required></select>
+                        <label>6th Team</label><select id="c6" class="s-team" required></select>
+                        <label>10th Team</label><select id="c10" class="s-team" required></select>
+                    </div>
 
-                    <h3 class="section-title" style="margin-top: 40px;">Wildcards</h3>
-                    <label style="color:var(--red)">Race: Biggest Loser</label>
-                    <select id="wl" class="s-wildcard" required></select>
+                    <div class="predict-group">
+                        <h3 style="color: var(--gold); border-color: var(--gold);">🃏 Strategic Wildcards</h3>
+                        <label style="color:var(--text-main)">Race: Biggest Loser</label>
+                        <select id="wl" class="s-wildcard" required></select>
 
-                    <div id="sprint-box" class="hidden" style="border:1px solid var(--red); padding:20px; margin-top:20px; border-radius:8px; background: rgba(225, 6, 0, 0.05); box-shadow: inset 0 0 20px rgba(225,6,0,0.05);">
-                        <h4 style="margin:0 0 15px; color:var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">⚡ Sprint Weekend Bonus</h4>
-                        <label>Sprint: Biggest Gainer</label><select id="sg" class="s-wildcard"></select>
-                        <label>Sprint: Biggest Loser</label><select id="sl" class="s-wildcard"></select>
+                        <div id="sprint-box" class="hidden" style="margin-top: 25px; padding-top: 25px; border-top: 1px dashed var(--border);">
+                            <h4 style="margin:0 0 15px; color:var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">⚡ Sprint Weekend Bonus</h4>
+                            <label>Sprint: Biggest Gainer</label><select id="sg" class="s-wildcard"></select>
+                            <label>Sprint: Biggest Loser</label><select id="sl" class="s-wildcard"></select>
+                        </div>
                     </div>
                 </div>
             </div>
-            <button type="submit" class="btn" id="sub-btn">🔒 LOCK IN STRATEGY</button>
+            <button type="submit" class="btn" id="sub-btn">🔒 Transmit Strategy</button>
         </form>
     </div>
 
     <div id="live" class="tab">
-        <h2 class="section-title" style="border:none; font-size: 2rem;">Live Predictions</h2>
-        <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 30px;">Opponent strategies locked for this weekend:</p>
-        <div id="live-list">Loading...</div>
+        <h2 class="section-title">Live Grid</h2>
+        <p style="color: var(--text-muted); margin-bottom: 30px;">Opponent strategies locked for this session:</p>
+        <div id="live-list"></div>
         
-        <div id="admin-panel" class="admin-box hidden">
+        <div id="admin-panel" class="hidden" style="margin-top:40px; border:1px solid var(--red); padding:30px; background:rgba(225,6,0,0.05); border-radius:12px; text-align: center;">
             <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0;">⚠️ STEWARDS CONTROL</h3>
-            <p style="color: var(--text-muted); margin-bottom: 20px;">Calculate scores, push to Discord, and reset database.</p>
             <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px;">Finalize Race Weekend</button>
-            <p id="adm-stat" style="margin-top: 15px; font-weight: bold;"></p>
         </div>
     </div>
 
     <div id="standings" class="tab">
-        <h2 class="section-title" style="border:none; font-size: 2rem;">2026 World Championship</h2>
+        <h2 class="section-title">2026 World Championship</h2>
         <div class="table-wrapper">
             <table>
                 <thead>
-                    <tr>
-                        <th style="width: 15%; text-align: center;">Pos</th>
-                        <th>Strategist</th>
-                        <th style="width: 25%; text-align: right;">Points</th>
-                    </tr>
+                    <tr><th style="width: 15%; text-align: center;">Pos</th><th>Strategist</th><th style="width: 25%; text-align: right;">Points</th></tr>
                 </thead>
-                <tbody id="leaderboard">
-                    <tr><td colspan="3" style="text-align:center; padding: 30px; color: var(--text-muted);">Loading telemetry...</td></tr>
-                </tbody>
+                <tbody id="leaderboard"></tbody>
             </table>
         </div>
     </div>
 
     <div id="calendar" class="tab">
-        <h2 class="section-title" style="border:none; font-size: 2rem;">2026 Calendar</h2>
+        <h2 class="section-title">2026 Calendar</h2>
         <div class="table-wrapper">
             <table>
                 <thead>
-                    <tr>
-                        <th style="width: 10%; text-align: center;">Rnd</th>
-                        <th>Grand Prix & Local Time (IST)</th>
-                    </tr>
+                    <tr><th style="width: 10%; text-align: center;">Rnd</th><th>Grand Prix & Local Time (IST)</th></tr>
                 </thead>
-                <tbody id="cal-body">
-                    <tr><td colspan="2" style="text-align:center; padding: 30px; color: var(--text-muted);">Loading calendar...</td></tr>
-                </tbody>
+                <tbody id="cal-body"></tbody>
             </table>
         </div>
     </div>
 
     <div id="grid" class="tab">
-        <h2 class="section-title" style="border:none; font-size: 2rem;">2026 Official Grid</h2>
-        <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 30px;">Complete line-up featuring all 11 Constructors and 22 Drivers.</p>
-        <div id="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px;">
-            </div>
+        <h2 class="section-title">2026 Official Grid</h2>
+        <div id="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-top: 20px;"></div>
     </div>
 
     <div id="rules" class="tab">
-        <h2 class="section-title" style="border:none; font-size: 2rem;">Sporting Regulations</h2>
-        <div class="rules-list">
+        <h2 class="section-title">Sporting Regulations</h2>
+        <div class="predict-group" style="line-height: 1.8;">
             <h3>⏰ 1. Parc Fermé (The Deadline)</h3>
-            <ul>
-                <li>Strategies are <strong>strictly locked</strong> the exact minute that <strong>Practice 1 (P1)</strong> begins on Friday (or Sprint Qualifying on Sprint weekends). No exceptions.</li>
-            </ul>
-            <h3>🏎️ 2. Driver Scoring Matrix</h3>
+            <ul><li>Strategies are <strong>strictly locked</strong> the exact minute that <strong>Practice 1 (P1)</strong> begins on Friday (or Sprint Qualifying on Sprint weekends). No exceptions.</li></ul>
+            <h3 style="margin-top:20px;">🏎️ 2. Driver Scoring Matrix</h3>
             <ul>
                 <li><strong>Exact Match Bonus:</strong> <span style="color: #00e160; font-weight: bold;">+2 Points</span>.</li>
                 <li><strong>Differential Penalty:</strong> <span style="color: var(--red); font-weight: bold;">-1 Point</span> for every position your prediction misses by.</li>
             </ul>
-            <h3>💥 3. The 'Engine Blow' (DNF Rule)</h3>
-            <ul>
-                <li>If a driver retires, crashes, or fails to classify (DNF), the Stewards automatically score them as finishing in <strong>P20</strong> to maximize the differential penalty.</li>
-            </ul>
-            <h3>🛠️ 4. Constructor Scoring</h3>
-            <ul>
-                <li>Constructor performance is ranked purely by combining the finishing positions of their two cars in that specific race session.</li>
-            </ul>
-            <h3>🃏 5. Strategic Wildcards</h3>
-            <ul>
-                <li><strong>Biggest Race Loser:</strong> <span style="color: #00e160; font-weight: bold;">+5 Points</span> for correctly identifying the driver who plummets the most positions from their grid start to the checkered flag.</li>
-            </ul>
+            <h3 style="margin-top:20px;">💥 3. The 'Engine Blow' (DNF Rule)</h3>
+            <ul><li>If a driver retires, crashes, or fails to classify (DNF), the Stewards automatically score them as finishing in <strong>P20</strong> to maximize the differential penalty.</li></ul>
+            <h3 style="margin-top:20px;">🛠️ 4. Constructor Scoring</h3>
+            <ul><li>Constructor performance is ranked purely by combining the finishing positions of their two cars in that specific race session.</li></ul>
+            <h3 style="margin-top:20px;">🃏 5. Strategic Wildcards</h3>
+            <ul><li><strong>Biggest Race Loser:</strong> <span style="color: #00e160; font-weight: bold;">+5 Points</span> for correctly identifying the driver who plummets the most positions from their grid start to the checkered flag.</li></ul>
         </div>
     </div>
 
     <div id="archive" class="tab">
-        <h2 class="section-title" style="border:none; font-size: 2rem;">2025 History</h2>
+        <h2 class="section-title">2025 History</h2>
         <div class="form-grid">
             <div class="table-wrapper">
                 <table style="margin-top: 0;">
@@ -364,42 +267,31 @@
 </div>
 
 <script>
-    // 22 Verified Official Drivers for 2026
-    const drivers = [
-        "Max Verstappen", "Isack Hadjar", "Lando Norris", "Oscar Piastri", 
-        "Charles Leclerc", "Lewis Hamilton", "George Russell", "Kimi Antonelli", 
-        "Fernando Alonso", "Lance Stroll", "Carlos Sainz", "Alex Albon", 
-        "Pierre Gasly", "Franco Colapinto", "Liam Lawson", "Arvid Lindblad", 
-        "Esteban Ocon", "Oliver Bearman", "Nico Hulkenberg", "Gabriel Bortoleto", 
-        "Sergio Perez", "Valtteri Bottas"
-    ].sort();
-
-    // 11 Official Constructors for 2026
-    const teams = [
-        "Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", 
-        "Alpine", "Williams", "Racing Bulls", "Haas", "Audi", "Cadillac"
-    ].sort();
+    const drivers = ["Max Verstappen", "Isack Hadjar", "Lando Norris", "Oscar Piastri", "Charles Leclerc", "Lewis Hamilton", "George Russell", "Kimi Antonelli", "Fernando Alonso", "Lance Stroll", "Carlos Sainz", "Alex Albon", "Pierre Gasly", "Franco Colapinto", "Liam Lawson", "Arvid Lindblad", "Esteban Ocon", "Oliver Bearman", "Nico Hulkenberg", "Gabriel Bortoleto", "Sergio Perez", "Valtteri Bottas"].sort();
+    const teams = ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", "Alpine", "Williams", "Racing Bulls", "Haas", "Audi", "Cadillac"].sort();
     
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
+    // --- CUSTOM TOAST NOTIFICATIONS ---
+    function showToast(message, type = 'error') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerText = message;
+        container.appendChild(toast);
+        setTimeout(() => { toast.style.animation = 'fadeOut 0.3s forwards'; setTimeout(() => toast.remove(), 300); }, 4000);
+    }
+
+    function showSupportModal() { showToast('Constructors Fund integration coming soon. Thank you for the support!', 'success'); }
+
     document.addEventListener('DOMContentLoaded', () => {
         fillDrops();
-        if(!user) {
-            document.getElementById('auth').style.display='flex';
-        } else {
-            document.getElementById('auth').style.display='none';
-            start();
-        }
+        if(!user) { document.getElementById('auth').style.display='flex'; } 
+        else { document.getElementById('auth').style.display='none'; start(); }
     });
 
-    function start() {
-        checkAdm();
-        loadRace();
-        loadBoard();
-        buildGridTab();
-        setupSmartDrops();
-    }
+    function start() { checkAdm(); loadRace(); loadBoard(); buildGridTab(); setupSmartDrops(); }
 
     function fillDrops() {
         const d = '<option value="" disabled selected>Select Driver...</option>' + drivers.map(x=>`<option value="${x}">${x}</option>`).join('');
@@ -415,9 +307,7 @@
             const picked = Array.from(group).map(s => s.value).filter(v => v);
             group.forEach(s => {
                 const current = s.value;
-                Array.from(s.options).forEach(o => {
-                    o.disabled = (o.value && picked.includes(o.value) && o.value !== current) ? true : false;
-                });
+                Array.from(s.options).forEach(o => { o.disabled = (o.value && picked.includes(o.value) && o.value !== current) ? true : false; });
             });
         }
         ds.forEach(s => s.addEventListener('change', () => update(ds)));
@@ -427,42 +317,121 @@
     async function loadRace() {
         try {
             const r = await fetch('/api/next-race').then(res=>res.json());
-            
             document.getElementById('r-round').innerText = `Round ${r.round} of 24`;
             document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
             document.getElementById('r-record').innerHTML = `⏱️ <b style="color: var(--text-main)">Lap Record:</b> ${r.record || 'No record available'}`;
-            
             raceLock = new Date(r.date);
             
-            const sp = document.getElementById('sprint-box');
-            if (r.hasSprint) {
-                sp.classList.remove('hidden');
-                document.getElementById('sg').required = true;
-                document.getElementById('sl').required = true;
-            } else {
-                sp.classList.add('hidden');
-                document.getElementById('sg').required = false;
-                document.getElementById('sl').required = false;
-            }
+            if (r.hasSprint) { document.getElementById('sprint-box').classList.remove('hidden'); document.getElementById('sg').required = true; document.getElementById('sl').required = true; } 
+            else { document.getElementById('sprint-box').classList.add('hidden'); document.getElementById('sg').required = false; document.getElementById('sl').required = false; }
             
             if (new Date() > raceLock) {
                 document.getElementById('p-form').style.display = 'none';
-                document.getElementById('locked-msg').style.display = 'block';
+                document.getElementById('locked-msg').classList.remove('hidden');
             }
-        } catch (e) { console.log("API Error", e); }
+        } catch (e) { showToast("Failed to load circuit telemetry.", "error"); }
     }
 
     function tab(t, btnElement) {
         document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
         document.getElementById(t).classList.add('active');
-        
-        // Handle Nav Highlights
         document.querySelectorAll('#main-nav button').forEach(b => b.classList.remove('active-nav'));
         if(btnElement) btnElement.classList.add('active-nav');
+        if(t==='live') loadLive(); if(t==='standings') loadBoard(); if(t==='calendar') loadCalendar();
+    }
 
-        if(t==='live') loadLive();
-        if(t==='standings') loadBoard();
-        if(t==='calendar') loadCalendar();
+    // --- RESTORED: FULL LIVE TELEMETRY ---
+    async function loadLive() {
+        const list = document.getElementById('live-list');
+        list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
+        const d = await fetch('/api/predictions').then(r=>r.json());
+        
+        if (d.length === 0) { 
+            list.innerHTML = "<div class='predict-group' style='text-align: center; color: var(--text-muted);'>No telemetry submitted yet for this session.</div>"; 
+        } else {
+            list.innerHTML = d.map(x=>`
+                <div class="predict-group" style="border-left: 4px solid var(--red);">
+                    <h3 style="margin-top:0;">🏎️ ${x.user_name}</h3>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 0.95rem;">
+                        <div style="background:#0a0a0c; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                            <strong style="color:var(--text-muted); display:block; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Drivers</strong>
+                            <div style="line-height:1.8; color: var(--text-main);">
+                                <span style="color:var(--text-muted)">P1:</span> <b>${x.p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${x.p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${x.p3}</b><br>
+                                <span style="color:var(--text-muted)">P11:</span> <b>${x.p11}</b> | <span style="color:var(--text-muted)">P12:</span> <b>${x.p12}</b><br>
+                                <span style="color:var(--text-muted)">P19:</span> <b>${x.p19}</b> | <span style="color:var(--text-muted)">P20:</span> <b>${x.p20}</b>
+                            </div>
+                        </div>
+                        <div style="background:#0a0a0c; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                            <strong style="color:var(--text-muted); display:block; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Constructors</strong>
+                            <div style="line-height:1.8; color: var(--text-main);">
+                                <span style="color:var(--text-muted)">1st:</span> <b>${x.c1}</b> | <span style="color:var(--text-muted)">2nd:</span> <b>${x.c2}</b><br>
+                                <span style="color:var(--text-muted)">5th:</span> <b>${x.c5}</b> | <span style="color:var(--text-muted)">6th:</span> <b>${x.c6}</b><br>
+                                <span style="color:var(--text-muted)">10th:</span> <b>${x.c10}</b>
+                            </div>
+                        </div>
+                        <div style="background:#0a0a0c; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                            <strong style="color:var(--gold); display:block; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Wildcards</strong>
+                            <div style="line-height:1.8; color: var(--text-main);">
+                                <span style="color:var(--text-muted)">Race Loser:</span> <b style="color:var(--red)">${x.w_race_loser}</b>
+                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b style="color:#00e160">${x.w_sprint_gainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b style="color:var(--red)">${x.w_sprint_loser}</b>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    async function loadBoard() {
+        const board = document.getElementById('leaderboard');
+        const skel = `<tr><td><div class="skeleton" style="width:30px;"></div></td><td><div class="skeleton" style="width:150px;"></div></td><td><div class="skeleton" style="width:40px; float:right;"></div></td></tr>`;
+        board.innerHTML = skel.repeat(5);
+        
+        const d = await fetch('/api/season-leaderboard').then(r=>r.json());
+        if (d.length === 0) { board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color: var(--text-muted);">No telemetry data available yet.</td></tr>'; } 
+        else {
+            board.innerHTML = d.map((x,i)=>{
+                let isVip = (i === 0); 
+                let nameHtml = isVip ? `<span class="vip-gold">${x.name}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 600;">${x.name}</span>`;
+                let posColor = i===0 ? '#FFD700' : (i===1 ? '#C0C0C0' : (i===2 ? '#CD7F32' : 'var(--text-muted)'));
+                
+                return `<tr><td style="text-align: center; font-weight: 900; color: ${posColor};">${i+1}</td><td>${nameHtml}</td><td style="text-align: right;"><b style="font-size:1.2rem; font-weight: 900; color: var(--text-main);">${x.total_score}</b></td></tr>`;
+            }).join('');
+        }
+    }
+
+    // --- RESTORED: FULL CALENDAR SESSIONS ---
+    async function loadCalendar() {
+        const body = document.getElementById('cal-body');
+        body.innerHTML = `<tr><td colspan="2"><div class="skeleton" style="width:100%; height:40px; margin-bottom:10px;"></div><div class="skeleton" style="width:100%; height:40px;"></div></td></tr>`;
+        
+        const d = await fetch('/api/calendar').then(r=>r.json());
+        body.innerHTML = d.map(x => {
+            const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
+            
+            let sess = x.hasSprint ? `
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: #0a0a0c; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP1</strong> ${formatTime(x.sessions?.fp1)}</div>
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">SQ</strong> ${formatTime(x.sessions?.sprintQuali)}</div>
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">Sprint</strong> ${formatTime(x.sessions?.sprint)}</div>
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">Quali</strong> ${formatTime(x.sessions?.quali)}</div>
+                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
+                        <strong style="color:var(--red); font-weight: 900; letter-spacing: 1px; width:55px; display:inline-block;">RACE</strong> <span style="color: var(--text-main); font-weight: 600;">${formatTime(x.sessions?.race)}</span>
+                    </div>
+                </div>
+            ` : `
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: #0a0a0c; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP1</strong> ${formatTime(x.sessions?.fp1)}</div>
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP2</strong> ${formatTime(x.sessions?.fp2)}</div>
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP3</strong> ${formatTime(x.sessions?.fp3)}</div>
+                    <div><strong style="color:var(--text-main); width:55px; display:inline-block;">Quali</strong> ${formatTime(x.sessions?.quali)}</div>
+                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
+                        <strong style="color:var(--red); font-weight: 900; letter-spacing: 1px; width:55px; display:inline-block;">RACE</strong> <span style="color: var(--text-main); font-weight: 600;">${formatTime(x.sessions?.race)}</span>
+                    </div>
+                </div>
+            `;
+            return `<tr><td style="vertical-align: top; font-size: 1.4rem; font-weight: 900; text-align: center; color: var(--text-muted);">${x.round}</td><td><strong style="font-size:1.3rem; display:inline-block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">${x.name}</strong>${x.hasSprint ? '<span class="sprint-badge" style="background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle;">Sprint Weekend</span>' : ''}${sess}</td></tr>`;
+        }).join('');
     }
 
     function buildGridTab() {
@@ -480,121 +449,23 @@
             { team: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
         ];
 
-        const container = document.getElementById('grid-container');
-        container.innerHTML = teamsData.map(t => {
-            // Convert hex to rgba for the subtle glow
+        document.getElementById('grid-container').innerHTML = teamsData.map(t => {
             let hex = t.color.replace('#', '');
-            let r = parseInt(hex.substring(0, 2), 16);
-            let g = parseInt(hex.substring(2, 4), 16);
-            let b = parseInt(hex.substring(4, 6), 16);
+            let r = parseInt(hex.substring(0, 2), 16), g = parseInt(hex.substring(2, 4), 16), b = parseInt(hex.substring(4, 6), 16);
             let glow = `rgba(${r}, ${g}, ${b}, 0.15)`;
-
             return `
-            <div class="team-card" style="--team-color: ${t.color}; --team-glow: ${glow};">
-                <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main);">${t.team}</h3>
+            <div class="predict-group team-card" style="--team-color: ${t.color}; --team-glow: ${glow}; border-left: 6px solid ${t.color}; padding: 20px; transition: transform 0.2s; position: relative; overflow: hidden; border-radius: 12px; margin-bottom: 0;">
+                <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); border:none;">${t.team}</h3>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div class="driver-pill">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[0].name}</span>
-                        <span style="background: ${t.color}; color: #000; padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[0].num}</span>
+                    <div style="background: #0a0a0c; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[0].name}</span><span style="background: ${t.color}; color: #000; padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[0].num}</span>
                     </div>
-                    <div class="driver-pill">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[1].name}</span>
-                        <span style="background: ${t.color}; color: #000; padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[1].num}</span>
+                    <div style="background: #0a0a0c; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[1].name}</span><span style="background: ${t.color}; color: #000; padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[1].num}</span>
                     </div>
                 </div>
             </div>
         `}).join('');
-    }
-
-    async function loadLive() {
-        const d = await fetch('/api/predictions').then(r=>r.json());
-        const list = document.getElementById('live-list');
-        if (d.length === 0) {
-            list.innerHTML = "<div style='padding: 30px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; text-align: center; color: var(--text-muted);'>No telemetry submitted yet for this session.</div>";
-        } else {
-            list.innerHTML = d.map(x=>`
-                <div style="background:var(--surface); padding:25px; margin-bottom:20px; border: 1px solid var(--border); border-left:4px solid var(--red); border-radius:8px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
-                    <h3 style="margin:0 0 20px 0; color:var(--text-main); text-transform:uppercase; font-size: 1.4rem; font-weight: 900; letter-spacing: 1px;">🏎️ ${x.user_name}</h3>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
-                        <div style="background:#0a0a0c; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-                            <strong style="color:var(--text-muted); display:block; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Drivers</strong>
-                            <div style="line-height:1.8; font-size:0.95rem; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">P1:</span> <b>${x.p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${x.p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${x.p3}</b><br>
-                                <span style="color:var(--text-muted)">P11:</span> <b>${x.p11}</b> | <span style="color:var(--text-muted)">P12:</span> <b>${x.p12}</b><br>
-                                <span style="color:var(--text-muted)">P19:</span> <b>${x.p19}</b> | <span style="color:var(--text-muted)">P20:</span> <b>${x.p20}</b>
-                            </div>
-                        </div>
-                        <div style="background:#0a0a0c; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-                            <strong style="color:var(--text-muted); display:block; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Constructors</strong>
-                            <div style="line-height:1.8; font-size:0.95rem; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">1st:</span> <b>${x.c1}</b> | <span style="color:var(--text-muted)">2nd:</span> <b>${x.c2}</b><br>
-                                <span style="color:var(--text-muted)">5th:</span> <b>${x.c5}</b> | <span style="color:var(--text-muted)">6th:</span> <b>${x.c6}</b><br>
-                                <span style="color:var(--text-muted)">10th:</span> <b>${x.c10}</b>
-                            </div>
-                        </div>
-                        <div style="background:#0a0a0c; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-                            <strong style="color:var(--text-muted); display:block; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Wildcards</strong>
-                            <div style="line-height:1.8; font-size:0.95rem; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">Race Loser:</span> <b style="color:var(--red)">${x.w_race_loser}</b>
-                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b style="color:#00e160">${x.w_sprint_gainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b style="color:var(--red)">${x.w_sprint_loser}</b>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-    }
-
-    async function loadBoard() {
-        const d = await fetch('/api/season-leaderboard').then(r=>r.json());
-        const board = document.getElementById('leaderboard');
-        if (d.length === 0) {
-            board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color: var(--text-muted);">No telemetry data available yet.</td></tr>';
-        } else {
-            board.innerHTML = d.map((x,i)=>`<tr><td style="text-align: center; font-weight: 900; color: ${i===0 ? '#FFD700' : (i===1 ? '#C0C0C0' : (i===2 ? '#CD7F32' : 'var(--text-muted)'))};">${i+1}</td><td style="font-weight: 600;">${x.name}</td><td style="text-align: right;"><b style="font-size:1.2rem; font-weight: 900; color: var(--text-main);">${x.total_score}</b></td></tr>`).join('');
-        }
-    }
-
-    async function loadCalendar() {
-        const d = await fetch('/api/calendar').then(r=>r.json());
-        const body = document.getElementById('cal-body');
-        body.innerHTML = d.map(x => {
-            const formatTime = (isoString) => {
-                if(!isoString) return 'TBC';
-                return new Date(isoString).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            };
-            let sessionHTML = x.hasSprint ? `
-                <div class="session-grid">
-                    <div><strong>FP1</strong> ${formatTime(x.sessions?.fp1)}</div>
-                    <div><strong>SQ</strong> ${formatTime(x.sessions?.sprintQuali)}</div>
-                    <div><strong>Sprint</strong> ${formatTime(x.sessions?.sprint)}</div>
-                    <div><strong>Quali</strong> ${formatTime(x.sessions?.quali)}</div>
-                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
-                        <strong style="color:var(--red); font-weight: 900; letter-spacing: 1px;">RACE</strong> <span style="color: var(--text-main); font-weight: 600;">${formatTime(x.sessions?.race)}</span>
-                    </div>
-                </div>
-            ` : `
-                <div class="session-grid">
-                    <div><strong>FP1</strong> ${formatTime(x.sessions?.fp1)}</div>
-                    <div><strong>FP2</strong> ${formatTime(x.sessions?.fp2)}</div>
-                    <div><strong>FP3</strong> ${formatTime(x.sessions?.fp3)}</div>
-                    <div><strong>Quali</strong> ${formatTime(x.sessions?.quali)}</div>
-                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
-                        <strong style="color:var(--red); font-weight: 900; letter-spacing: 1px;">RACE</strong> <span style="color: var(--text-main); font-weight: 600;">${formatTime(x.sessions?.race)}</span>
-                    </div>
-                </div>
-            `;
-            return `
-                <tr>
-                    <td style="vertical-align: top; font-size: 1.4rem; font-weight: 900; text-align: center; color: var(--text-muted);">${x.round}</td>
-                    <td>
-                        <strong style="font-size:1.3rem; display:inline-block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">${x.name}</strong> 
-                        ${x.hasSprint ? '<span class="sprint-badge">Sprint Weekend</span>' : ''}
-                        ${sessionHTML}
-                    </td>
-                </tr>
-            `;
-        }).join('');
     }
 
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
@@ -606,38 +477,31 @@
             w_race_loser:val('wl'), w_sprint_gainer: document.getElementById('sg').value, w_sprint_loser: document.getElementById('sl').value
         };
         const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-        if(res.ok) alert('✅ Strategy Locked Successfully!'); 
-        else {
-            const err = await res.json();
-            alert('Error: ' + (err.message || 'Locked or Failed'));
-        }
+        if(res.ok) { showToast('✅ Strategy Transmitted and Locked', 'success'); } 
+        else { const err = await res.json(); showToast('Error: ' + (err.message || 'Locked or Failed'), 'error'); }
     });
     function val(id) { return document.getElementById(id).value; }
 
     async function finalize() {
-        if(!confirm('⚠️ WARNING: Are you sure you want to finalize the race weekend and permanently calculate scores?')) return;
-        document.getElementById('adm-stat').innerText = 'Processing telemetry...';
+        if(!confirm('⚠️ WARNING: Finalize the race weekend and calculate scores?')) return;
+        showToast('Processing telemetry...', 'success');
         const res = await fetch('/api/finalize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_name:user.name, password:user.password}) });
         const d = await res.json();
-        if(res.ok) {
-            document.getElementById('adm-stat').innerText = '✅ Finalization Complete! Standings Updated.';
-            setTimeout(() => location.reload(), 2000);
-        } else {
-            document.getElementById('adm-stat').innerText = '❌ Error: ' + d.message;
-        }
+        if(res.ok) { showToast('✅ Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
+        else { showToast('❌ Error: ' + d.message, 'error'); }
     }
 
     async function login() {
         const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
         const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
         if(res.ok) { localStorage.setItem('f1_user', JSON.stringify({name, password})); location.reload(); }
-        else alert('Invalid Credentials. Access Denied.');
+        else showToast('Invalid Credentials. Access Denied.', 'error');
     }
     async function reg() {
         const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
         const res = await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
-        if(res.ok) alert('Registration Successful! You may now Enter the Garage.');
-        else alert('Username taken. Please choose another.');
+        if(res.ok) showToast('Registration Successful! You may now Enter.', 'success');
+        else showToast('Username taken. Please choose another.', 'error');
     }
     function logout() { localStorage.clear(); location.reload(); }
     function checkAdm() { if(user && user.name === 'admin') document.getElementById('admin-panel').classList.remove('hidden'); }
