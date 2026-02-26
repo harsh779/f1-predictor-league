@@ -54,11 +54,10 @@
         
         label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; display: block; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; letter-spacing: 1px;}
         
-        /* AGGRESSIVE DROPDOWN STYLING FIX */
+        /* AGGRESSIVE DROPDOWN STYLING FIX *//* AGGRESSIVE DROPDOWN STYLING FIX */
         select, input { 
             width: 100%; 
-            padding: 14px 45px 14px 16px; /* Extra right padding for the arrow */
-            background-color: var(--surface); 
+            padding: 14px 45px 14px 16px; 
             border: 2px solid var(--border); 
             color: var(--text-main); 
             border-radius: 8px; 
@@ -68,16 +67,29 @@
             box-sizing: border-box; 
             transition: all 0.2s ease; 
             cursor: pointer;
-            /* Force removal of native browser UI */
-            appearance: none; 
-            -webkit-appearance: none; 
-            -moz-appearance: none;
-            /* Custom Red Arrow */
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%23e10600" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); 
+            
+            /* 1. Force removal of native browser UI */
+            appearance: none !important; 
+            -webkit-appearance: none !important; 
+            -moz-appearance: none !important;
+            
+            /* 2. Base64 Encoded Custom Red Arrow (Guaranteed to work on all devices) */
+            background-color: var(--surface); 
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2UxMDYwMCI+PHBhdGggZD0iTTcgMTBsNSA1IDUtNXoiLz48L3N2Zz4='); 
             background-repeat: no-repeat; 
-            background-position: right 12px center; 
+            background-position: right 16px center;
+            background-size: 24px 24px;
         }
-        select:focus, input:focus { border-color: var(--red); outline: none; box-shadow: 0 0 0 4px var(--red-glow); background-color: #fffafA;}
+        
+        /* 3. Kill the native arrow specifically on older Edge/Windows browsers */
+        select::-ms-expand { display: none; }
+
+        select:focus, input:focus { 
+            border-color: var(--red); 
+            outline: none; 
+            box-shadow: 0 0 0 4px var(--red-glow); 
+            background-color: #fffafA;
+        }
         option { color: var(--text-main); font-weight: 600; }
         option:disabled { color: #aaa; background: #f0f0f0; }
         
