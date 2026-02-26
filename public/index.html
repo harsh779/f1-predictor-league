@@ -9,53 +9,43 @@
         :root { --red: #e10600; --bg: #15151e; --card: #1f1f23; --text: #fff; }
         body { margin:0; font-family:'Titillium Web',sans-serif; background:var(--bg); color:var(--text); }
         
-        /* Navigation */
         header { background:var(--red); padding:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap;}
         h1 { margin: 0; font-size: 1.5rem; font-style: italic; }
         nav { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;}
         nav button { background:rgba(0,0,0,0.2); border:none; color:white; font-weight:bold; cursor:pointer; padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; }
         nav button:hover { background:rgba(255,255,255,0.3); }
         
-        /* Layout */
         main { padding:20px; max-width:900px; margin:0 auto; }
         .tab { display:none; animation: fadeIn 0.3s; } 
         .active { display:block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Forms */
         .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:30px; }
         @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
         
         select, input { width:100%; padding:12px; margin:5px 0 15px; background:#2a2a2f; border:1px solid #444; color:white; border-radius:4px; box-sizing: border-box; }
         select:focus { border-color: var(--red); outline: none; }
         option:disabled { color: #555; background: #1a1a1a; }
-        
         label { font-size:0.9rem; color:#aaa; font-weight:bold; display:block; text-transform:uppercase; margin-top: 10px; }
         
-        /* Buttons */
         .btn { background:var(--red); color:white; border:none; padding:15px; width:100%; font-weight:bold; cursor:pointer; border-radius:4px; margin-top:20px; font-size: 1.1rem; }
         .btn:hover { background: #b30000; }
         
-        /* Admin Box */
         .admin-box { margin-top:40px; border:2px solid var(--red); padding:20px; background:rgba(225,6,0,0.1); border-radius:8px; display:none; text-align: center; }
         
-        /* Tables */
         table { width:100%; border-collapse:collapse; background: var(--card); border-radius: 8px; overflow: hidden; margin-top: 20px; }
         th { background:#2a2a2f; color:var(--red); padding:15px; text-align:left; text-transform: uppercase; font-size: 0.85rem; }
         td { padding:15px; border-bottom:1px solid #333; }
         
-        /* Rules List */
         .rules-list { line-height: 1.6; background: var(--card); padding: 20px 40px; border-radius: 8px; border-left: 4px solid var(--red); }
         .rules-list li { margin-bottom: 15px; }
         .rules-list h3 { color: var(--red); margin-bottom: 5px; margin-top: 20px;}
         
-        /* Login Modal */
         .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:999; }
         .modal-box { background:#222; padding:40px; border-radius:8px; width:90%; max-width:400px; text-align:center; border:1px solid #444; }
         .hidden { display:none; }
         .sprint-badge { background: #e10600; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px; text-transform: uppercase; }
         
-        /* Session Grid */
         .session-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: #ccc; margin-top: 10px; background: #1a1a1f; padding: 10px; border-radius: 4px;}
         .session-grid div strong { color: #fff; display: inline-block; width: 65px;}
     </style>
@@ -69,16 +59,22 @@
         <button onclick="tab('live')">Live</button>
         <button onclick="tab('standings')">Standings</button>
         <button onclick="tab('calendar')">📅 Calendar</button>
+        <button onclick="tab('grid')">🏎️ The Grid</button>
         <button onclick="tab('rules')">📜 Rules</button>
-        <button onclick="tab('archive')">🏆 2025 Archive</button>
+        <button onclick="tab('archive')">🏆 Archive</button>
         <button onclick="logout()">Logout</button>
     </nav>
 </header>
 
 <main>
     <div id="predict" class="tab active">
-        <h2>Next Race: <span id="r-name" style="color:var(--red)">Loading...</span></h2>
-        <div id="locked-msg" style="display:none; background:var(--red); padding:15px; text-align:center; font-weight: bold; border-radius: 4px;">🚫 PREDICTIONS LOCKED (CARS ON TRACK)</div>
+        <div style="background: #1a1a1f; padding: 20px; border-radius: 8px; border-left: 5px solid var(--red); margin-bottom: 20px;">
+            <p id="r-round" style="color: var(--red); font-weight: bold; font-size: 0.9rem; text-transform: uppercase; margin: 0 0 5px 0;">Loading...</p>
+            <h2 id="r-header" style="margin: 0 0 8px 0; font-size: 1.8rem; text-transform: uppercase;">Loading Circuit...</h2>
+            <p id="r-record" style="margin: 0; color: #aaa; font-size: 1rem;">⏱️ <b>Lap Record:</b> Loading...</p>
+        </div>
+
+        <div id="locked-msg" style="display:none; background:var(--red); padding:15px; text-align:center; font-weight: bold; border-radius: 4px; margin-bottom: 20px;">🚫 PREDICTIONS LOCKED (CARS ON TRACK)</div>
         
         <form id="p-form">
             <div class="form-grid">
@@ -162,34 +158,36 @@
         </table>
     </div>
 
+    <div id="grid" class="tab">
+        <h2>2026 Official Grid</h2>
+        <p style="color: #888;">Complete driver line-up and constructors for the 2026 FIA Formula One World Championship.</p>
+        <div id="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+            </div>
+    </div>
+
     <div id="rules" class="tab">
         <h2>📜 Official League Regulations</h2>
         <div class="rules-list">
             <h3>⏰ 1. The Deadline</h3>
             <ul>
                 <li>Predictions are <strong>strictly locked</strong> the exact minute that <strong>Practice 1 (P1)</strong> begins on Friday (or Sprint Qualifying on Sprint weekends).</li>
-                <li>Once cars are on track, no changes can be made.</li>
             </ul>
             <h3>🏎️ 2. Driver Scoring (P1, P2, P3, P11, P12, P19, P20)</h3>
             <ul>
-                <li><strong>Baseline:</strong> Everyone starts the race at 0 points.</li>
-                <li><strong>Exact Match Bonus:</strong> If you guess the driver's exact finishing position, you get <strong>+2 Points</strong>.</li>
-                <li><strong>Miss Penalty:</strong> You lose <strong>-1 Point</strong> for every position your prediction is away from the actual result.</li>
+                <li><strong>Exact Match Bonus:</strong> +2 Points.</li>
+                <li><strong>Miss Penalty:</strong> -1 Point for every position your prediction is away from the actual result.</li>
             </ul>
-            <h3>💥 3. The DNF Rule (Did Not Finish)</h3>
+            <h3>💥 3. The DNF Rule</h3>
             <ul>
-                <li>If a driver retires, crashes, or fails to finish the race (DNF), they are automatically scored as finishing in <strong>P20</strong> for our math.</li>
+                <li>If a driver retires, crashes, or fails to finish (DNF), they are automatically scored as finishing in <strong>P20</strong>.</li>
             </ul>
             <h3>🛠️ 4. Constructor Scoring (1st, 2nd, 5th, 6th, 10th)</h3>
             <ul>
-                <li>Constructor ranks are based on the combined finishing positions of their two cars in <em>that specific race</em>.</li>
-                <li><strong>Exact Match Bonus:</strong> +2 Points. <strong>Miss Penalty:</strong> -1 Point for every rank off.</li>
+                <li>Constructor ranks are based on the combined finishing positions of their two cars in that specific race.</li>
             </ul>
-            <h3>🃏 5. Wildcards & Penalties</h3>
+            <h3>🃏 5. Wildcards</h3>
             <ul>
-                <li><strong>Biggest Race Loser:</strong> Correctly guessing the driver who drops the most positions from grid to finish earns <strong>+5 Points</strong>.</li>
-                <li><strong>Sprint Weekends:</strong> On Sprint weekends, two extra wildcards activate: Sprint Gainer and Sprint Loser (<strong>+5 Points each</strong>).</li>
-                <li><strong>Missed Race:</strong> You receive the lowest score of the week, minus an additional 5 points.</li>
+                <li><strong>Biggest Race Loser:</strong> +5 Points for guessing the driver who drops the most positions from grid to finish.</li>
             </ul>
         </div>
     </div>
@@ -207,11 +205,6 @@
                         <tr><td>3</td><td>Oscar Piastri</td><td>410</td></tr>
                         <tr><td>4</td><td>George Russell</td><td>319</td></tr>
                         <tr><td>5</td><td>Charles Leclerc</td><td>242</td></tr>
-                        <tr><td>6</td><td>Lewis Hamilton</td><td>156</td></tr>
-                        <tr><td>7</td><td>Andrea Kimi Antonelli</td><td>150</td></tr>
-                        <tr><td>8</td><td>Alexander Albon</td><td>73</td></tr>
-                        <tr><td>9</td><td>Carlos Sainz</td><td>64</td></tr>
-                        <tr><td>10</td><td>Fernando Alonso</td><td>56</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -225,11 +218,6 @@
                         <tr><td>3</td><td>Red Bull Racing</td><td>451</td></tr>
                         <tr><td>4</td><td>Ferrari</td><td>398</td></tr>
                         <tr><td>5</td><td>Williams</td><td>137</td></tr>
-                        <tr><td>6</td><td>Racing Bulls</td><td>92</td></tr>
-                        <tr><td>7</td><td>Aston Martin</td><td>89</td></tr>
-                        <tr><td>8</td><td>Haas</td><td>79</td></tr>
-                        <tr><td>9</td><td>Kick Sauber</td><td>70</td></tr>
-                        <tr><td>10</td><td>Alpine</td><td>22</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -267,6 +255,7 @@
         checkAdm();
         loadRace();
         loadBoard();
+        buildGridTab(); // Build the new Grid page immediately
         setupSmartDrops();
     }
 
@@ -293,10 +282,16 @@
         ts.forEach(s => s.addEventListener('change', () => update(ts)));
     }
 
+    // --- UPDATED: PROFESSIONAL PREDICT HEADER ---
     async function loadRace() {
         try {
             const r = await fetch('/api/next-race').then(res=>res.json());
-            document.getElementById('r-name').innerText = r.name;
+            
+            // Populate the new broadcast header
+            document.getElementById('r-round').innerText = `Round ${r.round} of 24`;
+            document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
+            document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
+            
             raceLock = new Date(r.date);
             
             const sp = document.getElementById('sprint-box');
@@ -315,7 +310,7 @@
                 document.getElementById('locked-msg').style.display = 'block';
             }
         } catch (e) {
-            console.log("API Error");
+            console.log("API Error", e);
         }
     }
 
@@ -327,7 +322,39 @@
         if(t==='calendar') loadCalendar();
     }
 
-    // --- FULL LIVE DATA DISPLAY ---
+    // --- NEW: THE 2026 GRID PAGE ---
+    function buildGridTab() {
+        const teamsData = [
+            { team: "Ferrari", color: "#E80020", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
+            { team: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
+            { team: "Red Bull Racing", color: "#3671C6", drivers: [{name: "Max Verstappen", num: 1}, {name: "Yuki Tsunoda", num: 22}] },
+            { team: "Mercedes", color: "#27F4D2", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
+            { team: "Aston Martin", color: "#229971", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
+            { team: "Williams", color: "#64C4FF", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alex Albon", num: 23}] },
+            { team: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Jack Doohan", num: 7}] },
+            { team: "Racing Bulls", color: "#6692FF", drivers: [{name: "Liam Lawson", num: 30}, {name: "Isack Hadjar", num: 17}] },
+            { team: "Haas", color: "#FFFFFF", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
+            { team: "Audi (Sauber)", color: "#00FF00", drivers: [{name: "Gabriel Bortoleto", num: 5}, {name: "Franco Colapinto", num: 43}] }
+        ];
+
+        const container = document.getElementById('grid-container');
+        container.innerHTML = teamsData.map(t => `
+            <div style="background: var(--card); border-left: 6px solid ${t.color}; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; text-transform: uppercase;">${t.team}</h3>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="background: #1a1a1f; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; font-size: 1.1rem;">${t.drivers[0].name}</span>
+                        <span style="background: ${t.color}; color: #000; padding: 2px 8px; border-radius: 4px; font-weight: 900;">${t.drivers[0].num}</span>
+                    </div>
+                    <div style="background: #1a1a1f; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; font-size: 1.1rem;">${t.drivers[1].name}</span>
+                        <span style="background: ${t.color}; color: #000; padding: 2px 8px; border-radius: 4px; font-weight: 900;">${t.drivers[1].num}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
     async function loadLive() {
         const d = await fetch('/api/predictions').then(r=>r.json());
         const list = document.getElementById('live-list');
@@ -377,44 +404,35 @@
         }
     }
 
-    // --- FULL SESSION CALENDAR DISPLAY ---
     async function loadCalendar() {
         const d = await fetch('/api/calendar').then(r=>r.json());
         const body = document.getElementById('cal-body');
-        
         body.innerHTML = d.map(x => {
             const formatTime = (isoString) => {
                 if(!isoString) return 'TBC';
                 return new Date(isoString).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             };
-
-            let sessionHTML = '';
-            if (x.hasSprint) {
-                sessionHTML = `
-                    <div class="session-grid">
-                        <div><strong>FP1:</strong> ${formatTime(x.sessions?.fp1)}</div>
-                        <div><strong>SQ:</strong> ${formatTime(x.sessions?.sprintQuali)}</div>
-                        <div><strong>Sprint:</strong> ${formatTime(x.sessions?.sprint)}</div>
-                        <div><strong>Quali:</strong> ${formatTime(x.sessions?.quali)}</div>
-                        <div style="grid-column: 1 / -1; margin-top: 5px; color: white;">
-                            <strong style="color:var(--red)">RACE:</strong> ${formatTime(x.sessions?.race)}
-                        </div>
+            let sessionHTML = x.hasSprint ? `
+                <div class="session-grid">
+                    <div><strong>FP1:</strong> ${formatTime(x.sessions?.fp1)}</div>
+                    <div><strong>SQ:</strong> ${formatTime(x.sessions?.sprintQuali)}</div>
+                    <div><strong>Sprint:</strong> ${formatTime(x.sessions?.sprint)}</div>
+                    <div><strong>Quali:</strong> ${formatTime(x.sessions?.quali)}</div>
+                    <div style="grid-column: 1 / -1; margin-top: 5px; color: white;">
+                        <strong style="color:var(--red)">RACE:</strong> ${formatTime(x.sessions?.race)}
                     </div>
-                `;
-            } else {
-                sessionHTML = `
-                    <div class="session-grid">
-                        <div><strong>FP1:</strong> ${formatTime(x.sessions?.fp1)}</div>
-                        <div><strong>FP2:</strong> ${formatTime(x.sessions?.fp2)}</div>
-                        <div><strong>FP3:</strong> ${formatTime(x.sessions?.fp3)}</div>
-                        <div><strong>Quali:</strong> ${formatTime(x.sessions?.quali)}</div>
-                        <div style="grid-column: 1 / -1; margin-top: 5px; color: white;">
-                            <strong style="color:var(--red)">RACE:</strong> ${formatTime(x.sessions?.race)}
-                        </div>
+                </div>
+            ` : `
+                <div class="session-grid">
+                    <div><strong>FP1:</strong> ${formatTime(x.sessions?.fp1)}</div>
+                    <div><strong>FP2:</strong> ${formatTime(x.sessions?.fp2)}</div>
+                    <div><strong>FP3:</strong> ${formatTime(x.sessions?.fp3)}</div>
+                    <div><strong>Quali:</strong> ${formatTime(x.sessions?.quali)}</div>
+                    <div style="grid-column: 1 / -1; margin-top: 5px; color: white;">
+                        <strong style="color:var(--red)">RACE:</strong> ${formatTime(x.sessions?.race)}
                     </div>
-                `;
-            }
-
+                </div>
+            `;
             return `
                 <tr>
                     <td style="vertical-align: top; font-size: 1.2rem; font-weight: bold;">${x.round}</td>
@@ -434,9 +452,7 @@
             user_name: user.name, password: user.password,
             p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p19:val('p19'), p20:val('p20'),
             c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
-            w_race_loser:val('wl'), 
-            w_sprint_gainer: document.getElementById('sg').value,
-            w_sprint_loser: document.getElementById('sl').value
+            w_race_loser:val('wl'), w_sprint_gainer: document.getElementById('sg').value, w_sprint_loser: document.getElementById('sl').value
         };
         const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
         if(res.ok) alert('✅ Strategy Locked!'); 
