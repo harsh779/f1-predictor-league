@@ -17,8 +17,7 @@ const db = createClient({
 async function setupDatabase() {
   try {
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0)`);
-    
-    // UPDATED: Changed table name to 'f1_predictions_v2' to fix the column error
+    // TABLE v2: Includes P11, P12, Sprint Wildcards
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         user_name TEXT UNIQUE, 
@@ -29,7 +28,7 @@ async function setupDatabase() {
         w_race_loser TEXT, 
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
-    console.log("✅ Database Synced: v2 Table Ready.");
+    console.log("✅ Database Synced: v2 Ready.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -99,7 +98,7 @@ async function performFinalization() {
     const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v2");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions." };
 
-    // Parse Results
+    // Scoring Logic
     const actualDriverPositions = {};
     results.forEach(r => { actualDriverPositions[normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`)] = parseInt(r.position); });
 
@@ -125,7 +124,6 @@ async function performFinalization() {
        }
     });
 
-    // Score Calculations
     const predictions = await db.execute("SELECT * FROM f1_predictions_v2").then(r => r.rows);
     let scores = {}; let lowest = Infinity;
 
@@ -175,6 +173,11 @@ app.get('/api/next-race', (req, res) => {
     res.json(next);
 });
 
+// NEW: Calendar Route
+app.get('/api/calendar', (req, res) => {
+    res.json(f1Calendar2026);
+});
+
 app.post('/predict', async (req, res) => {
     const d = req.body;
     const auth = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [d.user_name, d.password] });
@@ -183,10 +186,8 @@ app.post('/predict', async (req, res) => {
     // LOCK CHECK
     const now = new Date();
     const next = f1Calendar2026.find(r => new Date(r.date) > now); 
-    // If NO future race is found, or we are currently in "Post-Race" limbo before finalization:
     if (!next) return res.status(403).json({ success: false, message: "Season Over" });
 
-    // DATABASE SAVE
     try {
         await db.execute({
             sql: `INSERT INTO f1_predictions_v2 (user_name, p1, p2, p3, p11, p12, p19, p20, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser) 
@@ -199,7 +200,6 @@ app.post('/predict', async (req, res) => {
         });
         res.json({ success: true });
     } catch (e) { 
-        console.error(e);
         res.status(500).json({ success: false, message: e.message }); 
     }
 });

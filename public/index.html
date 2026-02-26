@@ -52,6 +52,7 @@
         .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:999; }
         .modal-box { background:#222; padding:40px; border-radius:8px; width:90%; max-width:400px; text-align:center; border:1px solid #444; }
         .hidden { display:none; }
+        .sprint-badge { background: #e10600; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -62,6 +63,7 @@
         <button onclick="tab('predict')">Predict</button>
         <button onclick="tab('live')">Live</button>
         <button onclick="tab('standings')">Standings</button>
+        <button onclick="tab('calendar')">📅 Calendar</button>
         <button onclick="tab('rules')">📜 Rules</button>
         <button onclick="logout()">Logout</button>
     </nav>
@@ -79,14 +81,10 @@
                     <label>P1 Winner</label><select id="p1" class="s-driver" required></select>
                     <label>P2 Runner Up</label><select id="p2" class="s-driver" required></select>
                     <label>P3 Third</label><select id="p3" class="s-driver" required></select>
-                    
                     <hr style="border-color:#333; margin: 20px 0;">
-                    
                     <label>P11 (Just Missed Points)</label><select id="p11" class="s-driver" required></select>
                     <label>P12</label><select id="p12" class="s-driver" required></select>
-                    
                     <hr style="border-color:#333; margin: 20px 0;">
-                    
                     <label>P19</label><select id="p19" class="s-driver" required></select>
                     <label>P20 Last Place</label><select id="p20" class="s-driver" required></select>
                 </div>
@@ -143,6 +141,22 @@
         </table>
     </div>
 
+    <div id="calendar" class="tab">
+        <h2>2026 Schedule</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Round</th>
+                    <th>Date</th>
+                    <th>Grand Prix</th>
+                </tr>
+            </thead>
+            <tbody id="cal-body">
+                <tr><td colspan="3" style="text-align:center; color: #888;">Loading calendar...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
     <div id="rules" class="tab">
         <h2>📜 Official 2026 Regulations</h2>
         <ul class="rules-list">
@@ -195,7 +209,7 @@
     function start() {
         checkAdm();
         loadRace();
-        loadBoard(); // Load standings immediately
+        loadBoard();
         setupSmartDrops();
     }
 
@@ -216,7 +230,6 @@
             group.forEach(s => {
                 const current = s.value;
                 Array.from(s.options).forEach(o => {
-                    // Disable if picked elsewhere AND not currently selected here
                     if (o.value && picked.includes(o.value) && o.value !== current) {
                         o.disabled = true;
                     } else {
@@ -236,7 +249,6 @@
             document.getElementById('r-name').innerText = r.name;
             raceLock = new Date(r.date);
             
-            // Sprint Toggle
             const sp = document.getElementById('sprint-box');
             if (r.hasSprint) {
                 sp.classList.remove('hidden');
@@ -248,7 +260,6 @@
                 document.getElementById('sl').required = false;
             }
             
-            // Lock Check
             if (new Date() > raceLock) {
                 document.getElementById('p-form').style.display = 'none';
                 document.getElementById('locked-msg').style.display = 'block';
@@ -265,6 +276,7 @@
         
         if(t==='live') loadLive();
         if(t==='standings') loadBoard();
+        if(t==='calendar') loadCalendar(); // NEW
     }
 
     // --- 4. DATA FETCHING ---
@@ -289,13 +301,26 @@
         if (d.length === 0) {
             board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">No drivers registered yet.</td></tr>';
         } else {
-            board.innerHTML = d.map((x,i)=>`
-                <tr>
-                    <td>${i+1}</td>
-                    <td>${x.name}</td>
-                    <td><b>${x.total_score}</b></td>
-                </tr>`).join('');
+            board.innerHTML = d.map((x,i)=>`<tr><td>${i+1}</td><td>${x.name}</td><td><b>${x.total_score}</b></td></tr>`).join('');
         }
+    }
+
+    async function loadCalendar() {
+        const d = await fetch('/api/calendar').then(r=>r.json());
+        const body = document.getElementById('cal-body');
+        body.innerHTML = d.map(x => {
+            const date = new Date(x.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            return `
+                <tr>
+                    <td>${x.round}</td>
+                    <td>${date}</td>
+                    <td>
+                        ${x.name}
+                        ${x.hasSprint ? '<span class="sprint-badge">Sprint</span>' : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
     // --- 5. SUBMIT & ADMIN ---
@@ -345,10 +370,7 @@
         else alert('Username taken.');
     }
     function logout() { localStorage.clear(); location.reload(); }
-    
-    function checkAdm() {
-        if(user && user.name === 'admin') document.getElementById('admin-panel').style.display = 'block';
-    }
+    function checkAdm() { if(user && user.name === 'admin') document.getElementById('admin-panel').style.display = 'block'; }
 </script>
 </body>
 </html>
