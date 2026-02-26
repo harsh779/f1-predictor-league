@@ -53,7 +53,7 @@
         .predict-group h3 { margin: 0 0 20px 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
         label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; display: block; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; letter-spacing: 1px;}
         
-        /* THE NEW "TAP-TRIGGER" INPUTS */
+        /* THE "TAP-TRIGGER" INPUTS */
         input.selector-input { 
             width: 100%; 
             padding: 14px 45px 14px 16px; 
@@ -68,7 +68,6 @@
             transition: all 0.2s ease; 
             cursor: pointer;
             outline: none;
-            /* Custom tap icon instead of dropdown arrow */
             background-image: url('data:image/svg+xml;utf8,<svg fill="%23d1d1d6" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>'); 
             background-repeat: no-repeat; 
             background-position: right 16px center; 
@@ -107,11 +106,13 @@
         /* 10. GRID MODAL (THE NEW DROPDOWN) */
         .grid-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter: blur(5px); display:flex; justify-content:center; align-items:flex-end; z-index:9999; }
         .grid-modal-content { background: var(--bg-light); width: 100%; max-width: 700px; max-height: 85vh; border-radius: 20px 20px 0 0; padding: 25px; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @media (min-width: 768px) { .grid-modal { align-items: center; } .grid-modal-content { border-radius: 20px; max-height: 80vh; } }
         @keyframes slideUpModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
         
         .grid-modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 15px; }
         .grid-modal-header h3 { margin: 0; font-size: 1.3rem; text-transform: uppercase; color: var(--text-main); font-weight: 900;}
-        .close-btn { background: none; border: none; font-size: 2rem; color: var(--text-muted); cursor: pointer; line-height: 1; }
+        .close-btn { background: none; border: none; font-size: 2rem; color: var(--text-muted); cursor: pointer; line-height: 1; transition: color 0.2s ease; }
+        .close-btn:hover { color: var(--red); }
         
         .modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; overflow-y: auto; padding-bottom: 30px; }
         .modal-grid-btn { background: var(--surface); border: 1px solid var(--border); padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-family: 'Titillium Web'; font-size: 1.1rem; font-weight: 700; color: var(--text-main); cursor: pointer; transition: all 0.2s ease; border-left: 5px solid var(--team-color); }
@@ -176,7 +177,7 @@
 
                     <div class="predict-group">
                         <h3>🎯 The Points Bubble</h3>
-                        <label>P11 (Heartbreak)</label><input type="text" id="p11" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p11', 'driver', 'Select P11')" required>
+                        <label>P11 (Heartbreak)</label><input type="text" id="p11" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p11', 'driver', 'Select P11 (Just Missed Points)')" required>
                         <label>P12</label><input type="text" id="p12" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p12', 'driver', 'Select P12')" required>
                     </div>
 
@@ -307,7 +308,7 @@
     </div>
 </main>
 
-<div id="auth" class="modal">
+<div id="auth" class="modal" style="display: none;">
     <div class="modal-box">
         <h2 style="margin-top: 0; font-size: 2rem; text-transform: uppercase; letter-spacing: 1px;">Paddock Entry</h2>
         <input type="text" id="u-name" placeholder="Driver Name" style="margin-bottom: 15px; padding: 14px; width: 100%; border-radius: 8px; border: 1px solid var(--border); font-size: 1rem; box-sizing: border-box;">
@@ -318,33 +319,33 @@
 </div>
 
 <script>
-    // RICH DATA FOR THE MODAL GRID
-    const detailedDrivers = [
-        {name: "Max Verstappen", num: 1, color: "#1E41FF"}, {name: "Isack Hadjar", num: 20, color: "#1E41FF"},
-        {name: "Lando Norris", num: 4, color: "#FF8000"}, {name: "Oscar Piastri", num: 81, color: "#FF8000"},
-        {name: "Charles Leclerc", num: 16, color: "#E80020"}, {name: "Lewis Hamilton", num: 44, color: "#E80020"},
-        {name: "George Russell", num: 63, color: "#27F4D2"}, {name: "Kimi Antonelli", num: 12, color: "#27F4D2"},
-        {name: "Fernando Alonso", num: 14, color: "#006F62"}, {name: "Lance Stroll", num: 18, color: "#006F62"},
-        {name: "Carlos Sainz", num: 55, color: "#00A0E9"}, {name: "Alex Albon", num: 23, color: "#00A0E9"},
-        {name: "Pierre Gasly", num: 10, color: "#FF87BC"}, {name: "Franco Colapinto", num: 43, color: "#FF87BC"},
-        {name: "Liam Lawson", num: 30, color: "#1434CB"}, {name: "Arvid Lindblad", num: 8, color: "#1434CB"},
-        {name: "Esteban Ocon", num: 31, color: "#B6BABD"}, {name: "Oliver Bearman", num: 87, color: "#B6BABD"},
-        {name: "Nico Hulkenberg", num: 27, color: "#00FF00"}, {name: "Gabriel Bortoleto", num: 5, color: "#00FF00"},
-        {name: "Sergio Perez", num: 11, color: "#FFB800"}, {name: "Valtteri Bottas", num: 77, color: "#FFB800"}
+    // 1. SINGLE SOURCE OF TRUTH FOR TEAMS & DRIVERS
+    const teamsData = [
+        { name: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
+        { name: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
+        { name: "Ferrari", color: "#E80020", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
+        { name: "Mercedes", color: "#27F4D2", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
+        { name: "Aston Martin", color: "#006F62", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
+        { name: "Williams", color: "#00A0E9", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alex Albon", num: 23}] },
+        { name: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Franco Colapinto", num: 43}] },
+        { name: "Racing Bulls", color: "#1434CB", drivers: [{name: "Liam Lawson", num: 30}, {name: "Arvid Lindblad", num: 8}] },
+        { name: "Haas", color: "#B6BABD", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
+        { name: "Audi", color: "#00FF00", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
+        { name: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
     ];
 
-    const detailedTeams = [
-        {name: "Red Bull Racing", color: "#1E41FF"}, {name: "Mercedes", color: "#27F4D2"},
-        {name: "Ferrari", color: "#E80020"}, {name: "McLaren", color: "#FF8000"},
-        {name: "Aston Martin", color: "#006F62"}, {name: "Alpine", color: "#FF87BC"},
-        {name: "Williams", color: "#00A0E9"}, {name: "Racing Bulls", color: "#1434CB"},
-        {name: "Haas", color: "#B6BABD"}, {name: "Audi", color: "#00FF00"},
-        {name: "Cadillac", color: "#FFB800"}
-    ];
-    
+    // 2. DYNAMICALLY GENERATE ALPHABETICAL LISTS FOR THE MODALS
+    const detailedTeams = teamsData.map(t => ({ name: t.name, color: t.color }));
+    detailedTeams.sort((a, b) => a.name.localeCompare(b.name));
+
+    const detailedDrivers = [];
+    teamsData.forEach(t => t.drivers.forEach(d => detailedDrivers.push({ name: d.name, num: d.num, color: t.color })));
+    detailedDrivers.sort((a, b) => a.name.localeCompare(b.name));
+
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
+    // --- TOAST NOTIFICATIONS ---
     function showToast(message, type = 'error') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -353,14 +354,24 @@
         container.appendChild(toast);
         setTimeout(() => { toast.style.animation = 'fadeOut 0.3s forwards'; setTimeout(() => toast.remove(), 300); }, 4000);
     }
+
     function showSupportModal() { showToast('Constructors Fund integration coming soon. Thank you for the support!', 'success'); }
 
+    // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
-        if(!user) { document.getElementById('auth').style.display='flex'; } 
-        else { document.getElementById('auth').style.display='none'; start(); }
+        if(!user) { 
+            document.getElementById('auth').style.display = 'flex'; 
+        } else { 
+            start(); 
+        }
     });
 
-    function start() { checkAdm(); loadRace(); loadBoard(); buildGridTab(); }
+    function start() { 
+        checkAdm(); 
+        loadRace(); 
+        loadBoard(); 
+        buildGridTab(); 
+    }
 
     // --- THE NEW MODAL SELECTOR LOGIC ---
     let currentInputId = null;
@@ -371,9 +382,9 @@
         const grid = document.getElementById('selector-grid');
         grid.innerHTML = '';
         
-        // Anti-Repetition: Find what is already selected in this category
-        const groupClass = type === 'team' ? '.s-team' : '.s-driver';
-        const picked = Array.from(document.querySelectorAll(groupClass))
+        // Anti-Repetition: Find what is already selected globally across ALL inputs of this type
+        const groupSelectors = type === 'team' ? '.s-team' : '.s-driver, .s-wildcard';
+        const picked = Array.from(document.querySelectorAll(groupSelectors))
                             .map(inp => inp.value)
                             .filter(v => v !== '' && v !== document.getElementById(inputId).value);
 
@@ -391,7 +402,9 @@
             
             if (!isDisabled) {
                 btn.onclick = () => {
-                    document.getElementById(currentInputId).value = item.name;
+                    const inputField = document.getElementById(currentInputId);
+                    inputField.value = item.name;
+                    inputField.setAttribute('value', item.name); // Triggers CSS styling
                     closeSelectorModal();
                 };
             }
@@ -412,6 +425,7 @@
         if (event.target === modal) { closeSelectorModal(); }
     }
 
+    // --- API FETCH & RENDER FUNCTIONS ---
     async function loadRace() {
         try {
             const r = await fetch('/api/next-race').then(res=>res.json());
@@ -420,8 +434,15 @@
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
             raceLock = new Date(r.date);
             
-            if (r.hasSprint) { document.getElementById('sprint-box').classList.remove('hidden'); } 
-            else { document.getElementById('sprint-box').classList.add('hidden'); }
+            if (r.hasSprint) { 
+                document.getElementById('sprint-box').classList.remove('hidden');
+                document.getElementById('sg').required = true;
+                document.getElementById('sl').required = true;
+            } else { 
+                document.getElementById('sprint-box').classList.add('hidden');
+                document.getElementById('sg').required = false;
+                document.getElementById('sl').required = false;
+            }
             
             if (new Date() > raceLock) {
                 document.getElementById('p-form').style.display = 'none';
@@ -525,33 +546,37 @@
     }
 
     function buildGridTab() {
-        document.getElementById('grid-container').innerHTML = detailedTeams.map((t, index) => {
-            const drv1 = detailedDrivers[index * 2];
-            const drv2 = detailedDrivers[(index * 2) + 1];
+        document.getElementById('grid-container').innerHTML = teamsData.map(t => {
             return `
             <div class="predict-group" style="border-left: 6px solid ${t.color}; padding: 20px; border-radius: 12px; margin-bottom: 0;">
                 <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); border:none;">${t.name}</h3>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="background: var(--surface-inner); padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${drv1.name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${drv1.num}</span>
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[0].name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[0].num}</span>
                     </div>
                     <div style="background: var(--surface-inner); padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${drv2.name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${drv2.num}</span>
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[1].name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[1].num}</span>
                     </div>
                 </div>
             </div>
         `}).join('');
     }
 
+    // --- FORM SUBMISSION & AUTH ---
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
         
-        // Manual validation for the new Tap-Inputs
+        // Manual validation for the Tap-Inputs
         const requiredInputs = ['p1', 'p2', 'p3', 'p11', 'p12', 'p19', 'p20', 'c1', 'c2', 'c5', 'c6', 'c10', 'wl'];
-        if (!document.getElementById('sprint-box').classList.contains('hidden')) { requiredInputs.push('sg', 'sl'); }
+        if (!document.getElementById('sprint-box').classList.contains('hidden')) { 
+            requiredInputs.push('sg', 'sl'); 
+        }
         
         for (let id of requiredInputs) {
-            if (!val(id)) { showToast('⚠️ Strategy Incomplete. Please fill all fields.', 'error'); return; }
+            if (!val(id)) { 
+                showToast('⚠️ Strategy Incomplete. Please fill all required fields.', 'error'); 
+                return; 
+            }
         }
 
         const body = {
@@ -582,14 +607,19 @@
         if(res.ok) { localStorage.setItem('f1_user', JSON.stringify({name, password})); location.reload(); }
         else showToast('Invalid Credentials. Access Denied.', 'error');
     }
+    
     async function reg() {
         const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
         const res = await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
-        if(res.ok) showToast('Registration Successful! You may now Enter.', 'success');
+        if(res.ok) showToast('Registration Successful! You may now Enter the Garage.', 'success');
         else showToast('Username taken. Please choose another.', 'error');
     }
+    
     function logout() { localStorage.clear(); location.reload(); }
-    function checkAdm() { if(user && user.name === 'admin') document.getElementById('admin-panel').classList.remove('hidden'); }
+    
+    function checkAdm() { 
+        if(user && user.name === 'admin') document.getElementById('admin-panel').classList.remove('hidden'); 
+    }
 </script>
 </body>
 </html>
