@@ -319,28 +319,28 @@
 
 <script>
     // RICH DATA FOR THE MODAL GRID
-// 1. SINGLE SOURCE OF TRUTH (Impossible to mismatch)
-    const teamsData = [
-        { name: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
-        { name: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
-        { name: "Ferrari", color: "#E80020", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
-        { name: "Mercedes", color: "#27F4D2", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
-        { name: "Aston Martin", color: "#006F62", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
-        { name: "Williams", color: "#00A0E9", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alex Albon", num: 23}] },
-        { name: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Franco Colapinto", num: 43}] },
-        { name: "Racing Bulls", color: "#1434CB", drivers: [{name: "Liam Lawson", num: 30}, {name: "Arvid Lindblad", num: 8}] },
-        { name: "Haas", color: "#B6BABD", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
-        { name: "Audi", color: "#00FF00", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
-        { name: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
+    const detailedDrivers = [
+        {name: "Max Verstappen", num: 1, color: "#1E41FF"}, {name: "Isack Hadjar", num: 20, color: "#1E41FF"},
+        {name: "Lando Norris", num: 4, color: "#FF8000"}, {name: "Oscar Piastri", num: 81, color: "#FF8000"},
+        {name: "Charles Leclerc", num: 16, color: "#E80020"}, {name: "Lewis Hamilton", num: 44, color: "#E80020"},
+        {name: "George Russell", num: 63, color: "#27F4D2"}, {name: "Kimi Antonelli", num: 12, color: "#27F4D2"},
+        {name: "Fernando Alonso", num: 14, color: "#006F62"}, {name: "Lance Stroll", num: 18, color: "#006F62"},
+        {name: "Carlos Sainz", num: 55, color: "#00A0E9"}, {name: "Alex Albon", num: 23, color: "#00A0E9"},
+        {name: "Pierre Gasly", num: 10, color: "#FF87BC"}, {name: "Franco Colapinto", num: 43, color: "#FF87BC"},
+        {name: "Liam Lawson", num: 30, color: "#1434CB"}, {name: "Arvid Lindblad", num: 8, color: "#1434CB"},
+        {name: "Esteban Ocon", num: 31, color: "#B6BABD"}, {name: "Oliver Bearman", num: 87, color: "#B6BABD"},
+        {name: "Nico Hulkenberg", num: 27, color: "#00FF00"}, {name: "Gabriel Bortoleto", num: 5, color: "#00FF00"},
+        {name: "Sergio Perez", num: 11, color: "#FFB800"}, {name: "Valtteri Bottas", num: 77, color: "#FFB800"}
     ];
 
-    // 2. DYNAMICALLY GENERATE ALPHABETICAL LISTS FOR THE MODALS
-    const detailedTeams = teamsData.map(t => ({ name: t.name, color: t.color }));
-    detailedTeams.sort((a, b) => a.name.localeCompare(b.name));
-
-    const detailedDrivers = [];
-    teamsData.forEach(t => t.drivers.forEach(d => detailedDrivers.push({ name: d.name, num: d.num, color: t.color })));
-    detailedDrivers.sort((a, b) => a.name.localeCompare(b.name));
+    const detailedTeams = [
+        {name: "Red Bull Racing", color: "#1E41FF"}, {name: "Mercedes", color: "#27F4D2"},
+        {name: "Ferrari", color: "#E80020"}, {name: "McLaren", color: "#FF8000"},
+        {name: "Aston Martin", color: "#006F62"}, {name: "Alpine", color: "#FF87BC"},
+        {name: "Williams", color: "#00A0E9"}, {name: "Racing Bulls", color: "#1434CB"},
+        {name: "Haas", color: "#B6BABD"}, {name: "Audi", color: "#00FF00"},
+        {name: "Cadillac", color: "#FFB800"}
+    ];
     
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
@@ -360,22 +360,7 @@
         else { document.getElementById('auth').style.display='none'; start(); }
     });
 
-    function buildGridTab() {
-        document.getElementById('grid-container').innerHTML = teamsData.map(t => {
-            return `
-            <div class="predict-group" style="border-left: 6px solid ${t.color}; padding: 20px; border-radius: 12px; margin-bottom: 0;">
-                <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); border:none;">${t.name}</h3>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div style="background: var(--surface-inner); padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[0].name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[0].num}</span>
-                    </div>
-                    <div style="background: var(--surface-inner); padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[1].name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[1].num}</span>
-                    </div>
-                </div>
-            </div>
-        `}).join('');
-    }
+    function start() { checkAdm(); loadRace(); loadBoard(); buildGridTab(); }
 
     // --- THE NEW MODAL SELECTOR LOGIC ---
     let currentInputId = null;
