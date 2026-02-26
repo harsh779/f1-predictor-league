@@ -16,7 +16,12 @@ const db = createClient({
 // --- 1. DATABASE SETUP ---
 async function setupDatabase() {
   try {
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0)`);
+    // Added has_participated flag to new databases
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0)`);
+    
+    // Safety catch to upgrade your existing database without deleting user data
+    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
+
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         user_name TEXT UNIQUE, 
@@ -28,7 +33,7 @@ async function setupDatabase() {
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
     try {
-        await db.execute({ sql: "INSERT INTO f1_drivers (name, password) VALUES ('admin', 'Open@0761') ON CONFLICT(name) DO NOTHING" });
+        await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated) VALUES ('admin', 'Open@0761', 0) ON CONFLICT(name) DO NOTHING" });
         console.log("✅ Admin Ready.");
     } catch (e) {}
     console.log("✅ Database Synced.");
@@ -178,9 +183,11 @@ async function performFinalization() {
     });
 
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
-    const allDrivers = await db.execute("SELECT * FROM f1_drivers").then(r => r.rows);
     
-    for (const d of allDrivers) {
+    // IMPORTANT FIX: Only apply scores and penalties to ACTIVE users.
+    const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
+    
+    for (const d of activeDrivers) {
         let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
         if (d.name !== 'admin') {
             await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
@@ -223,6 +230,10 @@ app.post('/predict', async (req, res) => {
                   w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
             args: [d.user_name, d.p1, d.p2, d.p3, d.p11, d.p12, d.p19, d.p20, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
         });
+        
+        // IMPORTANT FIX: Mark user as an active participant so they appear on the leaderboard
+        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [d.user_name] });
+        
         res.json({ success: true });
     } catch (e) { 
         res.status(500).json({ success: false, message: e.message }); 
@@ -236,7 +247,7 @@ app.post('/api/finalize', async (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-    try { await db.execute({ sql: "INSERT INTO f1_drivers (name, password) VALUES (?, ?)", args: [req.body.name, req.body.password] }); res.json({ success: true, message: "Registered!" }); } 
+    try { await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated) VALUES (?, ?, 0)", args: [req.body.name, req.body.password] }); res.json({ success: true, message: "Registered!" }); } 
     catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
 });
 
@@ -252,7 +263,8 @@ app.get('/api/predictions', async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-    const r = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
+    // IMPORTANT FIX: Only fetch users who have actively participated
+    const r = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
     res.json(r.rows);
 });
 
