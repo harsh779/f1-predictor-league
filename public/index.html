@@ -10,13 +10,13 @@
         :root { 
             --red: #e10600; 
             --red-glow: rgba(225, 6, 0, 0.15);
-            --bg-light: #f5f5f7; /* Off-white background */
-            --surface: #ffffff; /* Pure white cards */
+            --bg-light: #f5f5f7; 
+            --surface: #ffffff; 
             --surface-hover: #eaeaea;
-            --surface-inner: #f8f8fc; /* For inner pill boxes */
-            --text-main: #15151e; /* Deep charcoal text */
-            --text-muted: #666677; /* Muted grey text */
-            --border: #d1d1d6; /* Light grey borders */
+            --surface-inner: #f8f8fc; 
+            --text-main: #15151e; 
+            --text-muted: #666677; 
+            --border: #d1d1d6; 
             --gold: #c59b27;
         }
 
@@ -45,19 +45,19 @@
         .active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 5. PREDICT FORM CARDS & DROPDOWNS */
+        /* 5. PREDICT FORM CARDS & CUSTOM INPUTS */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; gap: 20px; } }
         
         .predict-group { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
         .predict-group h3 { margin: 0 0 20px 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
-        
         label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; display: block; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; letter-spacing: 1px;}
         
-        /* AGGRESSIVE DROPDOWN STYLING FIX *//* AGGRESSIVE DROPDOWN STYLING FIX */
-        select, input { 
+        /* THE NEW "TAP-TRIGGER" INPUTS */
+        input.selector-input { 
             width: 100%; 
             padding: 14px 45px 14px 16px; 
+            background-color: var(--surface); 
             border: 2px solid var(--border); 
             color: var(--text-main); 
             border-radius: 8px; 
@@ -67,31 +67,14 @@
             box-sizing: border-box; 
             transition: all 0.2s ease; 
             cursor: pointer;
-            
-            /* 1. Force removal of native browser UI */
-            appearance: none !important; 
-            -webkit-appearance: none !important; 
-            -moz-appearance: none !important;
-            
-            /* 2. Base64 Encoded Custom Red Arrow (Guaranteed to work on all devices) */
-            background-color: var(--surface); 
-            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2UxMDYwMCI+PHBhdGggZD0iTTcgMTBsNSA1IDUtNXoiLz48L3N2Zz4='); 
+            outline: none;
+            /* Custom tap icon instead of dropdown arrow */
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23d1d1d6" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>'); 
             background-repeat: no-repeat; 
-            background-position: right 16px center;
-            background-size: 24px 24px;
+            background-position: right 16px center; 
         }
-        
-        /* 3. Kill the native arrow specifically on older Edge/Windows browsers */
-        select::-ms-expand { display: none; }
-
-        select:focus, input:focus { 
-            border-color: var(--red); 
-            outline: none; 
-            box-shadow: 0 0 0 4px var(--red-glow); 
-            background-color: #fffafA;
-        }
-        option { color: var(--text-main); font-weight: 600; }
-        option:disabled { color: #aaa; background: #f0f0f0; }
+        input.selector-input:focus, input.selector-input:active { border-color: var(--red); box-shadow: 0 0 0 4px var(--red-glow); background-color: #fffafA;}
+        input.selector-input[value]:not([value=""]) { border-color: var(--text-main); background-image: url('data:image/svg+xml;utf8,<svg fill="%2300e160" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>');}
         
         .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
@@ -114,24 +97,49 @@
         .skeleton { background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; height: 20px; }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
-        /* 9. CUSTOM TOAST NOTIFICATIONS */
+        /* 9. TOAST NOTIFICATIONS */
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: var(--surface); border-left: 5px solid var(--red); color: var(--text-main); padding: 16px 24px; border-radius: 8px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: 'Titillium Web'; font-size: 1rem; letter-spacing: 0.5px; animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); min-width: 250px; border: 1px solid var(--border); border-left-width: 5px;}
+        .toast { background: var(--text-main); border-left: 5px solid var(--red); color: white; padding: 16px 24px; border-radius: 8px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: 'Titillium Web'; font-size: 1rem; letter-spacing: 0.5px; animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); min-width: 250px; }
         .toast.success { border-left-color: #00e160; }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
 
-        /* Utilities */
+        /* 10. GRID MODAL (THE NEW DROPDOWN) */
+        .grid-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter: blur(5px); display:flex; justify-content:center; align-items:flex-end; z-index:9999; }
+        .grid-modal-content { background: var(--bg-light); width: 100%; max-width: 700px; max-height: 85vh; border-radius: 20px 20px 0 0; padding: 25px; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUpModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .grid-modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 15px; }
+        .grid-modal-header h3 { margin: 0; font-size: 1.3rem; text-transform: uppercase; color: var(--text-main); font-weight: 900;}
+        .close-btn { background: none; border: none; font-size: 2rem; color: var(--text-muted); cursor: pointer; line-height: 1; }
+        
+        .modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; overflow-y: auto; padding-bottom: 30px; }
+        .modal-grid-btn { background: var(--surface); border: 1px solid var(--border); padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-family: 'Titillium Web'; font-size: 1.1rem; font-weight: 700; color: var(--text-main); cursor: pointer; transition: all 0.2s ease; border-left: 5px solid var(--team-color); }
+        .modal-grid-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-color: var(--text-main); }
+        .modal-grid-btn.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(100%); transform: none; box-shadow: none; border-color: var(--border); }
+        .modal-grid-btn .num { background: var(--team-color); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 4px; font-weight: 900; font-size: 0.9rem; }
+
+        /* General Modal */
         .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(5px); display:flex; justify-content:center; align-items:center; z-index:999; }
         .modal-box { background:var(--surface); padding:40px; border-radius:12px; width:90%; max-width:400px; text-align:center; border:1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.2);}
         .hidden { display:none !important; }
-        
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
     </style>
 </head>
 <body>
 
 <div id="toast-container"></div>
+
+<div id="grid-selector-modal" class="grid-modal hidden">
+    <div class="grid-modal-content">
+        <div class="grid-modal-header">
+            <h3 id="selector-title">Select...</h3>
+            <button class="close-btn" onclick="closeSelectorModal()">&times;</button>
+        </div>
+        <div id="selector-grid" class="modal-grid">
+            </div>
+    </div>
+</div>
 
 <header>
     <h1><span>F1</span> 2026 LEAGUE</h1>
@@ -161,43 +169,45 @@
                 <div>
                     <div class="predict-group">
                         <h3>🏆 The Podium</h3>
-                        <label>P1 Winner</label><select id="p1" class="s-driver" required></select>
-                        <label>P2 Runner Up</label><select id="p2" class="s-driver" required></select>
-                        <label>P3 Third</label><select id="p3" class="s-driver" required></select>
+                        <label>P1 Winner</label><input type="text" id="p1" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p1', 'driver', 'Select P1 Winner')" required>
+                        <label>P2 Runner Up</label><input type="text" id="p2" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p2', 'driver', 'Select P2 Runner Up')" required>
+                        <label>P3 Third</label><input type="text" id="p3" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p3', 'driver', 'Select P3 Third')" required>
                     </div>
 
                     <div class="predict-group">
                         <h3>🎯 The Points Bubble</h3>
-                        <label>P11 (Heartbreak)</label><select id="p11" class="s-driver" required></select>
-                        <label>P12</label><select id="p12" class="s-driver" required></select>
+                        <label>P11 (Heartbreak)</label><input type="text" id="p11" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p11', 'driver', 'Select P11')" required>
+                        <label>P12</label><input type="text" id="p12" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p12', 'driver', 'Select P12')" required>
                     </div>
 
                     <div class="predict-group">
                         <h3>⚠️ The Backmarkers</h3>
-                        <label>P19</label><select id="p19" class="s-driver" required></select>
-                        <label>P20 Last Place</label><select id="p20" class="s-driver" required></select>
+                        <label>P19</label><input type="text" id="p19" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p19', 'driver', 'Select P19')" required>
+                        <label>P20 Last Place</label><input type="text" id="p20" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p20', 'driver', 'Select P20 Last Place')" required>
                     </div>
                 </div>
 
                 <div>
                     <div class="predict-group">
                         <h3>🏭 Constructor Targets</h3>
-                        <label>1st Team</label><select id="c1" class="s-team" required></select>
-                        <label>2nd Team</label><select id="c2" class="s-team" required></select>
-                        <label>5th Team</label><select id="c5" class="s-team" required></select>
-                        <label>6th Team</label><select id="c6" class="s-team" required></select>
-                        <label>10th Team</label><select id="c10" class="s-team" required></select>
+                        <label>1st Team</label><input type="text" id="c1" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c1', 'team', 'Select 1st Team')" required>
+                        <label>2nd Team</label><input type="text" id="c2" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c2', 'team', 'Select 2nd Team')" required>
+                        <label>5th Team</label><input type="text" id="c5" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c5', 'team', 'Select 5th Team')" required>
+                        <label>6th Team</label><input type="text" id="c6" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c6', 'team', 'Select 6th Team')" required>
+                        <label>10th Team</label><input type="text" id="c10" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c10', 'team', 'Select 10th Team')" required>
                     </div>
 
                     <div class="predict-group" style="border-color: var(--gold); background: rgba(197, 155, 39, 0.02);">
                         <h3 style="color: var(--gold); border-color: rgba(197, 155, 39, 0.3);">🃏 Strategic Wildcards</h3>
                         <label>Race: Biggest Loser</label>
-                        <select id="wl" class="s-wildcard" required></select>
+                        <input type="text" id="wl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('wl', 'driver', 'Select Race Biggest Loser')" required>
 
                         <div id="sprint-box" class="hidden" style="margin-top: 25px; padding-top: 25px; border-top: 1px dashed var(--border);">
                             <h4 style="margin:0 0 15px; color:var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">⚡ Sprint Weekend Bonus</h4>
-                            <label>Sprint: Biggest Gainer</label><select id="sg" class="s-wildcard"></select>
-                            <label>Sprint: Biggest Loser</label><select id="sl" class="s-wildcard"></select>
+                            <label>Sprint: Biggest Gainer</label>
+                            <input type="text" id="sg" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sg', 'driver', 'Select Sprint Gainer')">
+                            <label>Sprint: Biggest Loser</label>
+                            <input type="text" id="sl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sl', 'driver', 'Select Sprint Loser')">
                         </div>
                     </div>
                 </div>
@@ -300,21 +310,41 @@
 <div id="auth" class="modal">
     <div class="modal-box">
         <h2 style="margin-top: 0; font-size: 2rem; text-transform: uppercase; letter-spacing: 1px;">Paddock Entry</h2>
-        <input type="text" id="u-name" placeholder="Driver Name" style="margin-bottom: 15px;">
-        <input type="password" id="u-pass" placeholder="Password">
+        <input type="text" id="u-name" placeholder="Driver Name" style="margin-bottom: 15px; padding: 14px; width: 100%; border-radius: 8px; border: 1px solid var(--border); font-size: 1rem; box-sizing: border-box;">
+        <input type="password" id="u-pass" placeholder="Password" style="padding: 14px; width: 100%; border-radius: 8px; border: 1px solid var(--border); font-size: 1rem; box-sizing: border-box;">
         <button onclick="login()" class="btn" style="margin-top: 25px;">Enter Garage</button>
         <button onclick="reg()" class="btn" style="background: var(--surface-inner); color: var(--text-main); margin-top: 15px; box-shadow: none; border: 1px solid var(--border);">Register New Driver</button>
     </div>
 </div>
 
 <script>
-    const drivers = ["Max Verstappen", "Isack Hadjar", "Lando Norris", "Oscar Piastri", "Charles Leclerc", "Lewis Hamilton", "George Russell", "Kimi Antonelli", "Fernando Alonso", "Lance Stroll", "Carlos Sainz", "Alex Albon", "Pierre Gasly", "Franco Colapinto", "Liam Lawson", "Arvid Lindblad", "Esteban Ocon", "Oliver Bearman", "Nico Hulkenberg", "Gabriel Bortoleto", "Sergio Perez", "Valtteri Bottas"].sort();
-    const teams = ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", "Alpine", "Williams", "Racing Bulls", "Haas", "Audi", "Cadillac"].sort();
+    // RICH DATA FOR THE MODAL GRID
+    const detailedDrivers = [
+        {name: "Max Verstappen", num: 1, color: "#1E41FF"}, {name: "Isack Hadjar", num: 20, color: "#1E41FF"},
+        {name: "Lando Norris", num: 4, color: "#FF8000"}, {name: "Oscar Piastri", num: 81, color: "#FF8000"},
+        {name: "Charles Leclerc", num: 16, color: "#E80020"}, {name: "Lewis Hamilton", num: 44, color: "#E80020"},
+        {name: "George Russell", num: 63, color: "#27F4D2"}, {name: "Kimi Antonelli", num: 12, color: "#27F4D2"},
+        {name: "Fernando Alonso", num: 14, color: "#006F62"}, {name: "Lance Stroll", num: 18, color: "#006F62"},
+        {name: "Carlos Sainz", num: 55, color: "#00A0E9"}, {name: "Alex Albon", num: 23, color: "#00A0E9"},
+        {name: "Pierre Gasly", num: 10, color: "#FF87BC"}, {name: "Franco Colapinto", num: 43, color: "#FF87BC"},
+        {name: "Liam Lawson", num: 30, color: "#1434CB"}, {name: "Arvid Lindblad", num: 8, color: "#1434CB"},
+        {name: "Esteban Ocon", num: 31, color: "#B6BABD"}, {name: "Oliver Bearman", num: 87, color: "#B6BABD"},
+        {name: "Nico Hulkenberg", num: 27, color: "#00FF00"}, {name: "Gabriel Bortoleto", num: 5, color: "#00FF00"},
+        {name: "Sergio Perez", num: 11, color: "#FFB800"}, {name: "Valtteri Bottas", num: 77, color: "#FFB800"}
+    ];
+
+    const detailedTeams = [
+        {name: "Red Bull Racing", color: "#1E41FF"}, {name: "Mercedes", color: "#27F4D2"},
+        {name: "Ferrari", color: "#E80020"}, {name: "McLaren", color: "#FF8000"},
+        {name: "Aston Martin", color: "#006F62"}, {name: "Alpine", color: "#FF87BC"},
+        {name: "Williams", color: "#00A0E9"}, {name: "Racing Bulls", color: "#1434CB"},
+        {name: "Haas", color: "#B6BABD"}, {name: "Audi", color: "#00FF00"},
+        {name: "Cadillac", color: "#FFB800"}
+    ];
     
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
-    // --- CUSTOM TOAST NOTIFICATIONS ---
     function showToast(message, type = 'error') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -323,36 +353,63 @@
         container.appendChild(toast);
         setTimeout(() => { toast.style.animation = 'fadeOut 0.3s forwards'; setTimeout(() => toast.remove(), 300); }, 4000);
     }
-
     function showSupportModal() { showToast('Constructors Fund integration coming soon. Thank you for the support!', 'success'); }
 
     document.addEventListener('DOMContentLoaded', () => {
-        fillDrops();
         if(!user) { document.getElementById('auth').style.display='flex'; } 
         else { document.getElementById('auth').style.display='none'; start(); }
     });
 
-    function start() { checkAdm(); loadRace(); loadBoard(); buildGridTab(); setupSmartDrops(); }
+    function start() { checkAdm(); loadRace(); loadBoard(); buildGridTab(); }
 
-    function fillDrops() {
-        const d = '<option value="" disabled selected>Select Driver...</option>' + drivers.map(x=>`<option value="${x}">${x}</option>`).join('');
-        const t = '<option value="" disabled selected>Select Team...</option>' + teams.map(x=>`<option value="${x}">${x}</option>`).join('');
-        document.querySelectorAll('.s-driver, .s-wildcard').forEach(s => s.innerHTML = d);
-        document.querySelectorAll('.s-team').forEach(s => s.innerHTML = t);
+    // --- THE NEW MODAL SELECTOR LOGIC ---
+    let currentInputId = null;
+    
+    function openSelectorModal(inputId, type, title) {
+        currentInputId = inputId;
+        document.getElementById('selector-title').innerText = title;
+        const grid = document.getElementById('selector-grid');
+        grid.innerHTML = '';
+        
+        // Anti-Repetition: Find what is already selected in this category
+        const groupClass = type === 'team' ? '.s-team' : '.s-driver';
+        const picked = Array.from(document.querySelectorAll(groupClass))
+                            .map(inp => inp.value)
+                            .filter(v => v !== '' && v !== document.getElementById(inputId).value);
+
+        const items = type === 'team' ? detailedTeams : detailedDrivers;
+        
+        items.forEach(item => {
+            const isDisabled = picked.includes(item.name);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `modal-grid-btn ${isDisabled ? 'disabled' : ''}`;
+            btn.style.setProperty('--team-color', item.color);
+            
+            let numHtml = item.num ? `<span class="num">${item.num}</span>` : '';
+            btn.innerHTML = `<span>${item.name}</span> ${numHtml}`;
+            
+            if (!isDisabled) {
+                btn.onclick = () => {
+                    document.getElementById(currentInputId).value = item.name;
+                    closeSelectorModal();
+                };
+            }
+            grid.appendChild(btn);
+        });
+        
+        document.getElementById('grid-selector-modal').classList.remove('hidden');
     }
 
-    function setupSmartDrops() {
-        const ds = document.querySelectorAll('.s-driver');
-        const ts = document.querySelectorAll('.s-team');
-        function update(group) {
-            const picked = Array.from(group).map(s => s.value).filter(v => v);
-            group.forEach(s => {
-                const current = s.value;
-                Array.from(s.options).forEach(o => { o.disabled = (o.value && picked.includes(o.value) && o.value !== current) ? true : false; });
-            });
-        }
-        ds.forEach(s => s.addEventListener('change', () => update(ds)));
-        ts.forEach(s => s.addEventListener('change', () => update(ts)));
+    function closeSelectorModal() {
+        document.getElementById('grid-selector-modal').classList.add('hidden');
+        currentInputId = null;
+    }
+
+    // Close modal if clicked outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('grid-selector-modal');
+        if (event.target === modal) { closeSelectorModal(); }
     }
 
     async function loadRace() {
@@ -363,8 +420,8 @@
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
             raceLock = new Date(r.date);
             
-            if (r.hasSprint) { document.getElementById('sprint-box').classList.remove('hidden'); document.getElementById('sg').required = true; document.getElementById('sl').required = true; } 
-            else { document.getElementById('sprint-box').classList.add('hidden'); document.getElementById('sg').required = false; document.getElementById('sl').required = false; }
+            if (r.hasSprint) { document.getElementById('sprint-box').classList.remove('hidden'); } 
+            else { document.getElementById('sprint-box').classList.add('hidden'); }
             
             if (new Date() > raceLock) {
                 document.getElementById('p-form').style.display = 'none';
@@ -381,7 +438,6 @@
         if(t==='live') loadLive(); if(t==='standings') loadBoard(); if(t==='calendar') loadCalendar();
     }
 
-    // --- LIGHT MODE: LIVE TELEMETRY ---
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
@@ -435,13 +491,11 @@
                 let isVip = (i === 0); 
                 let nameHtml = isVip ? `<span class="vip-gold">${x.name}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${x.name}</span>`;
                 let posColor = i===0 ? '#c59b27' : (i===1 ? '#999999' : (i===2 ? '#b87333' : 'var(--text-muted)'));
-                
                 return `<tr><td style="text-align: center; font-weight: 900; color: ${posColor};">${i+1}</td><td>${nameHtml}</td><td style="text-align: right;"><b style="font-size:1.2rem; font-weight: 900; color: var(--text-main);">${x.total_score}</b></td></tr>`;
             }).join('');
         }
     }
 
-    // --- LIGHT MODE: CALENDAR ---
     async function loadCalendar() {
         const body = document.getElementById('cal-body');
         body.innerHTML = `<tr><td colspan="2"><div class="skeleton" style="width:100%; height:40px; margin-bottom:10px;"></div><div class="skeleton" style="width:100%; height:40px;"></div></td></tr>`;
@@ -449,16 +503,13 @@
         const d = await fetch('/api/calendar').then(r=>r.json());
         body.innerHTML = d.map(x => {
             const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
-            
             let sess = x.hasSprint ? `
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: var(--surface-inner); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP1</strong> ${formatTime(x.sessions?.fp1)}</div>
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">SQ</strong> ${formatTime(x.sessions?.sprintQuali)}</div>
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">Sprint</strong> ${formatTime(x.sessions?.sprint)}</div>
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">Quali</strong> ${formatTime(x.sessions?.quali)}</div>
-                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
-                        <strong style="color:var(--red); font-weight: 900; letter-spacing: 1px; width:55px; display:inline-block;">RACE</strong> <span style="color: var(--text-main); font-weight: 700;">${formatTime(x.sessions?.race)}</span>
-                    </div>
+                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><strong style="color:var(--red); font-weight: 900; letter-spacing: 1px; width:55px; display:inline-block;">RACE</strong> <span style="color: var(--text-main); font-weight: 700;">${formatTime(x.sessions?.race)}</span></div>
                 </div>
             ` : `
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: var(--surface-inner); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
@@ -466,41 +517,26 @@
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP2</strong> ${formatTime(x.sessions?.fp2)}</div>
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP3</strong> ${formatTime(x.sessions?.fp3)}</div>
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">Quali</strong> ${formatTime(x.sessions?.quali)}</div>
-                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
-                        <strong style="color:var(--red); font-weight: 900; letter-spacing: 1px; width:55px; display:inline-block;">RACE</strong> <span style="color: var(--text-main); font-weight: 700;">${formatTime(x.sessions?.race)}</span>
-                    </div>
+                    <div style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><strong style="color:var(--red); font-weight: 900; letter-spacing: 1px; width:55px; display:inline-block;">RACE</strong> <span style="color: var(--text-main); font-weight: 700;">${formatTime(x.sessions?.race)}</span></div>
                 </div>
             `;
             return `<tr><td style="vertical-align: top; font-size: 1.4rem; font-weight: 900; text-align: center; color: var(--text-muted);">${x.round}</td><td><strong style="font-size:1.3rem; display:inline-block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main);">${x.name}</strong>${x.hasSprint ? '<span class="sprint-badge">Sprint Weekend</span>' : ''}${sess}</td></tr>`;
         }).join('');
     }
 
-    // --- LIGHT MODE: GRID ---
     function buildGridTab() {
-        const teamsData = [
-            { team: "Ferrari", color: "#E80020", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
-            { team: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
-            { team: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
-            { team: "Mercedes", color: "#27F4D2", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
-            { team: "Aston Martin", color: "#006F62", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
-            { team: "Williams", color: "#00A0E9", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alex Albon", num: 23}] },
-            { team: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Franco Colapinto", num: 43}] },
-            { team: "Racing Bulls", color: "#1434CB", drivers: [{name: "Liam Lawson", num: 30}, {name: "Arvid Lindblad", num: 8}] },
-            { team: "Haas", color: "#B6BABD", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
-            { team: "Audi", color: "#00FF00", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
-            { team: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
-        ];
-
-        document.getElementById('grid-container').innerHTML = teamsData.map(t => {
+        document.getElementById('grid-container').innerHTML = detailedTeams.map((t, index) => {
+            const drv1 = detailedDrivers[index * 2];
+            const drv2 = detailedDrivers[(index * 2) + 1];
             return `
-            <div class="predict-group" style="border-left: 6px solid ${t.color}; padding: 20px; transition: transform 0.2s; border-radius: 12px; margin-bottom: 0;">
-                <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); border:none;">${t.team}</h3>
+            <div class="predict-group" style="border-left: 6px solid ${t.color}; padding: 20px; border-radius: 12px; margin-bottom: 0;">
+                <h3 style="margin: 0 0 20px 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); border:none;">${t.name}</h3>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="background: var(--surface-inner); padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[0].name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[0].num}</span>
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${drv1.name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${drv1.num}</span>
                     </div>
                     <div style="background: var(--surface-inner); padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
-                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${t.drivers[1].name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${t.drivers[1].num}</span>
+                        <span style="font-weight: 700; font-size: 1.1rem; color: var(--text-main);">${drv2.name}</span><span style="background: ${t.color}; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 4px; font-weight: 900; font-size: 1.1rem;">${drv2.num}</span>
                     </div>
                 </div>
             </div>
@@ -509,16 +545,26 @@
 
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
+        
+        // Manual validation for the new Tap-Inputs
+        const requiredInputs = ['p1', 'p2', 'p3', 'p11', 'p12', 'p19', 'p20', 'c1', 'c2', 'c5', 'c6', 'c10', 'wl'];
+        if (!document.getElementById('sprint-box').classList.contains('hidden')) { requiredInputs.push('sg', 'sl'); }
+        
+        for (let id of requiredInputs) {
+            if (!val(id)) { showToast('⚠️ Strategy Incomplete. Please fill all fields.', 'error'); return; }
+        }
+
         const body = {
             user_name: user.name, password: user.password,
             p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p19:val('p19'), p20:val('p20'),
             c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
-            w_race_loser:val('wl'), w_sprint_gainer: document.getElementById('sg').value, w_sprint_loser: document.getElementById('sl').value
+            w_race_loser:val('wl'), w_sprint_gainer: val('sg'), w_sprint_loser: val('sl')
         };
         const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
         if(res.ok) { showToast('✅ Strategy Transmitted and Locked', 'success'); } 
         else { const err = await res.json(); showToast('Error: ' + (err.message || 'Locked or Failed'), 'error'); }
     });
+    
     function val(id) { return document.getElementById(id).value; }
 
     async function finalize() {
