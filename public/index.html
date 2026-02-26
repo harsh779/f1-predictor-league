@@ -160,7 +160,7 @@
 
     <div id="grid" class="tab">
         <h2>2026 Official Grid</h2>
-        <p style="color: #888;">Complete driver line-up and constructors for the 2026 FIA Formula One World Championship.</p>
+        <p style="color: #888;">Complete line-up featuring all 11 Constructors and 22 Drivers for the 2026 season.</p>
         <div id="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
             </div>
     </div>
@@ -236,8 +236,28 @@
 </div>
 
 <script>
-    const drivers = ["Max Verstappen", "Lando Norris", "Oscar Piastri", "Lewis Hamilton", "Charles Leclerc", "George Russell", "Carlos Sainz", "Alex Albon", "Liam Lawson", "Yuki Tsunoda", "Kimi Antonelli", "Jack Doohan", "Gabriel Bortoleto", "Isack Hadjar", "Franco Colapinto", "Oliver Bearman", "Esteban Ocon", "Pierre Gasly", "Lance Stroll", "Fernando Alonso"].sort();
-    const teams = ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", "Alpine", "Williams", "RB", "Haas", "Audi"].sort();
+    // 22 Verified Official Drivers for 2026
+    const drivers = [
+        "Max Verstappen", "Isack Hadjar", 
+        "Lando Norris", "Oscar Piastri", 
+        "Charles Leclerc", "Lewis Hamilton", 
+        "George Russell", "Kimi Antonelli", 
+        "Fernando Alonso", "Lance Stroll", 
+        "Carlos Sainz", "Alex Albon", 
+        "Pierre Gasly", "Franco Colapinto", 
+        "Liam Lawson", "Arvid Lindblad", 
+        "Esteban Ocon", "Oliver Bearman", 
+        "Nico Hulkenberg", "Gabriel Bortoleto", 
+        "Sergio Perez", "Valtteri Bottas"
+    ].sort();
+
+    // 11 Official Constructors for 2026
+    const teams = [
+        "Red Bull Racing", "Mercedes", "Ferrari", "McLaren", 
+        "Aston Martin", "Alpine", "Williams", "Racing Bulls", 
+        "Haas", "Audi", "Cadillac"
+    ].sort();
+    
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
@@ -255,7 +275,7 @@
         checkAdm();
         loadRace();
         loadBoard();
-        buildGridTab(); // Build the new Grid page immediately
+        buildGridTab();
         setupSmartDrops();
     }
 
@@ -282,12 +302,10 @@
         ts.forEach(s => s.addEventListener('change', () => update(ts)));
     }
 
-    // --- UPDATED: PROFESSIONAL PREDICT HEADER ---
     async function loadRace() {
         try {
             const r = await fetch('/api/next-race').then(res=>res.json());
             
-            // Populate the new broadcast header
             document.getElementById('r-round').innerText = `Round ${r.round} of 24`;
             document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
@@ -322,19 +340,19 @@
         if(t==='calendar') loadCalendar();
     }
 
-    // --- NEW: THE 2026 GRID PAGE ---
     function buildGridTab() {
         const teamsData = [
             { team: "Ferrari", color: "#E80020", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
             { team: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
-            { team: "Red Bull Racing", color: "#3671C6", drivers: [{name: "Max Verstappen", num: 1}, {name: "Yuki Tsunoda", num: 22}] },
+            { team: "Red Bull Racing", color: "#3671C6", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
             { team: "Mercedes", color: "#27F4D2", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
             { team: "Aston Martin", color: "#229971", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
             { team: "Williams", color: "#64C4FF", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alex Albon", num: 23}] },
-            { team: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Jack Doohan", num: 7}] },
-            { team: "Racing Bulls", color: "#6692FF", drivers: [{name: "Liam Lawson", num: 30}, {name: "Isack Hadjar", num: 17}] },
+            { team: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Franco Colapinto", num: 43}] },
+            { team: "Racing Bulls", color: "#6692FF", drivers: [{name: "Liam Lawson", num: 30}, {name: "Arvid Lindblad", num: 8}] },
             { team: "Haas", color: "#FFFFFF", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
-            { team: "Audi (Sauber)", color: "#00FF00", drivers: [{name: "Gabriel Bortoleto", num: 5}, {name: "Franco Colapinto", num: 43}] }
+            { team: "Audi", color: "#00FF00", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
+            { team: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
         ];
 
         const container = document.getElementById('grid-container');
