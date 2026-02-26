@@ -3,384 +3,234 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>F1 Predictor League 2026</title>
+    <title>F1 2026 League</title>
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- CSS STYLES --- */
-        :root { --f1-red: #e10600; --bg: #15151e; --card-bg: #1f1f23; --text: #ffffff; }
-        body { margin: 0; font-family: 'Titillium Web', sans-serif; background-color: var(--bg); color: var(--text); }
-        
-        /* Layout */
-        header { background: var(--f1-red); padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        h1 { margin: 0; font-size: 1.5rem; font-style: italic; text-transform: uppercase; letter-spacing: 1px; }
-        nav button { background: none; border: none; color: white; font-weight: bold; cursor: pointer; padding: 10px; font-size: 1rem; margin-left: 10px; }
-        nav button:hover { background: rgba(255,255,255,0.2); border-radius: 4px; }
-        
-        main { padding: 20px; max-width: 900px; margin: 0 auto; }
-        .tab-content { display: none; animation: fadeIn 0.4s; }
-        .active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Forms & Dropdowns */
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-        @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; gap: 20px; } }
-        
-        /* THE DROPDOWN STYLING */
-        select, input { width: 100%; padding: 12px; margin: 8px 0; background: #2a2a2f; border: 1px solid #444; color: white; border-radius: 4px; font-family: inherit; font-size: 1rem; appearance: none; }
-        select { cursor: pointer; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right .7em top 50%; background-size: .65em auto; }
-        select:focus, input:focus { border-color: var(--f1-red); outline: none; box-shadow: 0 0 5px rgba(225, 6, 0, 0.5); }
-        
-        label { font-size: 0.9rem; color: #aaa; font-weight: bold; display: block; margin-top: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        /* Buttons */
-        .btn-submit { background: var(--f1-red); color: white; border: none; padding: 15px; width: 100%; font-size: 1.2rem; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 30px; transition: background 0.2s; }
-        .btn-submit:hover { background: #b30000; }
-
-        /* Admin & Cards */
-        .prediction-card { background: var(--card-bg); padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--f1-red); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .prediction-card h3 { margin: 0 0 10px 0; color: var(--f1-red); }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--card-bg); border-radius: 8px; overflow: hidden; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #333; }
-        th { background: #2a2a2f; color: var(--f1-red); text-transform: uppercase; font-size: 0.9rem; }
-        
-        .admin-box { margin-top: 40px; border: 2px solid var(--f1-red); padding: 20px; background: rgba(225, 6, 0, 0.1); border-radius: 8px; text-align: center; }
-        .admin-btn { background: var(--f1-red); color: white; padding: 12px 24px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
-
-        /* Modals */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
-        .modal-content { background: #222; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; border: 1px solid #444; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .close-btn { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 1.5rem; color: #888; }
-        .close-btn:hover { color: white; }
-        
-        .auth-btn { margin: 10px 5px; padding: 10px 20px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; font-weight: bold; }
-        .auth-btn.primary { background: var(--f1-red); }
-        
-        ul.rules-list { text-align: left; padding-left: 20px; line-height: 1.6; color: #ddd; }
-        ul.rules-list b { color: var(--f1-red); }
+        :root { --red: #e10600; --bg: #15151e; --card: #1f1f23; --text: #fff; }
+        body { margin:0; font-family:'Titillium Web',sans-serif; background:var(--bg); color:var(--text); }
+        header { background:var(--red); padding:15px; display:flex; justify-content:space-between; align-items:center; }
+        nav button { background:none; border:none; color:white; font-weight:bold; cursor:pointer; font-size:1rem; margin-left:10px; }
+        main { padding:20px; max-width:900px; margin:0 auto; }
+        .tab { display:none; } .active { display:block; }
+        .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:30px; }
+        select, input { width:100%; padding:10px; margin:5px 0 15px; background:#2a2a2f; border:1px solid #444; color:white; border-radius:4px; }
+        label { font-size:0.9rem; color:#aaa; font-weight:bold; display:block; text-transform:uppercase; }
+        .btn { background:var(--red); color:white; border:none; padding:15px; width:100%; font-weight:bold; cursor:pointer; border-radius:4px; margin-top:20px; }
+        .admin-box { margin-top:40px; border:2px solid var(--red); padding:20px; background:rgba(225,6,0,0.1); border-radius:8px; display:none; }
+        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:none; justify-content:center; align-items:center; z-index:999; }
+        .modal-box { background:#222; padding:30px; border-radius:8px; width:90%; max-width:400px; text-align:center; border:1px solid #444; }
+        .hidden { display:none; }
+        /* Disabled option style */
+        option:disabled { color: #555; background: #1a1a1a; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>🏎️ F1 PREDICTOR '26</h1>
-        <nav>
-            <button onclick="switchTab('predict')">Predict</button>
-            <button onclick="switchTab('live')">Live Race</button>
-            <button onclick="switchTab('standings')">Standings</button>
-            <button onclick="openRules()">📜 Rules</button>
-            <button onclick="logout()">Logout</button>
-        </nav>
-    </header>
+<header>
+    <h1>🏁 F1 2026</h1>
+    <nav>
+        <button onclick="tab('predict')">Predict</button>
+        <button onclick="tab('live')">Live</button>
+        <button onclick="tab('standings')">Standings</button>
+        <button onclick="logout()">Exit</button>
+    </nav>
+</header>
 
-    <main>
-        <div id="predict" class="tab-content active">
-            <h2>Strategy for: <span id="race-name" style="color:var(--f1-red)">Loading...</span></h2>
-            <form id="prediction-form">
-                <div class="form-grid">
-                    <div>
-                        <h3 style="border-bottom: 1px solid #444; padding-bottom: 5px;">Driver Positions</h3>
-                        
-                        <label>P1 Winner</label>
-                        <select id="p1" class="driver-select" required><option value="">Select Driver...</option></select>
-                        
-                        <label>P2 Runner Up</label>
-                        <select id="p2" class="driver-select" required><option value="">Select Driver...</option></select>
-                        
-                        <label>P3 Third</label>
-                        <select id="p3" class="driver-select" required><option value="">Select Driver...</option></select>
-                        
-                        <label>P11 (Just missed points)</label>
-                        <select id="p11" class="driver-select" required><option value="">Select Driver...</option></select>
-                        
-                        <label>P12</label>
-                        <select id="p12" class="driver-select" required><option value="">Select Driver...</option></select>
-                        
-                        <label>P19</label>
-                        <select id="p19" class="driver-select" required><option value="">Select Driver...</option></select>
-                        
-                        <label>P20 Last Place</label>
-                        <select id="p20" class="driver-select" required><option value="">Select Driver...</option></select>
-                    </div>
-                    <div>
-                        <h3 style="border-bottom: 1px solid #444; padding-bottom: 5px;">Constructors & Wildcards</h3>
-                        
-                        <label>1st Place Team</label>
-                        <select id="c1" class="team-select" required><option value="">Select Team...</option></select>
-                        
-                        <label>2nd Place Team</label>
-                        <select id="c2" class="team-select" required><option value="">Select Team...</option></select>
-                        
-                        <label>5th Place Team</label>
-                        <select id="c5" class="team-select" required><option value="">Select Team...</option></select>
-                        
-                        <label>6th Place Team</label>
-                        <select id="c6" class="team-select" required><option value="">Select Team...</option></select>
-                        
-                        <label>10th Place Team</label>
-                        <select id="c10" class="team-select" required><option value="">Select Team...</option></select>
-                        
-                        <label style="color: var(--f1-red);">WILDCARD: Biggest Loser</label>
-                        <select id="wl" class="driver-select" required><option value="">Select Driver...</option></select>
+<main>
+    <div id="predict" class="tab active">
+        <h2>Next: <span id="r-name" style="color:var(--red)">Loading...</span></h2>
+        <div id="locked-msg" style="display:none; background:var(--red); padding:10px; text-align:center;">🚫 RACE LOCKED</div>
+        
+        <form id="p-form">
+            <div class="form-grid">
+                <div>
+                    <h3>Drivers</h3>
+                    <label>P1 Winner</label><select id="p1" class="s-driver" required></select>
+                    <label>P2 Runner Up</label><select id="p2" class="s-driver" required></select>
+                    <label>P3 Third</label><select id="p3" class="s-driver" required></select>
+                    <hr style="border-color:#333">
+                    <label>P11 (Missed Points)</label><select id="p11" class="s-driver" required></select>
+                    <label>P12</label><select id="p12" class="s-driver" required></select>
+                    <hr style="border-color:#333">
+                    <label>P19</label><select id="p19" class="s-driver" required></select>
+                    <label>P20 Last</label><select id="p20" class="s-driver" required></select>
+                </div>
+
+                <div>
+                    <h3>Constructors</h3>
+                    <label>1st Team</label><select id="c1" class="s-team" required></select>
+                    <label>2nd Team</label><select id="c2" class="s-team" required></select>
+                    <label>5th Team</label><select id="c5" class="s-team" required></select>
+                    <label>6th Team</label><select id="c6" class="s-team" required></select>
+                    <label>10th Team</label><select id="c10" class="s-team" required></select>
+
+                    <h3>Wildcards</h3>
+                    <label style="color:var(--red)">Race: Biggest Loser</label>
+                    <select id="wl" class="s-wildcard" required></select>
+
+                    <div id="sprint-box" class="hidden" style="border:1px solid var(--red); padding:10px; margin-top:10px; border-radius:4px;">
+                        <h4 style="margin:0 0 10px; color:var(--red)">⚡ SPRINT WEEKEND</h4>
+                        <label>Sprint Gainer</label><select id="sg" class="s-wildcard"></select>
+                        <label>Sprint Loser</label><select id="sl" class="s-wildcard"></select>
                     </div>
                 </div>
-                <button type="submit" class="btn-submit">🔒 Lock In Strategy</button>
-            </form>
-        </div>
-
-        <div id="live" class="tab-content">
-            <h2>Live Paddock Status</h2>
-            <div id="live-list"></div>
-
-            <div id="admin-controls" style="display: none;" class="admin-box">
-                <h3>⚠️ STEWARDS CONTROL</h3>
-                <p>Verify results and commit scores to database.</p>
-                <button id="finalize-btn" class="admin-btn">Finalize Race Weekend</button>
-                <p id="admin-status" style="margin-top:10px; font-weight:bold;"></p>
             </div>
-        </div>
+            <button type="submit" class="btn" id="sub-btn">LOCK STRATEGY</button>
+        </form>
+    </div>
 
-        <div id="standings" class="tab-content">
-            <h2>World Championship Standings</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Pos</th>
-                        <th>Driver</th>
-                        <th>Points</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboard-body"></tbody>
-            </table>
-        </div>
-    </main>
-
-    <div id="rules-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeRules()">&times;</span>
-            <h2>📜 2026 Regulations</h2>
-            <ul class="rules-list">
-                <li><strong>Scoring:</strong> Start at 0. Deductions for errors, Bonus for exact matches.</li>
-                <li><strong>Drivers (P1, P2, P3, P11, P12, P19, P20):</strong>
-                    <br>• Exact Match: <b>+2 Points</b>
-                    <br>• Miss: <b>-1 Point</b> per position off.
-                </li>
-                <li><strong>Constructors (Rank 1, 2, 5, 6, 10):</strong>
-                    <br>• Exact Match: <b>+2 Points</b>
-                    <br>• Miss: <b>-1 Point</b> per rank off.
-                </li>
-                <li><strong>Wildcard (Biggest Loser):</strong>
-                    <br>• Correct Driver: <b>+5 Points</b>.
-                </li>
-                <li><strong>Penalty:</strong> Missed race = Lowest score - 5.</li>
-            </ul>
+    <div id="live" class="tab">
+        <h2>Live Predictions</h2>
+        <div id="live-list"></div>
+        <div id="admin-panel" class="admin-box">
+            <h3>⚠️ STEWARDS CONTROL</h3>
+            <button onclick="finalize()" style="background:var(--red); color:white; padding:10px; cursor:pointer;">Finalize Weekend</button>
+            <p id="adm-stat"></p>
         </div>
     </div>
 
-    <div id="login-modal" class="modal" style="display:flex;">
-        <div class="modal-content">
-            <h2>Paddock Entry</h2>
-            <input type="text" id="auth-name" placeholder="Driver Name">
-            <input type="password" id="auth-pass" placeholder="Password">
-            <div style="margin-top: 20px;">
-                <button class="auth-btn primary" onclick="login()">Login</button>
-                <button class="auth-btn" onclick="register()">Register</button>
-            </div>
-        </div>
+    <div id="standings" class="tab">
+        <h2>Championship</h2>
+        <table style="width:100%; border-collapse:collapse;">
+            <thead><tr style="background:#333; color:var(--red);"><th style="padding:10px; text-align:left;">Pos</th><th>Driver</th><th>Points</th></tr></thead>
+            <tbody id="leaderboard"></tbody>
+        </table>
     </div>
+</main>
 
-    <script>
-        // --- 1. CONFIGURATION ---
-        // 2026 Grid Data for Dropdowns
-        const drivers2026 = [
-            "Max Verstappen", "Lando Norris", "Oscar Piastri", "Lewis Hamilton", "Charles Leclerc",
-            "George Russell", "Carlos Sainz", "Alex Albon", "Liam Lawson", "Yuki Tsunoda",
-            "Kimi Antonelli", "Jack Doohan", "Gabriel Bortoleto", "Isack Hadjar", "Franco Colapinto",
-            "Oliver Bearman", "Esteban Ocon", "Pierre Gasly", "Lance Stroll", "Fernando Alonso"
-        ].sort();
+<div id="auth" class="modal" style="display:flex;">
+    <div class="modal-box">
+        <h2>Login</h2>
+        <input type="text" id="u-name" placeholder="Name">
+        <input type="password" id="u-pass" placeholder="Password">
+        <button onclick="login()" class="btn">Enter</button>
+        <button onclick="reg()" class="btn" style="background:#444;">Register</button>
+    </div>
+</div>
 
-        const teams2026 = [
-            "Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin",
-            "Alpine", "Williams", "RB (Racing Bulls)", "Haas", "Audi (Sauber)"
-        ].sort();
+<script>
+    // DATA
+    const drivers = ["Max Verstappen", "Lando Norris", "Oscar Piastri", "Lewis Hamilton", "Charles Leclerc", "George Russell", "Carlos Sainz", "Alex Albon", "Liam Lawson", "Yuki Tsunoda", "Kimi Antonelli", "Jack Doohan", "Gabriel Bortoleto", "Isack Hadjar", "Franco Colapinto", "Oliver Bearman", "Esteban Ocon", "Pierre Gasly", "Lance Stroll", "Fernando Alonso"].sort();
+    const teams = ["Red Bull Racing", "Mercedes", "Ferrari", "McLaren", "Aston Martin", "Alpine", "Williams", "RB", "Haas", "Audi"].sort();
+    let user = JSON.parse(localStorage.getItem('f1_user'));
+    let raceLock = null;
 
-        let currentUser = JSON.parse(localStorage.getItem('f1_user'));
+    // INIT
+    document.addEventListener('DOMContentLoaded', () => {
+        fillDrops();
+        if(user) { document.getElementById('auth').style.display='none'; start(); }
+    });
 
-        // --- 2. INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', () => {
-            populateDropdowns(); // Fill the Select menus
-            
-            if (!currentUser) {
-                document.getElementById('login-modal').style.display = 'flex';
-            } else {
-                document.getElementById('login-modal').style.display = 'none';
-                initApp();
-            }
-        });
+    function start() {
+        checkAdm();
+        loadRace();
+        loadBoard();
+        setupSmartDrops(); // Enable anti-repetition logic
+    }
 
-        function populateDropdowns() {
-            const driverSelects = document.querySelectorAll('.driver-select');
-            const teamSelects = document.querySelectorAll('.team-select');
+    // 1. DROPDOWNS & SMART LOGIC
+    function fillDrops() {
+        const d = '<option value="">Select...</option>' + drivers.map(x=>`<option value="${x}">${x}</option>`).join('');
+        const t = '<option value="">Select...</option>' + teams.map(x=>`<option value="${x}">${x}</option>`).join('');
+        document.querySelectorAll('.s-driver, .s-wildcard').forEach(s => s.innerHTML = d);
+        document.querySelectorAll('.s-team').forEach(s => s.innerHTML = t);
+    }
 
-            driverSelects.forEach(sel => {
-                drivers2026.forEach(d => {
-                    const opt = document.createElement('option');
-                    opt.value = d;
-                    opt.innerText = d;
-                    sel.appendChild(opt);
-                });
-            });
+    function setupSmartDrops() {
+        const ds = document.querySelectorAll('.s-driver'); // Only race positions
+        const ts = document.querySelectorAll('.s-team');
 
-            teamSelects.forEach(sel => {
-                teams2026.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t;
-                    opt.innerText = t;
-                    sel.appendChild(opt);
+        function update(group) {
+            const picked = Array.from(group).map(s => s.value).filter(v => v);
+            group.forEach(s => {
+                Array.from(s.options).forEach(o => {
+                    if (o.value && picked.includes(o.value) && o.value !== s.value) o.disabled = true;
+                    else o.disabled = false;
                 });
             });
         }
+        ds.forEach(s => s.addEventListener('change', () => update(ds)));
+        ts.forEach(s => s.addEventListener('change', () => update(ts)));
+    }
 
-        function initApp() {
-            fetchNextRace();
-            checkAdmin();
-            loadLeaderboard();
-        }
-
-        // --- 3. UI HELPERS ---
-        function openRules() { document.getElementById('rules-modal').style.display = 'flex'; }
-        function closeRules() { document.getElementById('rules-modal').style.display = 'none'; }
+    // 2. RACE & SPRINT LOGIC
+    async function loadRace() {
+        const r = await fetch('/api/next-race').then(res=>res.json());
+        document.getElementById('r-name').innerText = r.name;
+        raceLock = new Date(r.date);
         
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            if (tabId === 'live') loadLivePredictions();
-            if (tabId === 'standings') loadLeaderboard();
+        // Sprint Toggle
+        const sp = document.getElementById('sprint-box');
+        if (r.hasSprint) {
+            sp.classList.remove('hidden');
+            document.getElementById('sg').required = true;
+            document.getElementById('sl').required = true;
+        } else {
+            sp.classList.add('hidden');
+            document.getElementById('sg').required = false;
+            document.getElementById('sl').required = false;
         }
-
-        // --- 4. AUTHENTICATION ---
-        async function login() {
-            const name = document.getElementById('auth-name').value;
-            const password = document.getElementById('auth-pass').value;
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ name, password })
-            });
-            const data = await res.json();
-            if (data.success) {
-                localStorage.setItem('f1_user', JSON.stringify({ name, password }));
-                location.reload();
-            } else alert("Access Denied: " + data.message);
+        
+        // Lock Check
+        if (new Date() > raceLock) {
+            document.getElementById('p-form').style.display = 'none';
+            document.getElementById('locked-msg').style.display = 'block';
         }
+    }
 
-        async function register() {
-            const name = document.getElementById('auth-name').value;
-            const password = document.getElementById('auth-pass').value;
-            const res = await fetch('/register', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ name, password })
-            });
-            const data = await res.json();
-            alert(data.message);
+    // 3. AUTH & ADMIN
+    async function login() {
+        const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
+        const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
+        if(res.ok) { localStorage.setItem('f1_user', JSON.stringify({name, password})); location.reload(); }
+        else alert('Fail');
+    }
+    async function reg() {
+        const name=document.getElementById('u-name').value, password=document.getElementById('u-pass').value;
+        await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, password}) });
+        alert('Registered');
+    }
+    function logout() { localStorage.clear(); location.reload(); }
+    
+    function checkAdm() {
+        if(user && user.name === 'admin') document.getElementById('admin-panel').style.display = 'block';
+    }
+
+    // 4. SUBMIT & DATA
+    document.getElementById('p-form').addEventListener('submit', async(e)=>{
+        e.preventDefault();
+        const body = {
+            user_name: user.name, password: user.password,
+            p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p19:val('p19'), p20:val('p20'),
+            c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
+            w_race_loser:val('wl'), 
+            w_sprint_gainer: document.getElementById('sg').value,
+            w_sprint_loser: document.getElementById('sl').value
+        };
+        const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if(res.ok) alert('Locked!'); else alert('Error or Locked');
+    });
+    function val(id) { return document.getElementById(id).value; }
+
+    async function tab(t) {
+        document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+        document.getElementById(t).classList.add('active');
+        if(t==='live') {
+            const d = await fetch('/api/predictions').then(r=>r.json());
+            document.getElementById('live-list').innerHTML = d.map(x=>`<div style="background:#333; padding:10px; margin:5px; border-left:3px solid var(--red)"><b>${x.user_name}</b> | P1: ${x.p1}</div>`).join('');
         }
+    }
+    async function loadBoard() {
+        const d = await fetch('/api/season-leaderboard').then(r=>r.json());
+        document.getElementById('leaderboard').innerHTML = d.map((x,i)=>`<tr><td style="padding:10px; border-bottom:1px solid #444">${i+1}</td><td style="border-bottom:1px solid #444">${x.name}</td><td style="border-bottom:1px solid #444">${x.total_score}</td></tr>`).join('');
+    }
 
-        function logout() {
-            localStorage.removeItem('f1_user');
-            location.reload();
-        }
-
-        function checkAdmin() {
-            if (currentUser && currentUser.name === 'admin') {
-                document.getElementById('admin-controls').style.display = 'block';
-            } else {
-                document.getElementById('admin-controls').style.display = 'none';
-            }
-        }
-
-        // --- 5. DATA FETCHING ---
-        async function fetchNextRace() {
-            try {
-                const res = await fetch('/api/next-race');
-                const data = await res.json();
-                document.getElementById('race-name').innerText = data.name;
-            } catch (e) {}
-        }
-
-        document.getElementById('prediction-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const payload = {
-                user_name: currentUser.name,
-                password: currentUser.password,
-                p1: document.getElementById('p1').value,
-                p2: document.getElementById('p2').value,
-                p3: document.getElementById('p3').value,
-                p11: document.getElementById('p11').value,
-                p12: document.getElementById('p12').value,
-                p19: document.getElementById('p19').value,
-                p20: document.getElementById('p20').value,
-                c1: document.getElementById('c1').value,
-                c2: document.getElementById('c2').value,
-                c5: document.getElementById('c5').value,
-                c6: document.getElementById('c6').value,
-                c10: document.getElementById('c10').value,
-                w_race_loser: document.getElementById('wl').value
-            };
-            const res = await fetch('/predict', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) alert("✅ Strategy Locked In!");
-            else alert("Error submitting prediction.");
-        });
-
-        async function loadLivePredictions() {
-            const res = await fetch('/api/predictions');
-            const data = await res.json();
-            const list = document.getElementById('live-list');
-            if (data.length === 0) list.innerHTML = "<p>No predictions locked yet.</p>";
-            else {
-                list.innerHTML = data.map(p => `
-                    <div class="prediction-card">
-                        <h3>${p.user_name}</h3>
-                        <div>P1: <b>${p.p1}</b></div>
-                        <div>Wildcard: <b>${p.w_race_loser}</b></div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        async function loadLeaderboard() {
-            const res = await fetch('/api/season-leaderboard');
-            const data = await res.json();
-            document.getElementById('leaderboard-body').innerHTML = data.map((d, i) => `
-                <tr>
-                    <td>${i+1}</td>
-                    <td>${d.name}</td>
-                    <td><b>${d.total_score}</b></td>
-                </tr>
-            `).join('');
-        }
-
-        document.getElementById('finalize-btn').addEventListener('click', async () => {
-            if (!confirm("⚠️ CONFIRM: Finalize Race?")) return;
-            const status = document.getElementById('admin-status');
-            status.innerText = "Processing...";
-            const res = await fetch('/api/finalize', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_name: currentUser.name, password: currentUser.password })
-            });
-            const data = await res.json();
-            if (data.success) {
-                status.innerText = "✅ Success!";
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                status.innerText = "❌ Error: " + data.message;
-            }
-        });
-    </script>
+    async function finalize() {
+        if(!confirm('Finalize?')) return;
+        document.getElementById('adm-stat').innerText = 'Processing...';
+        const res = await fetch('/api/finalize', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_name:user.name, password:user.password}) });
+        if(res.ok) location.reload(); else alert('Error');
+    }
+</script>
 </body>
 </html>
