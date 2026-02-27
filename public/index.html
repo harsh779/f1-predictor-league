@@ -181,6 +181,11 @@
         <button onclick="tab('grid', this)">🏎️ The Grid</button>
         <button onclick="tab('archive', this)">🏆 Archive</button>
         <button onclick="showSupportModal()" class="btn-support">☕ Support</button>
+        
+        <span id="user-greeting" class="hidden" style="display: flex; align-items: center; font-family: 'Titillium Web'; color: var(--text-main); margin-left: 5px; padding: 0 15px; border-left: 2px solid var(--border); white-space: nowrap;">
+            👤 <span id="logged-in-name" style="font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-left: 8px; color: var(--red);"></span>
+        </span>
+        
         <button onclick="logout()" style="color: var(--red);">Logout</button>
     </nav>
 </header>
@@ -422,11 +427,13 @@
         if(!user) { 
             document.getElementById('auth').style.display = 'flex'; 
         } else { 
+            document.getElementById('logged-in-name').innerText = user.name;
+            document.getElementById('user-greeting').classList.remove('hidden');
             start(); 
         }
     });
 
-  function start() { 
+    function start() { 
         checkAdm(); 
         loadRace(); 
         buildGridTab(); 
@@ -514,7 +521,7 @@
         } catch (e) { showToast("Failed to load circuit telemetry.", "error"); }
     }
 
-   function tab(t, btnElement) {
+    function tab(t, btnElement) {
         // 1. Hide all tabs and remove active styling from nav buttons
         document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
         document.querySelectorAll('#main-nav button').forEach(b => b.classList.remove('active-nav'));
@@ -527,7 +534,7 @@
             btnElement.classList.add('active-nav');
         } else {
             document.querySelectorAll('#main-nav button').forEach(b => {
-                if(b.getAttribute('onclick').includes(`'${t}'`)) b.classList.add('active-nav');
+                if(b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${t}'`)) b.classList.add('active-nav');
             });
         }
 
@@ -590,7 +597,7 @@
         if (d.length === 0) { board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color: var(--text-muted);">No telemetry data available yet.</td></tr>'; } 
         else {
             board.innerHTML = d.map((x,i)=>{
-                let isVip = (i === 0); 
+                let isVip = (x.is_vip === 1); 
                 let nameHtml = isVip ? `<span class="vip-gold">${x.name}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${x.name}</span>`;
                 let posColor = i===0 ? '#c59b27' : (i===1 ? '#999999' : (i===2 ? '#b87333' : 'var(--text-muted)'));
                 return `<tr><td style="text-align: center; font-weight: 900; color: ${posColor};">${i+1}</td><td>${nameHtml}</td><td style="text-align: right;"><b style="font-size:1.2rem; font-weight: 900; color: var(--text-main);">${x.total_score}</b></td></tr>`;

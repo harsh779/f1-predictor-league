@@ -13,14 +13,15 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN
 });
 
-// --- 1. DATABASE SETUP ---
+// --- 1. DATABASE SETUP (UPGRADED FOR VIP FUND) ---
 async function setupDatabase() {
   try {
-    // Added has_participated flag to new databases
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0)`);
+    // Added is_vip flag to new databases
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
     
-    // Safety catch to upgrade your existing database without deleting user data
+    // Safety catches to upgrade existing database without deleting user data
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
+    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
 
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -33,10 +34,10 @@ async function setupDatabase() {
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
     try {
-        await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated) VALUES ('admin', 'Open@0761', 0) ON CONFLICT(name) DO NOTHING" });
+        await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
         console.log("✅ Admin Ready.");
     } catch (e) {}
-    console.log("✅ Database Synced.");
+    console.log("✅ Database Synced & VIP Active.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -89,7 +90,10 @@ function normalizeConstructor(c) {
 
 async function sendDiscordNotification(msg) {
     const url = process.env.DISCORD_WEBHOOK_URL;
-    if (!url) return;
+    if (!url) {
+        console.log("Discord alert skipped: No DISCORD_WEBHOOK_URL set.");
+        return;
+    }
     try {
         await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) });
     } catch (e) { console.error("Discord Error:", e); }
@@ -184,7 +188,6 @@ async function performFinalization() {
 
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
     
-    // IMPORTANT FIX: Only apply scores and penalties to ACTIVE users.
     const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
     
     for (const d of activeDrivers) {
@@ -195,7 +198,10 @@ async function performFinalization() {
     }
 
     await db.execute("DELETE FROM f1_predictions_v2");
-    await sendDiscordNotification(`🏁 **${raceData.raceName}** Finalized! Standings Updated.`);
+    
+    // Send official Discord Alert
+    await sendDiscordNotification(`🏁 The **${raceData.raceName}** has been finalized! Points have been calculated and the World Championship Standings are updated.`);
+    
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
 }
@@ -231,9 +237,7 @@ app.post('/predict', async (req, res) => {
             args: [d.user_name, d.p1, d.p2, d.p3, d.p11, d.p12, d.p19, d.p20, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
         });
         
-        // IMPORTANT FIX: Mark user as an active participant so they appear on the leaderboard
         await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [d.user_name] });
-        
         res.json({ success: true });
     } catch (e) { 
         res.status(500).json({ success: false, message: e.message }); 
@@ -247,7 +251,11 @@ app.post('/api/finalize', async (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-    try { await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated) VALUES (?, ?, 0)", args: [req.body.name, req.body.password] }); res.json({ success: true, message: "Registered!" }); } 
+    try { 
+        // Force is_vip to 0 on standard registration
+        await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES (?, ?, 0, 0)", args: [req.body.name, req.body.password] }); 
+        res.json({ success: true, message: "Registered!" }); 
+    } 
     catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
 });
 
@@ -262,9 +270,9 @@ app.get('/api/predictions', async (req, res) => {
     res.json(r.rows);
 });
 
+// IMPORTANT VIP FIX: Added is_vip to the SELECT statement
 app.get('/api/season-leaderboard', async (req, res) => {
-    // IMPORTANT FIX: Only fetch users who have actively participated
-    const r = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+    const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
     res.json(r.rows);
 });
 
