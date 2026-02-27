@@ -201,6 +201,8 @@
         <button onclick="tab('grid', this)">🏎️ The Grid</button>
         <button onclick="tab('archive', this)">🏆 Archive</button>
         <button onclick="showSupportModal()" class="btn-support">☕ Support</button>
+        
+        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">📲 Install App</button>
     </nav>
 
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
@@ -776,6 +778,47 @@
     }
 
     // --- PWA SERVICE WORKER REGISTRATION ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
+        });
+    }
+
+    // --- PWA INSTALLATION LOGIC ---
+    let deferredPrompt;
+
+    // 1. Listen for the browser telling us the app is installable
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); // Stop the default mini-banner
+        deferredPrompt = e; // Save the event
+        document.getElementById('install-btn').classList.remove('hidden'); // Show our custom button
+    });
+
+    // 2. Handle the click based on the device
+    function installApp() {
+        // Check if the user is on an iPhone/iPad
+        const isIos = () => {
+            return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+        };
+
+        if (isIos()) {
+            // Apple forces manual installation
+            showToast('🍎 iOS: Tap the "Share" icon at the bottom of Safari, then scroll down and tap "Add to Home Screen".', 'success');
+        } else if (deferredPrompt) {
+            // Android / Desktop triggers the native prompt
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    document.getElementById('install-btn').classList.add('hidden');
+                }
+                deferredPrompt = null;
+            });
+        } else {
+            showToast('App is already installed or not supported on this browser.', 'success');
+        }
+    }
+
+    // 3. Register the background worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
