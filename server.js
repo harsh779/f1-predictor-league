@@ -89,14 +89,19 @@ function normalizeConstructor(c) {
 }
 
 async function sendDiscordNotification(msg) {
-    const url = process.env.DISCORD_WEBHOOK_URL;
-    if (!url) {
-        console.log("Discord alert skipped: No DISCORD_WEBHOOK_URL set.");
-        return;
-    }
+    // Hardcoded URL to completely bypass Render's environment variable glitch
+    const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
+    
     try {
-        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) });
-    } catch (e) { console.error("Discord Error:", e); }
+        await fetch(url, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) 
+        });
+        console.log("✅ Discord Webhook Fired!");
+    } catch (e) { 
+        console.error("Discord Error:", e); 
+    }
 }
 
 // --- 4. SCORING ENGINE ---
