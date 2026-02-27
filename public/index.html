@@ -31,7 +31,7 @@
         header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
         h1 { margin: 0; font-size: 1.8rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); }
         h1 span { color: var(--red); }
-        nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+        nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         nav button { background: transparent; border: 1px solid transparent; color: var(--text-muted); font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 8px 16px; border-radius: 20px; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.3s ease; }
         nav button:hover { color: var(--text-main); background: var(--surface-hover); }
         nav button.active-nav { background: var(--surface); color: var(--red); border: 1px solid var(--red); box-shadow: 0 0 10px var(--red-glow); }
@@ -39,8 +39,8 @@
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        /* USER PROFILE DROPDOWN */
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; margin-left: 5px; padding-left: 15px; border-left: 2px solid var(--border); font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
+        /* USER PROFILE DROPDOWN (Fixed for Mobile & Desktop) */
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); margin-left: auto; }
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
@@ -75,7 +75,7 @@
             transition: all 0.2s ease; 
             cursor: pointer;
             outline: none;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%23d1d1d6" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>'); 
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23d1d1d6" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>'); 
             background-repeat: no-repeat; 
             background-position: right 16px center; 
         }
@@ -137,12 +137,19 @@
         /* MOBILE SPECIFIC OPTIMIZATIONS (The App Experience)  */
         /* --------------------------------------------------- */
         @media (max-width: 768px) {
-            header { padding: 15px; flex-direction: column; align-items: flex-start; border-bottom: none; box-shadow: none; background: var(--surface); }
-            h1 { font-size: 1.5rem; margin-bottom: 5px; }
-            nav { width: 100vw; margin-left: -15px; padding: 5px 15px 15px 15px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 10px; border-bottom: 1px solid var(--border); }
+            /* FIXED: Flex wrap and ordering decoupled the nav from the header items */
+            header { padding: 15px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: none; box-shadow: none; background: var(--surface); }
+            h1 { font-size: 1.5rem; margin-bottom: 10px; margin-top: 5px; width: auto;}
+            
+            /* User profile sits in the top right, clear of the scrollable nav */
+            .user-dropdown { margin-bottom: 10px; margin-top: 5px; }
+            .user-dropdown-content { top: 110%; right: 0; left: auto; }
+            
+            /* Nav moves down a line and scrolls safely */
+            nav { width: 100vw; margin-left: -15px; padding: 0 15px 15px 15px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 10px; border-bottom: 1px solid var(--border); order: 3; }
             nav::-webkit-scrollbar { display: none; }
             nav button { white-space: nowrap; font-size: 0.9rem; padding: 10px 16px; border-radius: 25px; }
-            .user-dropdown { margin-left: 0; padding-left: 0; border-left: none; }
+            
             main { padding: 15px 12px; min-height: 90vh; }
             .form-grid { grid-template-columns: 1fr; gap: 15px; }
             .predict-group { padding: 15px; margin-bottom: 15px; }
@@ -180,6 +187,7 @@
 
 <header>
     <h1><span>F1</span> 2026 LEAGUE</h1>
+    
     <nav id="main-nav">
         <button onclick="tab('predict', this)" class="active-nav">Predict</button>
         <button onclick="tab('live', this)">Live</button>
@@ -188,14 +196,14 @@
         <button onclick="tab('grid', this)">🏎️ The Grid</button>
         <button onclick="tab('archive', this)">🏆 Archive</button>
         <button onclick="showSupportModal()" class="btn-support">☕ Support</button>
-        
-        <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-            👤 <span id="logged-in-name" style="margin-left: 5px; color: var(--red);"></span>
-            <div id="user-dropdown-content" class="user-dropdown-content">
-                <button onclick="logout()">🚪 Logout</button>
-            </div>
-        </div>
     </nav>
+
+    <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
+        👤 <span id="logged-in-name" style="margin-left: 5px; color: var(--red);"></span>
+        <div id="user-dropdown-content" class="user-dropdown-content">
+            <button onclick="logout()">🚪 Logout</button>
+        </div>
+    </div>
 </header>
 
 <main>
@@ -448,12 +456,15 @@
     function start() { 
         checkAdm(); 
         loadRace(); 
+        loadBoard(); 
         buildGridTab(); 
+        
+        // --- TAB MEMORY RESTORE ---
         const savedTab = localStorage.getItem('f1_active_tab') || 'predict';
         tab(savedTab); 
     }
 
-    // --- DROPDOWN MENU LOGIC ---
+    // --- USER DROPDOWN LOGIC ---
     function toggleUserMenu() {
         document.getElementById('user-menu').classList.toggle('show');
     }
@@ -478,7 +489,7 @@
             const pickedNodes = Array.from(document.querySelectorAll('.s-driver'));
             picked = pickedNodes.map(inp => inp.value).filter(v => v !== '' && v !== document.getElementById(inputId).value);
         } else if (type === 'wildcard') {
-            // Wildcards have zero restrictions. Every driver is always visible.
+            // FIXED: Wildcards have zero restrictions. Every single driver will always be visible.
             picked = []; 
         }
         
@@ -511,7 +522,7 @@
         currentInputId = null;
     }
 
-    // Combined Click-Outside Handler for Modals and Menus
+    // Combined Click-Outside Handler
     window.onclick = function(event) {
         const modal = document.getElementById('grid-selector-modal');
         if (event.target === modal) { closeSelectorModal(); }
