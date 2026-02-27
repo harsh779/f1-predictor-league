@@ -107,7 +107,7 @@ async function sendDiscordNotification(msg) {
 // --- 4. SCORING ENGINE ---
 async function performFinalization() {
   try {
-    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/2024/24/results.json').then(r => r.json());
+    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
     if (!races || races.length === 0) return { success: false, message: "No data." };
     
