@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>F1 2026 Strategy League</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#e10600">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="F1 Strategy">
+    <link rel="apple-touch-icon" href="/icon.svg">
+
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
         /* 1. CSS VARIABLES: PREMIUM LIGHT MODE */
@@ -75,7 +83,7 @@
             transition: all 0.2s ease; 
             cursor: pointer;
             outline: none;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%23d1d1d6" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>'); 
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23d1d1d6" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>'); 
             background-repeat: no-repeat; 
             background-position: right 16px center; 
         }
@@ -137,15 +145,12 @@
         /* MOBILE SPECIFIC OPTIMIZATIONS (The App Experience)  */
         /* --------------------------------------------------- */
         @media (max-width: 768px) {
-            /* FIXED: Flex wrap and ordering decoupled the nav from the header items */
             header { padding: 15px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: none; box-shadow: none; background: var(--surface); }
             h1 { font-size: 1.5rem; margin-bottom: 10px; margin-top: 5px; width: auto;}
             
-            /* User profile sits in the top right, clear of the scrollable nav */
             .user-dropdown { margin-bottom: 10px; margin-top: 5px; }
             .user-dropdown-content { top: 110%; right: 0; left: auto; }
             
-            /* Nav moves down a line and scrolls safely */
             nav { width: 100vw; margin-left: -15px; padding: 0 15px 15px 15px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 10px; border-bottom: 1px solid var(--border); order: 3; }
             nav::-webkit-scrollbar { display: none; }
             nav button { white-space: nowrap; font-size: 0.9rem; padding: 10px 16px; border-radius: 25px; }
@@ -459,7 +464,6 @@
         loadBoard(); 
         buildGridTab(); 
         
-        // --- TAB MEMORY RESTORE ---
         const savedTab = localStorage.getItem('f1_active_tab') || 'predict';
         tab(savedTab); 
     }
@@ -489,7 +493,6 @@
             const pickedNodes = Array.from(document.querySelectorAll('.s-driver'));
             picked = pickedNodes.map(inp => inp.value).filter(v => v !== '' && v !== document.getElementById(inputId).value);
         } else if (type === 'wildcard') {
-            // FIXED: Wildcards have zero restrictions. Every single driver will always be visible.
             picked = []; 
         }
         
@@ -770,6 +773,13 @@
     
     function checkAdm() { 
         if(user && user.name === 'admin') document.getElementById('admin-panel').classList.remove('hidden'); 
+    }
+
+    // --- PWA SERVICE WORKER REGISTRATION ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
+        });
     }
 </script>
 </body>
