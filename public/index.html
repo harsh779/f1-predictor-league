@@ -31,7 +31,7 @@
         header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
         h1 { margin: 0; font-size: 1.8rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); }
         h1 span { color: var(--red); }
-        nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
         nav button { background: transparent; border: 1px solid transparent; color: var(--text-muted); font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 8px 16px; border-radius: 20px; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.3s ease; }
         nav button:hover { color: var(--text-main); background: var(--surface-hover); }
         nav button.active-nav { background: var(--surface); color: var(--red); border: 1px solid var(--red); box-shadow: 0 0 10px var(--red-glow); }
@@ -135,6 +135,7 @@
             nav { width: 100vw; margin-left: -15px; padding: 5px 15px 15px 15px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 10px; border-bottom: 1px solid var(--border); }
             nav::-webkit-scrollbar { display: none; }
             nav button { white-space: nowrap; font-size: 0.9rem; padding: 10px 16px; border-radius: 25px; }
+            #user-greeting { padding: 0 10px; margin-left: 0; border-left: none; border-right: 2px solid var(--border); }
             main { padding: 15px 12px; min-height: 90vh; }
             .form-grid { grid-template-columns: 1fr; gap: 15px; }
             .predict-group { padding: 15px; margin-bottom: 15px; }
@@ -236,14 +237,14 @@
                     <div class="predict-group" style="border-color: var(--gold); background: rgba(197, 155, 39, 0.02);">
                         <h3 style="color: var(--gold); border-color: rgba(197, 155, 39, 0.3);">🃏 Strategic Wildcards</h3>
                         <label>Race: Biggest Loser</label>
-                        <input type="text" id="wl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('wl', 'driver', 'Select Race Biggest Loser')" required>
+                        <input type="text" id="wl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('wl', 'wildcard', 'Select Race Biggest Loser')" required>
 
                         <div id="sprint-box" class="hidden" style="margin-top: 25px; padding-top: 25px; border-top: 1px dashed var(--border);">
                             <h4 style="margin:0 0 15px; color:var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">⚡ Sprint Weekend Bonus</h4>
                             <label>Sprint: Biggest Gainer</label>
-                            <input type="text" id="sg" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sg', 'driver', 'Select Sprint Gainer')">
+                            <input type="text" id="sg" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sg', 'wildcard', 'Select Sprint Gainer')">
                             <label>Sprint: Biggest Loser</label>
-                            <input type="text" id="sl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sl', 'driver', 'Select Sprint Loser')">
+                            <input type="text" id="sl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sl', 'wildcard', 'Select Sprint Loser')">
                         </div>
                     </div>
                 </div>
@@ -427,8 +428,10 @@
         if(!user) { 
             document.getElementById('auth').style.display = 'flex'; 
         } else { 
+            // Activate the user badge
             document.getElementById('logged-in-name').innerText = user.name;
             document.getElementById('user-greeting').classList.remove('hidden');
+            
             start(); 
         }
     });
@@ -452,13 +455,22 @@
         const grid = document.getElementById('selector-grid');
         grid.innerHTML = '';
         
-        // Anti-Repetition: Find what is already selected globally across ALL inputs of this type
-        const groupSelectors = type === 'team' ? '.s-team' : '.s-driver, .s-wildcard';
-        const picked = Array.from(document.querySelectorAll(groupSelectors))
-                            .map(inp => inp.value)
-                            .filter(v => v !== '' && v !== document.getElementById(inputId).value);
+        let picked = [];
+        let items = detailedDrivers; // Default to the drivers list
 
-        const items = type === 'team' ? detailedTeams : detailedDrivers;
+        if (type === 'team') {
+            // Logic for Constructor Selection
+            const pickedNodes = Array.from(document.querySelectorAll('.s-team'));
+            picked = pickedNodes.map(inp => inp.value).filter(v => v !== '' && v !== document.getElementById(inputId).value);
+            items = detailedTeams;
+        } else if (type === 'driver') {
+            // Logic for Main Drivers (P1, P2, etc.)
+            const pickedNodes = Array.from(document.querySelectorAll('.s-driver'));
+            picked = pickedNodes.map(inp => inp.value).filter(v => v !== '' && v !== document.getElementById(inputId).value);
+        } else if (type === 'wildcard') {
+            // FIXED: Wildcards have zero restrictions. Every single driver will always be visible.
+            picked = []; 
+        }
         
         items.forEach(item => {
             const isDisabled = picked.includes(item.name);
@@ -534,7 +546,7 @@
             btnElement.classList.add('active-nav');
         } else {
             document.querySelectorAll('#main-nav button').forEach(b => {
-                if(b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${t}'`)) b.classList.add('active-nav');
+                if(b.getAttribute('onclick').includes(`'${t}'`)) b.classList.add('active-nav');
             });
         }
 
@@ -597,6 +609,7 @@
         if (d.length === 0) { board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color: var(--text-muted);">No telemetry data available yet.</td></tr>'; } 
         else {
             board.innerHTML = d.map((x,i)=>{
+                // FIXED: Reads the is_vip column from the database for the Gold Badge
                 let isVip = (x.is_vip === 1); 
                 let nameHtml = isVip ? `<span class="vip-gold">${x.name}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${x.name}</span>`;
                 let posColor = i===0 ? '#c59b27' : (i===1 ? '#999999' : (i===2 ? '#b87333' : 'var(--text-muted)'));
