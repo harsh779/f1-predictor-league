@@ -426,11 +426,14 @@
         }
     });
 
-    function start() { 
+  function start() { 
         checkAdm(); 
         loadRace(); 
-        loadBoard(); 
         buildGridTab(); 
+        
+        // --- TAB MEMORY RESTORE ---
+        const savedTab = localStorage.getItem('f1_active_tab') || 'predict';
+        tab(savedTab); 
     }
 
     // --- THE NEW MODAL SELECTOR LOGIC ---
@@ -511,12 +514,30 @@
         } catch (e) { showToast("Failed to load circuit telemetry.", "error"); }
     }
 
-    function tab(t, btnElement) {
+   function tab(t, btnElement) {
+        // 1. Hide all tabs and remove active styling from nav buttons
         document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
-        document.getElementById(t).classList.add('active');
         document.querySelectorAll('#main-nav button').forEach(b => b.classList.remove('active-nav'));
-        if(btnElement) btnElement.classList.add('active-nav');
-        if(t==='live') loadLive(); if(t==='standings') loadBoard(); if(t==='calendar') loadCalendar();
+        
+        // 2. Show the targeted tab
+        document.getElementById(t).classList.add('active');
+        
+        // 3. Highlight the correct nav button (Handles both clicks and page reloads)
+        if(btnElement) {
+            btnElement.classList.add('active-nav');
+        } else {
+            document.querySelectorAll('#main-nav button').forEach(b => {
+                if(b.getAttribute('onclick').includes(`'${t}'`)) b.classList.add('active-nav');
+            });
+        }
+
+        // 4. Save current tab to browser memory
+        localStorage.setItem('f1_active_tab', t);
+
+        // 5. Fetch data only when needed
+        if(t==='live') loadLive(); 
+        if(t==='standings') loadBoard(); 
+        if(t==='calendar') loadCalendar();
     }
 
     async function loadLive() {
