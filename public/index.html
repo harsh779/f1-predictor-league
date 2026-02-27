@@ -784,41 +784,45 @@
         });
     }
 
-    // --- PWA INSTALLATION LOGIC ---
+    // --- PWA INSTALLATION LOGIC (UNIVERSAL FALLBACK) ---
     let deferredPrompt;
+    const installBtn = document.getElementById('install-btn');
 
-    // 1. Listen for the browser telling us the app is installable
+    // 1. Check if the app is ALREADY installed (standalone mode)
+    const isStandalone = () => ('standalone' in window.navigator && window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+
+    // 2. ALWAYS show the button if they aren't using the installed app yet
+    if (!isStandalone() && installBtn) {
+        installBtn.classList.remove('hidden');
+    }
+
+    // 3. Catch the native prompt if Chrome allows it
     window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); // Stop the default mini-banner
-        deferredPrompt = e; // Save the event
-        document.getElementById('install-btn').classList.remove('hidden'); // Show our custom button
+        e.preventDefault(); 
+        deferredPrompt = e; 
     });
 
-    // 2. Handle the click based on the device
+    // 4. Button Click Logic
     function installApp() {
-        // Check if the user is on an iPhone/iPad
-        const isIos = () => {
-            return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-        };
+        const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
 
-        if (isIos()) {
-            // Apple forces manual installation
-            showToast('🍎 iOS: Tap the "Share" icon at the bottom of Safari, then scroll down and tap "Add to Home Screen".', 'success');
-        } else if (deferredPrompt) {
-            // Android / Desktop triggers the native prompt
+        if (deferredPrompt) {
+            // Happy Path: Chrome allows the native pop-up
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    document.getElementById('install-btn').classList.add('hidden');
-                }
+                if (choiceResult.outcome === 'accepted') { installBtn.classList.add('hidden'); }
                 deferredPrompt = null;
             });
+        } else if (isIos()) {
+            // Apple Fallback
+            showToast('🍎 iOS: Tap the "Share" icon at the bottom of Safari, then scroll down and tap "Add to Home Screen".', 'success');
         } else {
-            showToast('App is already installed or not supported on this browser.', 'success');
+            // Android/Desktop Fallback (Bypasses the PNG image requirement)
+            showToast('🤖 Android: Tap the 3 dots (⋮) in your browser menu and tap "Add to Home screen" or "Install App".', 'success');
         }
     }
 
-    // 3. Register the background worker
+    // 5. Register Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
