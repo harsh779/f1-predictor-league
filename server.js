@@ -17,13 +17,11 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN
 });
 
-// --- 1. DATABASE SETUP (UPGRADED FOR VIP FUND) ---
+// --- 1. DATABASE SETUP ---
 async function setupDatabase() {
   try {
-    // Added is_vip flag to new databases
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
     
-    // Safety catches to upgrade existing database without deleting user data
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
 
@@ -37,18 +35,19 @@ async function setupDatabase() {
         w_race_loser TEXT, 
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
+    
     await db.execute(`CREATE TABLE IF NOT EXISTS league_story (id INTEGER PRIMARY KEY, narrative TEXT)`);
     try {
         await db.execute("INSERT INTO league_story (id, narrative) VALUES (1, 'The 2026 season is about to begin. The paddock is silent, but the tension between the strategists is already palpable.') ON CONFLICT(id) DO NOTHING");
         await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
         console.log("✅ Admin & Story Engine Ready.");
     } catch (e) {}
-    console.log("✅ Database Synced & VIP Active.");
+    console.log("✅ Database Synced.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
 
-// --- 2. 2026 CALENDAR WITH ENRICHED CIRCUIT DATA (IST) ---
+// --- 2. FULL 2026 CALENDAR ---
 const f1Calendar2026 = [
   { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-06T07:00:00+05:30", circuit: "Albert Park Circuit", country: "Australia", record: "Charles Leclerc (Ferrari) - 1:19.813 (2024)", sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
   { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-13T09:00:00+05:30", circuit: "Shanghai International Circuit", country: "China", record: "Michael Schumacher (Ferrari) - 1:32.238 (2004)", sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
@@ -111,14 +110,15 @@ async function sendDiscordNotification(msg) {
 // --- 4. SCORING ENGINE ---
 async function performFinalization() {
   try {
-    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
+    // ⚠️ PRE-SEASON TEST: Temporarily pulling 2023 Bahrain to guarantee historical data
+    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/2023/1/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
-    if (!races || races.length === 0) return { success: false, message: "No data." };
+    if (!races || races.length === 0) return { success: false, message: "No data from F1 API." };
     
     const raceData = races[0];
     const results = raceData.Results;
     const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v2");
-    if (check.rows[0].count === 0) return { success: false, message: "No predictions." };
+    if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
 
     const actualDriverPositions = {};
     results.forEach(r => {
@@ -289,8 +289,7 @@ app.post('/register', async (req, res) => {
     try { 
         await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES (?, ?, 0, 0)", args: [req.body.name, req.body.password] }); 
         res.json({ success: true, message: "Registered!" }); 
-    } 
-    catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
+    } catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
 });
 
 app.post('/login', async (req, res) => {
@@ -309,11 +308,17 @@ app.get('/api/season-leaderboard', async (req, res) => {
     res.json(r.rows);
 });
 
+app.get('/api/storyline', async (req, res) => {
+    try {
+        const r = await db.execute("SELECT narrative FROM league_story WHERE id = 1");
+        res.json({ story: r.rows.length > 0 ? r.rows[0].narrative : "The paddock awaits..." });
+    } catch (e) { res.status(500).json({ story: "Telemetry unavailable." }); }
+});
+
 // --- 6. ADMIN ROUTES ---
 app.get('/api/admin/users', async (req, res) => {
   const { user, pass } = req.query;
   if (user !== 'admin' || pass !== 'Open@0761') return res.status(403).send("Unauthorized");
-
   try {
       const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY name ASC");
       res.json(r.rows);
@@ -323,12 +328,8 @@ app.get('/api/admin/users', async (req, res) => {
 app.post('/api/admin/toggle-vip', async (req, res) => {
   const { adminUser, adminPass, targetUser, vipStatus } = req.body;
   if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-
   try {
-      await db.execute({ 
-          sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", 
-          args: [vipStatus ? 1 : 0, targetUser] 
-      });
+      await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [vipStatus ? 1 : 0, targetUser] });
       res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -336,12 +337,8 @@ app.post('/api/admin/toggle-vip', async (req, res) => {
 app.post('/api/admin/reset-user', async (req, res) => {
   const { adminUser, adminPass, targetUser } = req.body;
   if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-
   try {
-      await db.execute({ 
-          sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", 
-          args: [targetUser] 
-      });
+      await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [targetUser] });
       res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -351,18 +348,31 @@ app.post('/api/steward', async (req, res) => {
   const { username, message } = req.body;
 
   try {
-      // 1. Fetch the user's current standing to give the AI context
       const userRow = await db.execute({ sql: "SELECT total_score FROM f1_drivers WHERE name = ?", args: [username] });
       const userScore = userRow.rows.length > 0 ? userRow.rows[0].total_score : 0;
 
-      // 2. The Core Persona Prompt
+      const predRow = await db.execute({ sql: "SELECT * FROM f1_predictions_v2 WHERE user_name = ?", args: [username] });
+      let predictionContext = "The user hasn't submitted a strategy for the upcoming race yet. Yell at them for being late to the paddock.";
+      
+      if (predRow.rows.length > 0) {
+          const p = predRow.rows[0];
+          predictionContext = `The user's locked strategy for the upcoming race is: 
+          Podium picks: P1: ${p.p1}, P2: ${p.p2}, P3: ${p.p3}. 
+          Midfield picks: P11: ${p.p11}, P12: ${p.p12}. 
+          Backmarker picks: P19: ${p.p19}, P20: ${p.p20}. 
+          Constructor picks: 1st: ${p.c1}, 2nd: ${p.c2}, 5th: ${p.c5}, 6th: ${p.c6}, 10th: ${p.c10}.
+          Wildcard (Biggest Loser): ${p.w_race_loser}.`;
+      }
+
       const systemPrompt = `You are the Head FIA Steward for a private F1 2026 fantasy league. 
       You are grumpy, strictly adhere to the rules, and have zero patience for silly questions. Think Günther Steiner meets Michael Masi.
       The user talking to you is named "${username}", and their current championship score is ${userScore} points.
-      If their score is negative or 0, mock them relentlessly. If they ask for advice on who to pick, tell them to figure it out themselves but drop ONE vague historical F1 hint.
+      
+      ${predictionContext}
+      
+      If they ask about their predictions, ruthlessly roast their specific driver/team choices based on the context above. If their score is negative or 0, mock them relentlessly. If they ask for advice on who to pick, tell them to figure it out themselves but drop ONE vague historical F1 hint.
       Keep responses under 3 sentences. Be punchy, snarky, and authoritative.`;
 
-      // 3. Call ChatGPT
       const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
