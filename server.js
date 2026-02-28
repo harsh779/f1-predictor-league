@@ -107,8 +107,8 @@ async function sendDiscordNotification(msg) {
 // --- 4. SCORING ENGINE ---
 async function performFinalization() {
   try {
-    // ⚠️ PRE-SEASON TEST: Temporarily pulling 2023 Bahrain to guarantee historical data
-    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/2023/1/results.json').then(r => r.json());
+    // 🟢 LIVE SEASON MODE: Pulls the most recently completed F1 race
+    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
     if (!races || races.length === 0) return { success: false, message: "No data from F1 API." };
     
