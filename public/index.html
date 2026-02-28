@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version bumped to 2.0 to flush out the HTML `<p>` bug
+        // Version bumped to force UI updates
         (function() {
-            const currentVersion = "2.0"; 
+            const currentVersion = "2.1"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -35,6 +35,7 @@
     </script>
 
     <style>
+        /* --- 1. CORE VARIABLES --- */
         :root { 
             --red: #e10600; 
             --red-glow: rgba(225, 6, 0, 0.15);
@@ -55,6 +56,7 @@
         ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
+        /* --- 2. HEADER & NAVIGATION --- */
         header { 
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
             padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; 
@@ -92,11 +94,13 @@
             nav button { font-size: 0.95rem; padding: 10px 20px; }
         }
 
+        /* --- 3. LAYOUT --- */
         main { padding: 30px 20px; max-width: 1200px; margin: 0 auto; min-height: 80vh; }
         .tab { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); } 
         .active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* --- 4. PREDICT FORM & CARDS --- */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         .predict-group { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
         .predict-group h3 { margin: 0 0 20px 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
@@ -115,10 +119,12 @@
         .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
         
+        /* --- 5. LIVE TAB GRID --- */
         .live-grid-container { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 20px; font-size: 0.95rem; }
         .live-card-section { background: var(--surface-inner); padding: 18px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box;}
         .live-card-title { color: var(--text-muted); display: block; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
 
+        /* --- 6. TABLES & GLOBALS --- */
         .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);}
         table { width: 100%; border-collapse: collapse; }
@@ -159,6 +165,7 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
+        /* --- 7. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
             header { padding: 15px 15px 0 15px !important; flex-direction: row !important; flex-wrap: wrap !important; }
             h1 { font-size: 1.4rem !important; margin: 0 !important; width: auto !important; flex: 1; }
@@ -599,14 +606,19 @@
 
     async function loadRace() {
         try {
-            const r = await fetch('/api/next-race').then(res=>res.json());
+            // CACHE BUSTER ADDED TO FETCH
+            const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
             document.getElementById('r-round').innerText = `Round ${r.round} of 24`;
             document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
             
-            raceLock = new Date(r.lockTime);
-            const dlFormat = raceLock.toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            document.getElementById('r-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
+            if (r.lockTime) {
+                raceLock = new Date(r.lockTime);
+                const dlFormat = raceLock.toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                document.getElementById('r-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
+            } else {
+                document.getElementById('r-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
+            }
             
             fetchWeather(r.country);
             
@@ -620,7 +632,7 @@
                 document.getElementById('sl').required = false;
             }
             
-            if (new Date() >= raceLock) {
+            if (raceLock && new Date() >= raceLock) {
                 document.getElementById('p-form').style.display = 'none';
                 document.getElementById('locked-msg').classList.remove('hidden');
             }
@@ -651,7 +663,8 @@
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
-        const d = await fetch('/api/predictions').then(r=>r.json());
+        // CACHE BUSTER ADDED TO FETCH
+        const d = await fetch('/api/predictions?t=' + new Date().getTime()).then(r=>r.json());
         
         if (d.length === 0) { 
             list.innerHTML = "<div class='predict-group' style='text-align: center; color: var(--text-muted);'>No telemetry submitted yet for this session.</div>"; 
@@ -695,7 +708,8 @@
 
     async function loadBoard() {
         try {
-            const storyRes = await fetch('/api/storyline').then(r=>r.json());
+            // CACHE BUSTER ADDED TO FETCH
+            const storyRes = await fetch('/api/storyline?t=' + new Date().getTime()).then(r=>r.json());
             const formattedStory = storyRes.story.replace(/\n/g, '<br>');
             document.getElementById('dts-storyline').innerHTML = formattedStory;
         } catch(e) {}
@@ -704,7 +718,8 @@
         const skel = `<tr><td><div class="skeleton" style="width:30px;"></div></td><td><div class="skeleton" style="width:150px;"></div></td><td><div class="skeleton" style="width:40px; float:right;"></div></td></tr>`;
         board.innerHTML = skel.repeat(5);
         
-        const d = await fetch('/api/season-leaderboard').then(r=>r.json());
+        // CACHE BUSTER ADDED TO FETCH
+        const d = await fetch('/api/season-leaderboard?t=' + new Date().getTime()).then(r=>r.json());
         if (d.length === 0) { board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color: var(--text-muted);">No telemetry data available yet.</td></tr>'; } 
         else {
             board.innerHTML = d.map((x,i)=>{
@@ -720,7 +735,8 @@
         const body = document.getElementById('cal-body');
         body.innerHTML = `<tr><td colspan="2"><div class="skeleton" style="width:100%; height:40px; margin-bottom:10px;"></div><div class="skeleton" style="width:100%; height:40px;"></div></td></tr>`;
         
-        const d = await fetch('/api/calendar').then(r=>r.json());
+        // CACHE BUSTER ADDED TO FETCH
+        const d = await fetch('/api/calendar?t=' + new Date().getTime()).then(r=>r.json());
         body.innerHTML = d.map(x => {
             const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
             let sess = x.hasSprint ? `
@@ -854,7 +870,8 @@
 
     async function loadAdminUserList() {
         try {
-            const resp = await fetch(`/api/admin/users?user=${encodeURIComponent(user.name)}&pass=${encodeURIComponent(user.password)}`);
+            // CACHE BUSTER ADDED TO FETCH
+            const resp = await fetch(`/api/admin/users?user=${encodeURIComponent(user.name)}&pass=${encodeURIComponent(user.password)}&t=` + new Date().getTime());
             if(!resp.ok) return;
             const users = await resp.json();
             const list = document.getElementById('admin-user-list');
@@ -907,7 +924,6 @@
         } catch (e) { showToast('Error resetting user', 'error'); }
     }
 
-    // NEW FUNCTION: Reset the AI Story
     async function resetStory() {
         if(!confirm('⚠️ Are you sure you want to wipe the current AI story and reset it to the default pre-season message?')) return;
         try {
