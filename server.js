@@ -249,21 +249,17 @@ async function performFinalization() {
 // --- 5. CORE ROUTES ---
 app.get('/api/next-race', (req, res) => {
     const now = new Date();
-    // Safety Buffer: Keep the current round on screen until 4 hours AFTER the race starts
     const next = f1Calendar2026.find(r => {
         const raceEndBuffer = new Date(r.sessions.race);
         raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
         return raceEndBuffer > now;
     }) || f1Calendar2026[f1Calendar2026.length-1];
     
-    // Always lock at Qualifying, regardless of Sprint status
     const payload = { ...next, lockTime: next.sessions.quali };
     res.json(payload);
 });
 
-app.get('/api/calendar', (req, res) => {
-    res.json(f1Calendar2026);
-});
+app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
 app.post('/predict', async (req, res) => {
     const d = req.body;
@@ -278,7 +274,6 @@ app.post('/predict', async (req, res) => {
     }); 
     if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
-    // The Ultimate Lockout Mechanism (Exactly at standard Qualifying)
     const lockTime = new Date(currentRace.sessions.quali);
     if (now > lockTime) {
         return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
@@ -297,9 +292,7 @@ app.post('/predict', async (req, res) => {
         
         await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [d.user_name] });
         res.json({ success: true });
-    } catch (e) { 
-        res.status(500).json({ success: false, message: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/finalize', async (req, res) => {
@@ -366,11 +359,20 @@ app.post('/api/admin/reset-user', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// NEW: Global Story Reset Endpoint
+app.post('/api/admin/reset-story', async (req, res) => {
+    const { adminUser, adminPass } = req.body;
+    if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+    try {
+        await db.execute("UPDATE league_story SET narrative = 'The 2026 season is about to begin. The paddock is silent, but the tension between the strategists is already palpable.' WHERE id = 1");
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // --- 7. AUTOMATED CRON JOB ---
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
     const now = new Date();
-    // Safely looks for a race that started within the last 24 hours to automatically finalize it
     const active = f1Calendar2026.find(r => { 
         const raceTime = new Date(r.sessions.race); 
         return now > raceTime && now - raceTime < (24 * 60 * 60 * 1000); 
