@@ -37,9 +37,11 @@ async function setupDatabase() {
         w_race_loser TEXT, 
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS league_story (id INTEGER PRIMARY KEY, narrative TEXT)`);
     try {
+        await db.execute("INSERT INTO league_story (id, narrative) VALUES (1, 'The 2026 season is about to begin. The paddock is silent, but the tension between the strategists is already palpable.') ON CONFLICT(id) DO NOTHING");
         await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
-        console.log("✅ Admin Ready.");
+        console.log("✅ Admin & Story Engine Ready.");
     } catch (e) {}
     console.log("✅ Database Synced & VIP Active.");
   } catch (e) { console.error("DB Error:", e); }
@@ -206,8 +208,34 @@ async function performFinalization() {
 
     await db.execute("DELETE FROM f1_predictions_v2");
     
-    // Send official Discord Alert
-    await sendDiscordNotification(`🏁 The **${raceData.raceName}** has been finalized! Points have been calculated and the World Championship Standings are updated.`);
+    // --- AI: DRIVE TO SURVIVE NARRATIVE GENERATOR ---
+    try {
+        const standingsRow = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
+        const standingsStr = standingsRow.rows.map(r => `${r.name}: ${r.total_score} pts`).join(', ');
+        
+        const prompt = `You are a dramatic Netflix 'Drive to Survive' narrator. 
+        The F1 race "${raceData.raceName}" just finished. 
+        Here are the updated scores for our fantasy league: ${standingsStr}.
+        Write a thrilling, 2 to 3 paragraph recap of the fantasy league's current storyline. 
+        Focus entirely on the rivalries between the human players (e.g., who is choking, who is dominating, who made a massive comeback).
+        Make it intense, cinematic, and use F1 terminology.`;
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 300,
+            temperature: 0.8
+        });
+        
+        const newStory = completion.choices[0].message.content;
+        await db.execute({ sql: "UPDATE league_story SET narrative = ? WHERE id = 1", args: [newStory] });
+        
+        // Send AI Story to Discord
+        await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!**\n\n🎬 **Drive to Survive - Paddock Rumors:**\n${newStory}`);
+    } catch (aiErr) {
+        console.error("Story Gen Error:", aiErr);
+        await sendDiscordNotification(`🏁 The **${raceData.raceName}** has been finalized! Points updated.`);
+    }
     
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
