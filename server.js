@@ -1,6 +1,10 @@
 const express = require('express');
 const { createClient } = require('@libsql/client');
 const path = require('path');
+const { OpenAI } = require('openai');
+
+// Initialize OpenAI (Make sure OPENAI_API_KEY is set in Render Environment Variables)
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -73,35 +77,33 @@ const f1Calendar2026 = [
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
-    const l = normalizeStr(c);
-    if (l.includes("mclaren")) return "mclaren";
-    if (l.includes("red bull") || l.includes("redbull")) return "red bull";
-    if (l.includes("ferrari")) return "ferrari";
-    if (l.includes("mercedes")) return "mercedes";
-    if (l.includes("aston")) return "aston martin";
-    if (l.includes("alpine")) return "alpine";
-    if (l.includes("haas")) return "haas";
-    if (l.includes("rb") || l.includes("racing bulls")) return "racing bulls";
-    if (l.includes("williams")) return "williams";
-    if (l.includes("sauber") || l.includes("audi")) return "audi";
-    if (l.includes("cadillac")) return "cadillac"; 
-    return l;
+  const l = normalizeStr(c);
+  if (l.includes("mclaren")) return "mclaren";
+  if (l.includes("red bull") || l.includes("redbull")) return "red bull";
+  if (l.includes("ferrari")) return "ferrari";
+  if (l.includes("mercedes")) return "mercedes";
+  if (l.includes("aston")) return "aston martin";
+  if (l.includes("alpine")) return "alpine";
+  if (l.includes("haas")) return "haas";
+  if (l.includes("rb") || l.includes("racing bulls")) return "racing bulls";
+  if (l.includes("williams")) return "williams";
+  if (l.includes("sauber") || l.includes("audi")) return "audi";
+  if (l.includes("cadillac")) return "cadillac"; 
+  return l;
 }
 
 async function sendDiscordNotification(msg) {
-    // Hardcoded URL to completely bypass Render's environment variable glitch
-    const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
-    
-    try {
-        await fetch(url, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) 
-        });
-        console.log("✅ Discord Webhook Fired!");
-    } catch (e) { 
-        console.error("Discord Error:", e); 
-    }
+  const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
+  try {
+      await fetch(url, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) 
+      });
+      console.log("✅ Discord Webhook Fired!");
+  } catch (e) { 
+      console.error("Discord Error:", e); 
+  }
 }
 
 // --- 4. SCORING ENGINE ---
@@ -211,7 +213,7 @@ async function performFinalization() {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-// --- 5. ROUTES ---
+// --- 5. CORE ROUTES ---
 app.get('/api/next-race', (req, res) => {
     const now = new Date();
     const next = f1Calendar2026.find(r => new Date(r.date) > now) || f1Calendar2026[f1Calendar2026.length-1];
@@ -257,7 +259,6 @@ app.post('/api/finalize', async (req, res) => {
 
 app.post('/register', async (req, res) => {
     try { 
-        // Force is_vip to 0 on standard registration
         await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES (?, ?, 0, 0)", args: [req.body.name, req.body.password] }); 
         res.json({ success: true, message: "Registered!" }); 
     } 
@@ -275,12 +276,83 @@ app.get('/api/predictions', async (req, res) => {
     res.json(r.rows);
 });
 
-// IMPORTANT VIP FIX: Added is_vip to the SELECT statement
 app.get('/api/season-leaderboard', async (req, res) => {
     const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
     res.json(r.rows);
 });
 
+// --- 6. ADMIN ROUTES ---
+app.get('/api/admin/users', async (req, res) => {
+  const { user, pass } = req.query;
+  if (user !== 'admin' || pass !== 'Open@0761') return res.status(403).send("Unauthorized");
+
+  try {
+      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY name ASC");
+      res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/toggle-vip', async (req, res) => {
+  const { adminUser, adminPass, targetUser, vipStatus } = req.body;
+  if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+
+  try {
+      await db.execute({ 
+          sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", 
+          args: [vipStatus ? 1 : 0, targetUser] 
+      });
+      res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/reset-user', async (req, res) => {
+  const { adminUser, adminPass, targetUser } = req.body;
+  if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+
+  try {
+      await db.execute({ 
+          sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", 
+          args: [targetUser] 
+      });
+      res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- 7. AI STEWARD INTERROGATION ROOM ---
+app.post('/api/steward', async (req, res) => {
+  const { username, message } = req.body;
+
+  try {
+      // 1. Fetch the user's current standing to give the AI context
+      const userRow = await db.execute({ sql: "SELECT total_score FROM f1_drivers WHERE name = ?", args: [username] });
+      const userScore = userRow.rows.length > 0 ? userRow.rows[0].total_score : 0;
+
+      // 2. The Core Persona Prompt
+      const systemPrompt = `You are the Head FIA Steward for a private F1 2026 fantasy league. 
+      You are grumpy, strictly adhere to the rules, and have zero patience for silly questions. Think Günther Steiner meets Michael Masi.
+      The user talking to you is named "${username}", and their current championship score is ${userScore} points.
+      If their score is negative or 0, mock them relentlessly. If they ask for advice on who to pick, tell them to figure it out themselves but drop ONE vague historical F1 hint.
+      Keep responses under 3 sentences. Be punchy, snarky, and authoritative.`;
+
+      // 3. Call ChatGPT
+      const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: message }
+          ],
+          max_tokens: 150,
+          temperature: 0.8
+      });
+
+      res.json({ success: true, reply: completion.choices[0].message.content });
+  } catch (e) {
+      console.error("AI Error:", e);
+      res.status(500).json({ success: false, reply: "The Steward is currently out on the track. Try again later." });
+  }
+});
+
+// --- 8. CRON & CATCH-ALL ---
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
     const now = new Date();
@@ -289,5 +361,7 @@ setInterval(async () => {
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
 }, 15 * 60 * 1000);
 
-app.get('/{*splat}', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Fixed the typo here so the frontend loads properly!
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 app.listen(port, () => console.log(`🏁 Server 3000`));
