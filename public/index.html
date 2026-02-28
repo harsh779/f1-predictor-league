@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>F1 2026 Strategy League</title>
     
     <link rel="manifest" href="/manifest.json">
@@ -50,7 +53,7 @@
             background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent; 
             font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 10px 20px; 
             border-radius: 30px; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; 
-            white-space: nowrap;
+            white-space: nowrap; flex-shrink: 0;
         }
         nav button:hover { color: var(--text-main); background: #e0e2e6; }
         nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
@@ -135,48 +138,48 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
-        /* --- 7. EXTREME MOBILE RESPONSIVENESS FIX --- */
-        @media (max-width: 768px) {
-            /* Fix Header to split properly */
-            header { padding: 15px 15px 0 15px; border-bottom: none; }
-            h1 { order: 1; font-size: 1.5rem; margin: 0; }
-            .user-dropdown { order: 2; margin: 0; }
-            .user-dropdown-content { top: 120%; right: 0; }
+        /* --- 7. EXTREME MOBILE RESPONSIVENESS (NUCLEAR FIX) --- */
+        @media (max-width: 850px) {
+            /* Force Header to split cleanly */
+            header { padding: 15px 15px 0 15px !important; flex-direction: row !important; flex-wrap: wrap !important; }
+            h1 { font-size: 1.4rem !important; margin: 0 !important; width: auto !important; flex: 1; }
+            .user-dropdown { margin: 0 !important; }
             
-            /* Fix Nav scroll blowout */
-            nav { order: 3; width: 100%; margin: 15px 0 0 0; padding: 15px 0; border-top: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 10px; justify-content: flex-start; }
-            nav::-webkit-scrollbar { display: none; }
-            nav button { flex-shrink: 0; padding: 10px 16px; font-size: 0.9rem; }
+            /* Force Nav to be a horizontal scroll list below header */
+            nav { 
+                width: 100vw !important; 
+                margin-left: -15px !important; 
+                margin-top: 15px !important; 
+                padding: 10px 15px 15px 15px !important; 
+                border-top: 1px solid var(--border) !important; 
+                overflow-x: auto !important; 
+                -webkit-overflow-scrolling: touch !important; 
+                display: flex !important; 
+                flex-wrap: nowrap !important; 
+                justify-content: flex-start !important;
+                gap: 8px !important;
+            }
+            nav button { flex: 0 0 auto !important; font-size: 0.85rem !important; padding: 10px 15px !important; }
             
-            main { padding: 15px 12px; }
+            main { padding: 15px 12px !important; }
             
-            /* Fix Dashboard Stacking */
-            #predict > div:first-child { flex-direction: column !important; padding: 20px !important; gap: 15px !important; margin-bottom: 20px !important; }
-            #predict > div:first-child > div { min-width: 100% !important; width: 100% !important; box-sizing: border-box; }
-            
-            /* Fix Form and Live Grids squishing */
-            .form-grid { grid-template-columns: 1fr; gap: 15px; }
-            .live-grid-container { grid-template-columns: 1fr; gap: 12px; }
-            #grid-container { grid-template-columns: 1fr !important; }
+            /* Force Live Grid to Stack Vertically! This fixes the squished cards */
+            .live-grid-container { 
+                display: flex !important; 
+                flex-direction: column !important; 
+                gap: 15px !important; 
+            }
 
-            .predict-group { padding: 15px; margin-bottom: 15px; }
-            .predict-group h3 { font-size: 1.1rem; margin-bottom: 12px; padding-bottom: 8px;}
-            label { margin-top: 12px; font-size: 0.8rem; }
-            input.selector-input { padding: 12px 35px 12px 12px; font-size: 1rem; border-width: 1px; }
-            .btn { padding: 15px; font-size: 1.1rem; margin-top: 15px;}
+            /* Dashboard stacking */
+            #predict > div:first-child { flex-direction: column !important; padding: 15px !important; }
             
-            #r-header { font-size: 1.6rem !important; }
-            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
-            th, td { padding: 12px 10px; font-size: 0.95rem; }
-            th { font-size: 0.75rem; }
+            /* Form stacking */
+            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
             
-            .grid-modal-content { padding: 20px 15px; border-radius: 16px 16px 0 0; max-height: 90vh; width: 100%;}
-            .modal-grid { grid-template-columns: 1fr; gap: 8px; padding-bottom: 40px;}
-            .modal-grid-btn { padding: 15px; font-size: 1.1rem; border-left-width: 4px;}
-            .close-btn { font-size: 2.2rem; margin-top: -5px; }
-            
-            #toast-container { top: 10px; right: 10px; left: 10px; align-items: stretch; }
-            .toast { min-width: 0; width: auto; font-size: 0.9rem; padding: 14px 20px;}
+            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            #r-header { font-size: 1.5rem !important; }
+            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
         }
     </style>
 </head>
@@ -441,6 +444,13 @@
 </div>
 
 <script>
+    // --- CACHE BUSTER SCRIPT: FORCE DEVICES TO UPDATE UI ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) { registration.unregister(); }
+        });
+    }
+
     // 1. SINGLE SOURCE OF TRUTH FOR TEAMS & DRIVERS
     const teamsData = [
         { name: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
