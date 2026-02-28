@@ -362,6 +362,6 @@ setInterval(async () => {
 }, 15 * 60 * 1000);
 
 // Fixed the typo here so the frontend loads properly!
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/(.*)', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(port, () => console.log(`🏁 Server 3000`));
