@@ -101,9 +101,7 @@ async function sendDiscordNotification(msg) {
           headers: { 'Content-Type': 'application/json' }, 
           body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) 
       });
-  } catch (e) { 
-      console.error("Discord Error:", e); 
-  }
+  } catch (e) { console.error("Discord Error:", e); }
 }
 
 // --- 4. SCORING ENGINE ---
@@ -211,12 +209,12 @@ async function performFinalization() {
     try {
         const standingsRow = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
 
-        // 1. Extract real-world race highlights
+        // Extract real-world race highlights
         const podium = `${results[0].Driver.familyName}, ${results[1].Driver.familyName}, ${results[2].Driver.familyName}`;
         const dnfs = results.filter(r => r.positionText === 'R' || r.positionText === 'D').map(r => r.Driver.familyName).join(', ') || 'No DNFs';
         const raceHighlights = `Podium: ${podium}. DNFs: ${dnfs}.`;
 
-        // 2. Extract human player performance & context
+        // Extract human player performance
         const playerPerformance = standingsRow.rows.map(r => {
             let p = predictions.find(pred => pred.user_name === r.name);
             let roundScore = scores[r.name] !== undefined ? scores[r.name] : penalty;
@@ -224,7 +222,6 @@ async function performFinalization() {
             return `${r.name}: ${r.total_score} total pts (+${roundScore} this race, predicted ${pickedWinner} to win)`;
         }).join(' | ');
 
-        // 3. The Analytical Race Summary Prompt
         const prompt = `You are an expert F1 pundit providing a post-race summary for a private F1 prediction league. 
         The real-world "${raceData.raceName}" just finished. 
         Real Race Events: ${raceHighlights}
@@ -241,8 +238,6 @@ async function performFinalization() {
         
         const newStory = completion.choices[0].message.content;
         await db.execute({ sql: "UPDATE league_story SET narrative = ? WHERE id = 1", args: [newStory] });
-        
-        // Send AI Story to Discord
         await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!**\n\n🎙️ **Paddock Post-Race Analysis:**\n${newStory}`);
     } catch (aiErr) {
         console.error("Story Gen Error:", aiErr);
@@ -355,54 +350,7 @@ app.post('/api/admin/reset-user', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- 7. AI STEWARD INTERROGATION ROOM ---
-app.post('/api/steward', async (req, res) => {
-  const { username, message } = req.body;
-
-  try {
-      const userRow = await db.execute({ sql: "SELECT total_score FROM f1_drivers WHERE name = ?", args: [username] });
-      const userScore = userRow.rows.length > 0 ? userRow.rows[0].total_score : 0;
-
-      const predRow = await db.execute({ sql: "SELECT * FROM f1_predictions_v2 WHERE user_name = ?", args: [username] });
-      let predictionContext = "The user hasn't submitted a strategy for the upcoming race yet. Yell at them for being late to the paddock.";
-      
-      if (predRow.rows.length > 0) {
-          const p = predRow.rows[0];
-          predictionContext = `The user's locked strategy for the upcoming race is: 
-          Podium picks: P1: ${p.p1}, P2: ${p.p2}, P3: ${p.p3}. 
-          Midfield picks: P11: ${p.p11}, P12: ${p.p12}. 
-          Backmarker picks: P19: ${p.p19}, P20: ${p.p20}. 
-          Constructor picks: 1st: ${p.c1}, 2nd: ${p.c2}, 5th: ${p.c5}, 6th: ${p.c6}, 10th: ${p.c10}.
-          Wildcard (Biggest Loser): ${p.w_race_loser}.`;
-      }
-
-      const systemPrompt = `You are the Head FIA Steward for a private F1 2026 fantasy league. 
-      You are grumpy, strictly adhere to the rules, and have zero patience for silly questions. Think Günther Steiner meets Michael Masi.
-      The user talking to you is named "${username}", and their current championship score is ${userScore} points.
-      
-      ${predictionContext}
-      
-      If they ask about their predictions, ruthlessly roast their specific driver/team choices based on the context above. If their score is negative or 0, mock them relentlessly. If they ask for advice on who to pick, tell them to figure it out themselves but drop ONE vague historical F1 hint.
-      Keep responses under 3 sentences. Be punchy, snarky, and authoritative.`;
-
-      const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: message }
-          ],
-          max_tokens: 150,
-          temperature: 0.8
-      });
-
-      res.json({ success: true, reply: completion.choices[0].message.content });
-  } catch (e) {
-      console.error("AI Error:", e);
-      res.status(500).json({ success: false, reply: "The Steward is currently out on the track. Try again later." });
-  }
-});
-
-// --- 8. CRON & CATCH-ALL ---
+// --- 7. CRON & CATCH-ALL ---
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
     const now = new Date();
@@ -411,7 +359,6 @@ setInterval(async () => {
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
 }, 15 * 60 * 1000);
 
-// Using a pure Regex object /.*/ completely bypasses the strict string parser
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(port, () => console.log(`🏁 Server 3000`));

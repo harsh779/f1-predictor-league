@@ -14,7 +14,6 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        /* 1. CSS VARIABLES: PREMIUM LIGHT MODE */
         :root { 
             --red: #e10600; 
             --red-glow: rgba(225, 6, 0, 0.15);
@@ -28,14 +27,12 @@
             --gold: #c59b27;
         }
 
-        /* 2. GLOBAL RESET */
         body { margin: 0; font-family: 'Titillium Web', sans-serif; background: var(--bg-light); color: var(--text-main); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-light); }
         ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
-        /* 3. NAVIGATION */
         header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
         h1 { margin: 0; font-size: 1.8rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); }
         h1 span { color: var(--red); }
@@ -47,20 +44,17 @@
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        /* USER PROFILE DROPDOWN */
         .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); margin-left: auto; }
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
-        /* 4. LAYOUT */
         main { padding: 30px 20px; max-width: 1000px; margin: 0 auto; min-height: 80vh; }
         .tab { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); } 
         .active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 5. PREDICT FORM CARDS & CUSTOM INPUTS */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; gap: 20px; } }
         
@@ -81,32 +75,25 @@
         .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
         
-        /* 6. HEADERS & TABLES */
-        .broadcast-header { background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 30px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
         .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
-        
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);}
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--surface-inner); color: var(--text-muted); padding: 16px; text-align: left; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; font-weight: 700; border-bottom: 2px solid var(--border);}
         td { padding: 18px 16px; border-bottom: 1px solid var(--border); font-size: 1.05rem; }
         tbody tr:hover { background: var(--surface-hover); }
 
-        /* 7. VIP GOLD STYLING */
         .vip-gold { background: linear-gradient(45deg, #c59b27, #e2c044); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900 !important; }
         .vip-badge { background: rgba(197, 155, 39, 0.1); border: 1px solid var(--gold); color: var(--gold); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; vertical-align: middle; margin-left: 8px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;}
 
-        /* 8. SKELETON LOADERS */
         .skeleton { background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; height: 20px; }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
-        /* 9. TOAST NOTIFICATIONS */
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: var(--text-main); border-left: 5px solid var(--red); color: white; padding: 16px 24px; border-radius: 8px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: 'Titillium Web'; font-size: 1rem; letter-spacing: 0.5px; animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); min-width: 250px; }
         .toast.success { border-left-color: #00e160; }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
 
-        /* 10. GRID MODAL */
         .grid-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter: blur(5px); display:flex; justify-content:center; align-items:flex-end; z-index:9999; }
         .grid-modal-content { background: var(--bg-light); width: 100%; max-width: 700px; max-height: 85vh; border-radius: 20px 20px 0 0; padding: 25px; box-sizing: border-box; display: flex; flex-direction: column; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @media (min-width: 768px) { .grid-modal { align-items: center; } .grid-modal-content { border-radius: 20px; max-height: 80vh; } }
@@ -128,46 +115,6 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
-        /* --- 11. AI STEWARD CHAT WIDGET STYLES --- */
-        #steward-chat-btn {
-            position: fixed; bottom: 20px; right: 20px; background: #e10600; color: white; border: none; padding: 12px 20px; 
-            border-radius: 30px; font-family: 'Titillium Web'; font-size: 1.1rem; font-weight: 900; text-transform: uppercase;
-            cursor: pointer; box-shadow: 0 6px 15px rgba(0,0,0,0.4); z-index: 1000; transition: transform 0.2s;
-        }
-        #steward-chat-btn:hover { transform: scale(1.05); }
-
-        #steward-chat-window {
-            position: fixed; bottom: 75px; right: 20px; width: 340px; background: #15151e; border: 2px solid #333; 
-            border-radius: 12px; display: flex; flex-direction: column; z-index: 1000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); 
-            overflow: hidden; max-height: 500px;
-        }
-
-        #steward-chat-header {
-            background: #e10600; color: white; padding: 14px; display: flex; justify-content: space-between; 
-            align-items: center; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;
-        }
-        #steward-chat-header button { background: none; border: none; color: white; cursor: pointer; font-size: 1.2rem; }
-
-        #steward-chat-messages {
-            height: 320px; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; background: #1e1e28;
-        }
-        .msg { padding: 12px 16px; border-radius: 8px; max-width: 85%; font-size: 0.95rem; line-height: 1.4; font-family: 'Titillium Web'; font-weight: 600; }
-        .steward-msg { background: #2b2b36; color: #fff; align-self: flex-start; border-left: 4px solid #e10600; border-bottom-left-radius: 0; }
-        .user-msg { background: #e10600; color: white; align-self: flex-end; border-bottom-right-radius: 0; }
-
-        #steward-chat-input-area { display: flex; border-top: 1px solid #333; }
-        #steward-msg-input {
-            flex: 1; padding: 15px; border: none; background: #15151e; color: white; outline: none; font-family: 'Titillium Web'; font-size: 1rem;
-        }
-        #steward-chat-input-area button {
-            background: #333; color: white; border: none; padding: 0 18px; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; 
-            text-transform: uppercase; transition: background 0.2s;
-        }
-        #steward-chat-input-area button:hover { background: #e10600; }
-
-        /* --------------------------------------------------- */
-        /* MOBILE SPECIFIC OPTIMIZATIONS */
-        /* --------------------------------------------------- */
         @media (max-width: 768px) {
             header { padding: 15px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: none; box-shadow: none; background: var(--surface); }
             h1 { font-size: 1.5rem; margin-bottom: 10px; margin-top: 5px; width: auto;}
@@ -183,7 +130,6 @@
             label { margin-top: 12px; font-size: 0.8rem; }
             input.selector-input { padding: 12px 40px 12px 12px; font-size: 1rem; border-width: 1px; }
             .btn { padding: 15px; font-size: 1.1rem; margin-top: 20px;}
-            .broadcast-header { padding: 20px; margin-bottom: 20px; border-left-width: 4px; }
             #r-header { font-size: 1.6rem !important; }
             .section-title { font-size: 1.6rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 12px 10px; font-size: 0.95rem; }
@@ -194,10 +140,6 @@
             .close-btn { font-size: 2.2rem; }
             #toast-container { top: 10px; right: 10px; left: 10px; align-items: stretch; }
             .toast { min-width: 0; width: auto; font-size: 0.9rem; padding: 14px 20px;}
-            
-            /* Mobile AI Chat Tweaks */
-            #steward-chat-window { width: 90vw; bottom: 85px; right: 5vw; z-index: 1001; }
-            #steward-chat-btn { bottom: 20px; right: 15px; padding: 10px 16px; font-size: 0.95rem; }
         }
     </style>
 </head>
@@ -241,10 +183,22 @@
 
 <main>
     <div id="predict" class="tab active">
-        <div class="broadcast-header">
-            <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
-            <h2 id="r-header" style="margin: 0 0 10px 0; font-size: 2.2rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
-            <p id="r-record" style="margin: 0; color: var(--text-muted); font-size: 1rem;"><div class="skeleton" style="width: 40%; margin-top: 10px;"></div></p>
+        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 30px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
+            
+            <div style="flex: 1; min-width: 250px;">
+                <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
+                <h2 id="r-header" style="margin: 0 0 10px 0; font-size: 2.2rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
+                <p id="r-record" style="margin: 0; color: var(--text-muted); font-size: 1rem;"><div class="skeleton" style="width: 40%; margin-top: 10px;"></div></p>
+            </div>
+
+            <div style="background: var(--surface-inner); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 220px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);">
+                <h4 style="margin:0 0 12px 0; color:var(--text-main); text-transform:uppercase; font-size:0.85rem; letter-spacing:1px; border-bottom:1px solid var(--border); padding-bottom:6px;">Live Track Conditions</h4>
+                <div id="weather-widget">
+                    <div class="skeleton" style="width: 80%; height: 25px; margin-bottom: 8px;"></div>
+                    <div class="skeleton" style="width: 60%; height: 15px;"></div>
+                </div>
+            </div>
+
         </div>
 
         <div id="locked-msg" class="hidden" style="background:rgba(225,6,0,0.05); border: 2px solid var(--red); padding:20px; text-align:center; font-weight: 900; border-radius: 8px; margin-bottom: 25px; letter-spacing: 1px; color: var(--red);">🚫 PARC FERMÉ: PREDICTIONS LOCKED</div>
@@ -320,8 +274,8 @@
         <h2 class="section-title">2026 World Championship</h2>
         
         <div style="background: linear-gradient(135deg, #15151e 0%, #2b2b36 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid var(--red); box-shadow: 0 8px 20px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
-            <div style="position: absolute; top: -10px; right: -10px; font-size: 5rem; opacity: 0.05;">🎬</div>
-            <h3 style="margin: 0 0 15px 0; color: var(--red); text-transform: uppercase; letter-spacing: 2px; font-size: 1.1rem; font-weight: 900;">Drive to Survive: Inside the Paddock</h3>
+            <div style="position: absolute; top: -10px; right: -10px; font-size: 5rem; opacity: 0.05;">🎙️</div>
+            <h3 style="margin: 0 0 15px 0; color: var(--red); text-transform: uppercase; letter-spacing: 2px; font-size: 1.1rem; font-weight: 900;">Paddock Post-Race Analysis</h3>
             <div id="dts-storyline" style="font-family: serif; font-size: 1.05rem; line-height: 1.6; font-style: italic; color: #d1d1d6;">
                 <div class="skeleton" style="width:100%; height:15px; margin-bottom:10px;"></div>
                 <div class="skeleton" style="width:90%; height:15px; margin-bottom:10px;"></div>
@@ -451,22 +405,6 @@
     </div>
 </div>
 
-<button id="steward-chat-btn" onclick="toggleStewardChat()">🎙️ Radio the Steward</button>
-
-<div id="steward-chat-window" style="display: none;">
-    <div id="steward-chat-header">
-        <strong>🏁 FIA Steward's Office</strong>
-        <button onclick="toggleStewardChat()">✖</button>
-    </div>
-    <div id="steward-chat-messages">
-        <div class="msg steward-msg">State your business. I'm busy looking at telemetry.</div>
-    </div>
-    <div id="steward-chat-input-area">
-        <input type="text" id="steward-msg-input" placeholder="Complain to the FIA..." onkeypress="handleStewardEnter(event)">
-        <button onclick="sendStewardMessage()">Send</button>
-    </div>
-</div>
-
 <script>
     // 1. SINGLE SOURCE OF TRUTH FOR TEAMS & DRIVERS
     const teamsData = [
@@ -483,7 +421,6 @@
         { name: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
     ];
 
-    // 2. DYNAMICALLY GENERATE ALPHABETICAL LISTS FOR THE MODALS
     const detailedTeams = teamsData.map(t => ({ name: t.name, color: t.color }));
     detailedTeams.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -494,7 +431,6 @@
     let user = JSON.parse(localStorage.getItem('f1_user'));
     let raceLock = null;
 
-    // --- TOAST NOTIFICATIONS ---
     function showToast(message, type = 'error') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -506,7 +442,6 @@
 
     function showSupportModal() { showToast('Constructors Fund integration coming soon. Thank you for the support!', 'success'); }
 
-    // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
         if(!user) { 
             document.getElementById('auth').style.display = 'flex'; 
@@ -527,12 +462,10 @@
         tab(savedTab); 
     }
 
-    // --- USER DROPDOWN LOGIC ---
     function toggleUserMenu() {
         document.getElementById('user-menu').classList.toggle('show');
     }
 
-    // --- THE NEW MODAL SELECTOR LOGIC ---
     let currentInputId = null;
     
     function openSelectorModal(inputId, type, title) {
@@ -569,7 +502,7 @@
                 btn.onclick = () => {
                     const inputField = document.getElementById(currentInputId);
                     inputField.value = item.name;
-                    inputField.setAttribute('value', item.name); // Triggers CSS styling
+                    inputField.setAttribute('value', item.name); 
                     closeSelectorModal();
                 };
             }
@@ -584,7 +517,6 @@
         currentInputId = null;
     }
 
-    // Combined Click-Outside Handler
     window.onclick = function(event) {
         const modal = document.getElementById('grid-selector-modal');
         if (event.target === modal) { closeSelectorModal(); }
@@ -595,7 +527,38 @@
         }
     }
 
-    // --- API FETCH & RENDER FUNCTIONS ---
+    // --- FETCH WEATHER API ---
+    async function fetchWeather(locationQuery) {
+        try {
+            // 1. Get Lat/Lon via free geocoding API
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1`);
+            const geoData = await geoRes.json();
+            if(!geoData.results || geoData.results.length === 0) throw new Error("Location not found");
+            const { latitude, longitude } = geoData.results[0];
+
+            // 2. Fetch live weather via Open-Meteo
+            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,weather_code,wind_speed_10m`);
+            const wData = await weatherRes.json();
+            const curr = wData.current;
+
+            // Simple weather icon mapping
+            const code = curr.weather_code;
+            let icon = '☁️';
+            if(code === 0) icon = '☀️';
+            else if(code > 0 && code < 4) icon = '⛅';
+            else if(code >= 51 && code <= 67) icon = '🌧️';
+            else if(code >= 71 && code <= 77) icon = '❄️';
+            else if(code >= 95) icon = '⛈️';
+
+            document.getElementById('weather-widget').innerHTML = `
+                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${icon} ${curr.temperature_2m}°C</div>
+                <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
+            `;
+        } catch(e) {
+            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Radar offline.</span>";
+        }
+    }
+
     async function loadRace() {
         try {
             const r = await fetch('/api/next-race').then(res=>res.json());
@@ -603,6 +566,9 @@
             document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
             raceLock = new Date(r.date);
+            
+            // Trigger the weather fetch using the country name
+            fetchWeather(r.country);
             
             if (r.hasSprint) { 
                 document.getElementById('sprint-box').classList.remove('hidden');
@@ -687,7 +653,6 @@
         // Fetch AI Storyline
         try {
             const storyRes = await fetch('/api/storyline').then(r=>r.json());
-            // Convert newline characters into HTML line breaks
             const formattedStory = storyRes.story.replace(/\n/g, '<br>');
             document.getElementById('dts-storyline').innerHTML = formattedStory;
         } catch(e) {}
@@ -753,7 +718,6 @@
         `}).join('');
     }
 
-    // --- FORM SUBMISSION & AUTH ---
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
         
@@ -838,11 +802,10 @@
     
     function logout() { localStorage.clear(); location.reload(); }
     
-    // --- INTEGRATED ADMIN FUNCTIONS ---
     function checkAdm() { 
         if(user && user.name === 'admin') {
             document.getElementById('admin-panel').classList.remove('hidden'); 
-            loadAdminUserList(); // Fetch the users if admin
+            loadAdminUserList(); 
         }
     }
 
@@ -901,59 +864,6 @@
         } catch (e) { showToast('Error resetting user', 'error'); }
     }
 
-    // --- AI STEWARD CHAT LOGIC ---
-    function toggleStewardChat() {
-        const chat = document.getElementById('steward-chat-window');
-        chat.style.display = chat.style.display === 'none' ? 'flex' : 'none';
-    }
-
-    function handleStewardEnter(e) {
-        if (e.key === 'Enter') sendStewardMessage();
-    }
-
-    async function sendStewardMessage() {
-        const input = document.getElementById('steward-msg-input');
-        const message = input.value.trim();
-        if (!message) return;
-
-        // Uses your locally stored user variable!
-        const username = user ? user.name : "Unknown Driver"; 
-
-        const msgBox = document.getElementById('steward-chat-messages');
-
-        // 1. Add user message
-        msgBox.innerHTML += `<div class="msg user-msg">${message}</div>`;
-        input.value = '';
-        msgBox.scrollTop = msgBox.scrollHeight;
-
-        // 2. Add loading text
-        const loadingId = 'loading-' + Date.now();
-        msgBox.innerHTML += `<div class="msg steward-msg" id="${loadingId}">... Reviewing telemetry ...</div>`;
-        msgBox.scrollTop = msgBox.scrollHeight;
-
-        try {
-            // 3. Ping backend
-            const res = await fetch('/api/steward', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, message })
-            });
-            const data = await res.json();
-
-            // 4. Update UI
-            document.getElementById(loadingId).remove();
-            if (data.success) {
-                msgBox.innerHTML += `<div class="msg steward-msg">${data.reply}</div>`;
-            } else {
-                msgBox.innerHTML += `<div class="msg steward-msg" style="color:#ff4444;">[Radio Comm Failure] ${data.reply}</div>`;
-            }
-        } catch (err) {
-            document.getElementById(loadingId)?.remove();
-            msgBox.innerHTML += `<div class="msg steward-msg" style="color:#ff4444;">Radio disconnected. Check your connection.</div>`;
-        }
-        msgBox.scrollTop = msgBox.scrollHeight;
-    }
-
-    // --- PWA SERVICE WORKER REGISTRATION ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
