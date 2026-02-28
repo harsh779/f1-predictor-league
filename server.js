@@ -101,7 +101,6 @@ async function sendDiscordNotification(msg) {
           headers: { 'Content-Type': 'application/json' }, 
           body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) 
       });
-      console.log("✅ Discord Webhook Fired!");
   } catch (e) { 
       console.error("Discord Error:", e); 
   }
@@ -208,22 +207,35 @@ async function performFinalization() {
 
     await db.execute("DELETE FROM f1_predictions_v2");
     
-    // --- AI: DRIVE TO SURVIVE NARRATIVE GENERATOR ---
+    // --- AI: RACE SUMMARY GENERATOR ---
     try {
         const standingsRow = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
-        const standingsStr = standingsRow.rows.map(r => `${r.name}: ${r.total_score} pts`).join(', ');
+
+        // 1. Extract real-world race highlights
+        const podium = `${results[0].Driver.familyName}, ${results[1].Driver.familyName}, ${results[2].Driver.familyName}`;
+        const dnfs = results.filter(r => r.positionText === 'R' || r.positionText === 'D').map(r => r.Driver.familyName).join(', ') || 'No DNFs';
+        const raceHighlights = `Podium: ${podium}. DNFs: ${dnfs}.`;
+
+        // 2. Extract human player performance & context
+        const playerPerformance = standingsRow.rows.map(r => {
+            let p = predictions.find(pred => pred.user_name === r.name);
+            let roundScore = scores[r.name] !== undefined ? scores[r.name] : penalty;
+            let pickedWinner = p ? p.p1 : 'Nobody';
+            return `${r.name}: ${r.total_score} total pts (+${roundScore} this race, predicted ${pickedWinner} to win)`;
+        }).join(' | ');
+
+        // 3. The Analytical Race Summary Prompt
+        const prompt = `You are an expert F1 pundit providing a post-race summary for a private F1 prediction league. 
+        The real-world "${raceData.raceName}" just finished. 
+        Real Race Events: ${raceHighlights}
+        Player Predictions & Performance: ${playerPerformance}
         
-        const prompt = `You are a dramatic Netflix 'Drive to Survive' narrator. 
-        The F1 race "${raceData.raceName}" just finished. 
-        Here are the updated scores for our fantasy league: ${standingsStr}.
-        Write a thrilling, strictly 1 paragraph recap of the fantasy league's current storyline. 
-        Focus entirely on the rivalries between the human players (e.g., who is choking, who is dominating, who made a massive comeback).
-        Make it intense, cinematic, and use F1 terminology. Do not exceed one paragraph.`;
+        Write a strictly 1-paragraph Race Summary that perfectly marries the real-world track events with our players' predictions. Explain how the actual podium or unexpected DNFs directly impacted the players' scores this weekend based on who they predicted to win. Analyze which players made brilliant strategic calls and whose predictions were ruined by the race results. Keep it engaging, analytical, and use proper F1 terminology. Do not exceed 1 paragraph.`;
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 200,
+            max_tokens: 250, 
             temperature: 0.8
         });
         
@@ -231,7 +243,7 @@ async function performFinalization() {
         await db.execute({ sql: "UPDATE league_story SET narrative = ? WHERE id = 1", args: [newStory] });
         
         // Send AI Story to Discord
-        await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!**\n\n🎬 **Drive to Survive - Paddock Rumors:**\n${newStory}`);
+        await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!**\n\n🎙️ **Paddock Post-Race Analysis:**\n${newStory}`);
     } catch (aiErr) {
         console.error("Story Gen Error:", aiErr);
         await sendDiscordNotification(`🏁 The **${raceData.raceName}** has been finalized! Points updated.`);
