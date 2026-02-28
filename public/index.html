@@ -35,17 +35,17 @@
         ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
-        /* --- 2. HEADER & NAVIGATION RECALIBRATION --- */
+        /* --- 2. HEADER & NAVIGATION --- */
         header { 
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
             padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; 
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
-            gap: 20px;
+            flex-wrap: wrap;
         }
         h1 { margin: 0; font-size: 1.8rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; }
         h1 span { color: var(--red); }
         
-        nav { display: flex; gap: 10px; align-items: center; flex: 1; flex-wrap: wrap; }
+        nav { display: flex; gap: 10px; align-items: center; flex: 1; margin-left: 30px; }
         nav button { 
             background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent; 
             font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 10px 20px; 
@@ -58,7 +58,7 @@
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; }
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; margin-left: auto; }
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
@@ -89,7 +89,7 @@
         .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
         
-        /* --- 5. LIVE TAB GRID RECALIBRATION --- */
+        /* --- 5. LIVE TAB GRID --- */
         .live-grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; font-size: 0.95rem; }
         .live-card-section { background: var(--surface-inner); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
         .live-card-title { color: var(--text-muted); display: block; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
@@ -135,37 +135,46 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
-        /* --- 7. MOBILE RESPONSIVENESS CALIBRATION --- */
+        /* --- 7. EXTREME MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 768px) {
-            header { padding: 15px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: none; box-shadow: none; background: var(--surface); }
-            h1 { font-size: 1.5rem; margin-bottom: 10px; margin-top: 5px; width: auto;}
-            .user-dropdown { margin-bottom: 10px; margin-top: 5px; }
-            .user-dropdown-content { top: 110%; right: 0; left: auto; }
+            /* Fix Header to split properly */
+            header { padding: 15px 15px 0 15px; border-bottom: none; }
+            h1 { order: 1; font-size: 1.5rem; margin: 0; }
+            .user-dropdown { order: 2; margin: 0; }
+            .user-dropdown-content { top: 120%; right: 0; }
             
-            /* The smoothly scrolling Nav Bar for Mobile */
-            nav { width: 100vw; margin-left: -15px; padding: 0 15px 15px 15px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 10px; border-bottom: 1px solid var(--border); order: 3; justify-content: flex-start;}
+            /* Fix Nav scroll blowout */
+            nav { order: 3; width: 100%; margin: 15px 0 0 0; padding: 15px 0; border-top: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 10px; justify-content: flex-start; }
             nav::-webkit-scrollbar { display: none; }
-            nav button { padding: 10px 16px; font-size: 0.9rem; }
+            nav button { flex-shrink: 0; padding: 10px 16px; font-size: 0.9rem; }
             
-            main { padding: 15px 12px; min-height: 90vh; }
+            main { padding: 15px 12px; }
+            
+            /* Fix Dashboard Stacking */
+            #predict > div:first-child { flex-direction: column !important; padding: 20px !important; gap: 15px !important; margin-bottom: 20px !important; }
+            #predict > div:first-child > div { min-width: 100% !important; width: 100% !important; box-sizing: border-box; }
+            
+            /* Fix Form and Live Grids squishing */
             .form-grid { grid-template-columns: 1fr; gap: 15px; }
-            
-            /* Stacking the Live Grid perfectly on Mobile */
-            .live-grid-container { grid-template-columns: 1fr; }
+            .live-grid-container { grid-template-columns: 1fr; gap: 12px; }
+            #grid-container { grid-template-columns: 1fr !important; }
 
             .predict-group { padding: 15px; margin-bottom: 15px; }
             .predict-group h3 { font-size: 1.1rem; margin-bottom: 12px; padding-bottom: 8px;}
             label { margin-top: 12px; font-size: 0.8rem; }
-            input.selector-input { padding: 12px 40px 12px 12px; font-size: 1rem; border-width: 1px; }
-            .btn { padding: 15px; font-size: 1.1rem; margin-top: 20px;}
+            input.selector-input { padding: 12px 35px 12px 12px; font-size: 1rem; border-width: 1px; }
+            .btn { padding: 15px; font-size: 1.1rem; margin-top: 15px;}
+            
             #r-header { font-size: 1.6rem !important; }
-            .section-title { font-size: 1.6rem; border-width: 1px; padding-bottom: 8px;}
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 12px 10px; font-size: 0.95rem; }
             th { font-size: 0.75rem; }
+            
             .grid-modal-content { padding: 20px 15px; border-radius: 16px 16px 0 0; max-height: 90vh; width: 100%;}
             .modal-grid { grid-template-columns: 1fr; gap: 8px; padding-bottom: 40px;}
             .modal-grid-btn { padding: 15px; font-size: 1.1rem; border-left-width: 4px;}
-            .close-btn { font-size: 2.2rem; }
+            .close-btn { font-size: 2.2rem; margin-top: -5px; }
+            
             #toast-container { top: 10px; right: 10px; left: 10px; align-items: stretch; }
             .toast { min-width: 0; width: auto; font-size: 0.9rem; padding: 14px 20px;}
         }
