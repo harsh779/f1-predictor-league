@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version bumped to 1.8 to force your devices to update the rules text
+        // Version bumped to 1.9 for the Deadline UI update
         (function() {
-            const currentVersion = "1.8"; 
+            const currentVersion = "1.9"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -230,6 +230,7 @@
                 <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
                 <h2 id="r-header" style="margin: 0 0 10px 0; font-size: 2.2rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
                 <p id="r-record" style="margin: 0; color: var(--text-muted); font-size: 1rem;"><div class="skeleton" style="width: 40%; margin-top: 10px;"></div></p>
+                <p id="r-deadline" style="margin: 15px 0 0 0; font-size: 1.05rem;"><div class="skeleton" style="width: 50%; height: 20px; margin-top: 10px;"></div></p>
             </div>
 
             <div style="background: var(--surface-inner); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 220px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);">
@@ -601,8 +602,10 @@
             document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
             
-            // Evaluates based on universal Qualifying deadline
+            // Generate the visual Lockout Deadline timer
             raceLock = new Date(r.lockTime);
+            const dlFormat = raceLock.toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            document.getElementById('r-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
             
             fetchWeather(r.country);
             
