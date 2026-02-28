@@ -361,7 +361,7 @@ setInterval(async () => {
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
 }, 15 * 60 * 1000);
 
-// Fixed the typo here so the frontend loads properly!
-app.get('/(.*)', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Using a pure Regex object /.*/ completely bypasses the strict string parser
+app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.listen(port, () => console.log(`🏁 Server 3000`));
