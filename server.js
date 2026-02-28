@@ -3,7 +3,7 @@ const { createClient } = require('@libsql/client');
 const path = require('path');
 const { OpenAI } = require('openai');
 
-// Initialize OpenAI (Make sure OPENAI_API_KEY is set in Render Environment Variables)
+// Initialize OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express();
@@ -49,7 +49,7 @@ setupDatabase();
 
 // --- 2. FULL 2026 CALENDAR ---
 const f1Calendar2026 = [
-  { round: 1, name: "Australian Grand Pri", hasSprint: false, date: "2026-03-06T07:00:00+05:30", circuit: "Albert Park Circuit", country: "Australia", record: "Charles Leclerc (Ferrari) - 1:19.813 (2024)", sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
+  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-06T07:00:00+05:30", circuit: "Albert Park Circuit", country: "Australia", record: "Charles Leclerc (Ferrari) - 1:19.813 (2024)", sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
   { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-13T09:00:00+05:30", circuit: "Shanghai International Circuit", country: "China", record: "Michael Schumacher (Ferrari) - 1:32.238 (2004)", sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
   { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-27T08:00:00+05:30", circuit: "Suzuka International Racing Course", country: "Japan", record: "Lewis Hamilton (Mercedes) - 1:30.983 (2019)", sessions: { fp1: "2026-03-27T08:00:00+05:30", fp2: "2026-03-27T11:30:00+05:30", fp3: "2026-03-28T08:00:00+05:30", quali: "2026-03-28T11:30:00+05:30", race: "2026-03-29T10:30:00+05:30" } },
   { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-10T17:00:00+05:30", circuit: "Bahrain International Circuit", country: "Bahrain", record: "Pedro de la Rosa (McLaren) - 1:31.447 (2005)", sessions: { fp1: "2026-04-10T17:00:00+05:30", fp2: "2026-04-10T20:30:00+05:30", fp3: "2026-04-11T17:30:00+05:30", quali: "2026-04-11T21:30:00+05:30", race: "2026-04-12T20:30:00+05:30" } },
@@ -209,12 +209,10 @@ async function performFinalization() {
     try {
         const standingsRow = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
 
-        // Extract real-world race highlights
         const podium = `${results[0].Driver.familyName}, ${results[1].Driver.familyName}, ${results[2].Driver.familyName}`;
         const dnfs = results.filter(r => r.positionText === 'R' || r.positionText === 'D').map(r => r.Driver.familyName).join(', ') || 'No DNFs';
         const raceHighlights = `Podium: ${podium}. DNFs: ${dnfs}.`;
 
-        // Extract human player performance
         const playerPerformance = standingsRow.rows.map(r => {
             let p = predictions.find(pred => pred.user_name === r.name);
             let roundScore = scores[r.name] !== undefined ? scores[r.name] : penalty;
@@ -251,8 +249,16 @@ async function performFinalization() {
 // --- 5. CORE ROUTES ---
 app.get('/api/next-race', (req, res) => {
     const now = new Date();
-    const next = f1Calendar2026.find(r => new Date(r.date) > now) || f1Calendar2026[f1Calendar2026.length-1];
-    res.json(next);
+    // Safety Buffer: Keep the current round on screen until 4 hours AFTER the race starts
+    const next = f1Calendar2026.find(r => {
+        const raceEndBuffer = new Date(r.sessions.race);
+        raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
+        return raceEndBuffer > now;
+    }) || f1Calendar2026[f1Calendar2026.length-1];
+    
+    // Always lock at Qualifying, regardless of Sprint status
+    const payload = { ...next, lockTime: next.sessions.quali };
+    res.json(payload);
 });
 
 app.get('/api/calendar', (req, res) => {
@@ -265,8 +271,18 @@ app.post('/predict', async (req, res) => {
     if (auth.rows.length === 0) return res.status(401).json({ success: false, message: "Login failed" });
 
     const now = new Date();
-    const next = f1Calendar2026.find(r => new Date(r.date) > now); 
-    if (!next) return res.status(403).json({ success: false, message: "Season Over" });
+    const currentRace = f1Calendar2026.find(r => {
+        const raceEndBuffer = new Date(r.sessions.race);
+        raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
+        return raceEndBuffer > now;
+    }); 
+    if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
+
+    // The Ultimate Lockout Mechanism (Exactly at standard Qualifying)
+    const lockTime = new Date(currentRace.sessions.quali);
+    if (now > lockTime) {
+        return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
+    }
 
     try {
         await db.execute({
@@ -350,11 +366,15 @@ app.post('/api/admin/reset-user', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- 7. CRON & CATCH-ALL ---
+// --- 7. AUTOMATED CRON JOB ---
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
     const now = new Date();
-    const active = f1Calendar2026.find(r => { const d = new Date(r.date); return now > d && now - d < (48 * 60 * 60 * 1000); });
+    // Safely looks for a race that started within the last 24 hours to automatically finalize it
+    const active = f1Calendar2026.find(r => { 
+        const raceTime = new Date(r.sessions.race); 
+        return now > raceTime && now - raceTime < (24 * 60 * 60 * 1000); 
+    });
     if (active) await performFinalization();
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
 }, 15 * 60 * 1000);

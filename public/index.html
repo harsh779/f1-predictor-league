@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // 🚨 NUCLEAR CACHE BUSTER: Forces the PWA to update itself
+        // Version bumped to 1.8 to force your devices to update the rules text
         (function() {
-            const currentVersion = "1.6"; 
+            const currentVersion = "1.8"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -35,7 +35,6 @@
     </script>
 
     <style>
-        /* --- 1. CORE VARIABLES --- */
         :root { 
             --red: #e10600; 
             --red-glow: rgba(225, 6, 0, 0.15);
@@ -56,7 +55,6 @@
         ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
-        /* --- 2. FOOLPROOF HEADER & NAVIGATION --- */
         header { 
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
             padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; 
@@ -86,7 +84,6 @@
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        /* DESKTOP HEADER OVERRIDE */
         @media (min-width: 900px) {
             header { padding: 15px 30px; gap: 20px; flex-wrap: nowrap; }
             h1 { font-size: 1.8rem; }
@@ -95,13 +92,11 @@
             nav button { font-size: 0.95rem; padding: 10px 20px; }
         }
 
-        /* --- 3. LAYOUT --- */
         main { padding: 30px 20px; max-width: 1200px; margin: 0 auto; min-height: 80vh; }
         .tab { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); } 
         .active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* --- 4. PREDICT FORM & CARDS --- */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         .predict-group { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
         .predict-group h3 { margin: 0 0 20px 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
@@ -120,12 +115,10 @@
         .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
         
-        /* --- 5. LIVE TAB GRID --- */
         .live-grid-container { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 20px; font-size: 0.95rem; }
         .live-card-section { background: var(--surface-inner); padding: 18px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box;}
         .live-card-title { color: var(--text-muted); display: block; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* --- 6. TABLES & GLOBALS --- */
         .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);}
         table { width: 100%; border-collapse: collapse; }
@@ -166,38 +159,29 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
-        /* --- 7. EXTREME MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            main { padding: 15px 12px; }
+            header { padding: 15px 15px 0 15px !important; flex-direction: row !important; flex-wrap: wrap !important; }
+            h1 { font-size: 1.4rem !important; margin: 0 !important; width: auto !important; flex: 1; }
+            .user-dropdown { margin: 0 !important; }
             
-            /* Dashboard layout fix */
-            #dash-container { flex-direction: column !important; padding: 20px !important; gap: 15px !important; border-left-width: 4px !important;}
-            #dash-container > div { min-width: 100% !important; width: 100% !important; box-sizing: border-box; }
+            nav { 
+                width: 100vw !important; margin-left: -15px !important; margin-top: 15px !important; 
+                padding: 10px 15px 15px 15px !important; border-top: 1px solid var(--border) !important; 
+                overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; 
+                display: flex !important; flex-wrap: nowrap !important; justify-content: flex-start !important; gap: 8px !important;
+            }
+            nav button { flex: 0 0 auto !important; font-size: 0.85rem !important; padding: 10px 15px !important; }
+            main { padding: 15px 12px !important; }
             
-            /* Form stacking */
-            .form-grid { grid-template-columns: 1fr; gap: 15px; }
-            .predict-group { padding: 15px; margin-bottom: 15px; }
-            
-            /* Live Grid vertical stacking to prevent squish */
-            .live-grid-container { grid-template-columns: 1fr; gap: 12px; }
+            .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            #dash-container { flex-direction: column !important; padding: 15px !important; }
+            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
             #grid-container { grid-template-columns: 1fr !important; }
-
-            label { margin-top: 12px; font-size: 0.8rem; }
-            input.selector-input { padding: 12px 35px 12px 12px; font-size: 1rem; border-width: 1px; }
-            .btn { padding: 15px; font-size: 1.1rem; margin-top: 15px;}
             
-            #r-header { font-size: 1.6rem !important; }
-            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
-            th, td { padding: 12px 10px; font-size: 0.95rem; }
-            th { font-size: 0.75rem; }
-            
-            .grid-modal-content { padding: 20px 15px; border-radius: 16px 16px 0 0; max-height: 90vh; width: 100%;}
-            .modal-grid { grid-template-columns: 1fr; gap: 8px; padding-bottom: 40px;}
-            .modal-grid-btn { padding: 15px; font-size: 1.1rem; border-left-width: 4px;}
-            .close-btn { font-size: 2.2rem; margin-top: -5px; }
-            
-            #toast-container { top: 10px; right: 10px; left: 10px; align-items: stretch; }
-            .toast { min-width: 0; width: auto; font-size: 0.9rem; padding: 14px 20px;}
+            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            #r-header { font-size: 1.5rem !important; }
+            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
         }
     </style>
 </head>
@@ -371,7 +355,7 @@
         <h2 class="section-title">Sporting Regulations</h2>
         <div class="predict-group" style="line-height: 1.8;">
             <h3>⏰ 1. Parc Fermé (The Deadline)</h3>
-            <ul><li>Strategies are <strong>strictly locked</strong> the exact minute that <strong>Practice 1 (P1)</strong> begins on Friday (or Sprint Qualifying on Sprint weekends). No exceptions.</li></ul>
+            <ul><li>Strategies are <strong>strictly locked</strong> the exact minute that <strong>Qualifying</strong> begins. No exceptions.</li></ul>
             <h3 style="margin-top:20px;">🏎️ 2. Driver Scoring Matrix</h3>
             <ul>
                 <li><strong>Exact Match Bonus:</strong> <span style="color: #009940; font-weight: bold;">+2 Points</span>.</li>
@@ -462,7 +446,6 @@
 </div>
 
 <script>
-    // 1. SINGLE SOURCE OF TRUTH FOR TEAMS & DRIVERS
     const teamsData = [
         { name: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
         { name: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
@@ -583,7 +566,6 @@
         }
     }
 
-    // --- FETCH WEATHER API ---
     async function fetchWeather(locationQuery) {
         try {
             const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1`);
@@ -618,7 +600,9 @@
             document.getElementById('r-round').innerText = `Round ${r.round} of 24`;
             document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
             document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
-            raceLock = new Date(r.date);
+            
+            // Evaluates based on universal Qualifying deadline
+            raceLock = new Date(r.lockTime);
             
             fetchWeather(r.country);
             
@@ -632,7 +616,7 @@
                 document.getElementById('sl').required = false;
             }
             
-            if (new Date() > raceLock) {
+            if (new Date() >= raceLock) {
                 document.getElementById('p-form').style.display = 'none';
                 document.getElementById('locked-msg').classList.remove('hidden');
             }
@@ -660,7 +644,6 @@
         if(t==='calendar') loadCalendar();
     }
 
-    // --- RECALIBRATED LIVE GRID RENDERER ---
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
@@ -920,21 +903,11 @@
         } catch (e) { showToast('Error resetting user', 'error'); }
     }
 
-    // Initialize Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
-        });
-    }
-
     let deferredPrompt;
     const installBtn = document.getElementById('install-btn');
-
     const isStandalone = () => ('standalone' in window.navigator && window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
 
-    if (!isStandalone() && installBtn) {
-        installBtn.classList.remove('hidden');
-    }
+    if (!isStandalone() && installBtn) { installBtn.classList.remove('hidden'); }
 
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault(); 
