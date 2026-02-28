@@ -9,13 +9,31 @@
     <title>F1 2026 Strategy League</title>
     
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#e10600">
+    <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="F1 Strategy">
     <link rel="apple-touch-icon" href="/icon.svg">
 
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        // 🚨 NUCLEAR CACHE BUSTER: Forces the PWA to update itself
+        (function() {
+            const currentVersion = "1.6"; 
+            const storedVersion = localStorage.getItem('app_version');
+            if (storedVersion !== currentVersion) {
+                localStorage.setItem('app_version', currentVersion);
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                        for(let registration of registrations) { registration.unregister(); }
+                    });
+                }
+                window.location.href = window.location.pathname + "?v=" + new Date().getTime();
+            }
+        })();
+    </script>
+
     <style>
         /* --- 1. CORE VARIABLES --- */
         :root { 
@@ -38,21 +56,28 @@
         ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
-        /* --- 2. HEADER & NAVIGATION --- */
+        /* --- 2. FOOLPROOF HEADER & NAVIGATION --- */
         header { 
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
-            padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; 
+            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; 
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
-            flex-wrap: wrap;
+            flex-wrap: wrap; gap: 15px;
         }
-        h1 { margin: 0; font-size: 1.8rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; }
+        h1 { margin: 0; font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); white-space: nowrap; order: 1; flex-shrink: 0;}
         h1 span { color: var(--red); }
         
-        nav { display: flex; gap: 10px; align-items: center; flex: 1; margin-left: 30px; }
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); order: 2; flex-shrink: 0; margin-left: auto;}
+        .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
+        .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
+        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
+        .user-dropdown-content button:hover { background-color: var(--surface-hover); }
+
+        nav { display: flex; gap: 8px; align-items: center; order: 3; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
+        nav::-webkit-scrollbar { display: none; }
         nav button { 
             background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent; 
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 10px 20px; 
-            border-radius: 30px; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; 
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 10px 18px; 
+            border-radius: 30px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; 
             white-space: nowrap; flex-shrink: 0;
         }
         nav button:hover { color: var(--text-main); background: #e0e2e6; }
@@ -61,11 +86,14 @@
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; margin-left: auto; }
-        .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
-        .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
-        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
-        .user-dropdown-content button:hover { background-color: var(--surface-hover); }
+        /* DESKTOP HEADER OVERRIDE */
+        @media (min-width: 900px) {
+            header { padding: 15px 30px; gap: 20px; flex-wrap: nowrap; }
+            h1 { font-size: 1.8rem; }
+            nav { order: 2; width: auto; flex: 1; padding-bottom: 0; justify-content: flex-start; margin-left: 20px; }
+            .user-dropdown { order: 3; margin-left: 0; }
+            nav button { font-size: 0.95rem; padding: 10px 20px; }
+        }
 
         /* --- 3. LAYOUT --- */
         main { padding: 30px 20px; max-width: 1200px; margin: 0 auto; min-height: 80vh; }
@@ -93,9 +121,9 @@
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
         
         /* --- 5. LIVE TAB GRID --- */
-        .live-grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; font-size: 0.95rem; }
-        .live-card-section { background: var(--surface-inner); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
-        .live-card-title { color: var(--text-muted); display: block; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+        .live-grid-container { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 20px; font-size: 0.95rem; }
+        .live-card-section { background: var(--surface-inner); padding: 18px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box;}
+        .live-card-title { color: var(--text-muted); display: block; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
 
         /* --- 6. TABLES & GLOBALS --- */
         .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
@@ -138,48 +166,38 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
-        /* --- 7. EXTREME MOBILE RESPONSIVENESS (NUCLEAR FIX) --- */
+        /* --- 7. EXTREME MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            /* Force Header to split cleanly */
-            header { padding: 15px 15px 0 15px !important; flex-direction: row !important; flex-wrap: wrap !important; }
-            h1 { font-size: 1.4rem !important; margin: 0 !important; width: auto !important; flex: 1; }
-            .user-dropdown { margin: 0 !important; }
+            main { padding: 15px 12px; }
             
-            /* Force Nav to be a horizontal scroll list below header */
-            nav { 
-                width: 100vw !important; 
-                margin-left: -15px !important; 
-                margin-top: 15px !important; 
-                padding: 10px 15px 15px 15px !important; 
-                border-top: 1px solid var(--border) !important; 
-                overflow-x: auto !important; 
-                -webkit-overflow-scrolling: touch !important; 
-                display: flex !important; 
-                flex-wrap: nowrap !important; 
-                justify-content: flex-start !important;
-                gap: 8px !important;
-            }
-            nav button { flex: 0 0 auto !important; font-size: 0.85rem !important; padding: 10px 15px !important; }
-            
-            main { padding: 15px 12px !important; }
-            
-            /* Force Live Grid to Stack Vertically! This fixes the squished cards */
-            .live-grid-container { 
-                display: flex !important; 
-                flex-direction: column !important; 
-                gap: 15px !important; 
-            }
-
-            /* Dashboard stacking */
-            #predict > div:first-child { flex-direction: column !important; padding: 15px !important; }
+            /* Dashboard layout fix */
+            #dash-container { flex-direction: column !important; padding: 20px !important; gap: 15px !important; border-left-width: 4px !important;}
+            #dash-container > div { min-width: 100% !important; width: 100% !important; box-sizing: border-box; }
             
             /* Form stacking */
-            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
+            .form-grid { grid-template-columns: 1fr; gap: 15px; }
+            .predict-group { padding: 15px; margin-bottom: 15px; }
             
-            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
-            #r-header { font-size: 1.5rem !important; }
-            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
+            /* Live Grid vertical stacking to prevent squish */
+            .live-grid-container { grid-template-columns: 1fr; gap: 12px; }
+            #grid-container { grid-template-columns: 1fr !important; }
+
+            label { margin-top: 12px; font-size: 0.8rem; }
+            input.selector-input { padding: 12px 35px 12px 12px; font-size: 1rem; border-width: 1px; }
+            .btn { padding: 15px; font-size: 1.1rem; margin-top: 15px;}
+            
+            #r-header { font-size: 1.6rem !important; }
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
+            th, td { padding: 12px 10px; font-size: 0.95rem; }
+            th { font-size: 0.75rem; }
+            
+            .grid-modal-content { padding: 20px 15px; border-radius: 16px 16px 0 0; max-height: 90vh; width: 100%;}
+            .modal-grid { grid-template-columns: 1fr; gap: 8px; padding-bottom: 40px;}
+            .modal-grid-btn { padding: 15px; font-size: 1.1rem; border-left-width: 4px;}
+            .close-btn { font-size: 2.2rem; margin-top: -5px; }
+            
+            #toast-container { top: 10px; right: 10px; left: 10px; align-items: stretch; }
+            .toast { min-width: 0; width: auto; font-size: 0.9rem; padding: 14px 20px;}
         }
     </style>
 </head>
@@ -200,6 +218,13 @@
 <header>
     <h1><span>F1</span> 2026 LEAGUE</h1>
     
+    <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
+        👤 <span id="logged-in-name" style="margin-left: 5px; color: var(--red);"></span>
+        <div id="user-dropdown-content" class="user-dropdown-content">
+            <button onclick="logout()">🚪 Logout</button>
+        </div>
+    </div>
+
     <nav id="main-nav">
         <button onclick="tab('predict', this)" class="active-nav">Predict</button>
         <button onclick="tab('live', this)">Live</button>
@@ -211,18 +236,11 @@
         <button onclick="showSupportModal()" class="btn-support">☕ Support</button>
         <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">📲 Install App</button>
     </nav>
-
-    <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        👤 <span id="logged-in-name" style="margin-left: 5px; color: var(--red);"></span>
-        <div id="user-dropdown-content" class="user-dropdown-content">
-            <button onclick="logout()">🚪 Logout</button>
-        </div>
-    </div>
 </header>
 
 <main>
     <div id="predict" class="tab active">
-        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 30px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
+        <div id="dash-container" style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 30px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
             
             <div style="flex: 1; min-width: 250px;">
                 <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
@@ -444,13 +462,6 @@
 </div>
 
 <script>
-    // --- CACHE BUSTER SCRIPT: FORCE DEVICES TO UPDATE UI ---
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) { registration.unregister(); }
-        });
-    }
-
     // 1. SINGLE SOURCE OF TRUTH FOR TEAMS & DRIVERS
     const teamsData = [
         { name: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
@@ -909,6 +920,7 @@
         } catch (e) { showToast('Error resetting user', 'error'); }
     }
 
+    // Initialize Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed:', err));
