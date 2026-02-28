@@ -216,14 +216,14 @@ async function performFinalization() {
         const prompt = `You are a dramatic Netflix 'Drive to Survive' narrator. 
         The F1 race "${raceData.raceName}" just finished. 
         Here are the updated scores for our fantasy league: ${standingsStr}.
-        Write a thrilling, 2 to 3 paragraph recap of the fantasy league's current storyline. 
+        Write a thrilling, strictly 1 paragraph recap of the fantasy league's current storyline. 
         Focus entirely on the rivalries between the human players (e.g., who is choking, who is dominating, who made a massive comeback).
-        Make it intense, cinematic, and use F1 terminology.`;
+        Make it intense, cinematic, and use F1 terminology. Do not exceed one paragraph.`;
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 300,
+            max_tokens: 200,
             temperature: 0.8
         });
         
