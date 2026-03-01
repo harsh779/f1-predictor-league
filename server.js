@@ -10,7 +10,16 @@ const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026'; // Match this in Render Env
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); 
+
+// 🚀 CACHE KILLER: Forces browsers to load the newest version instantly
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
+
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false })); 
 
 const db = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
 
@@ -67,7 +76,6 @@ function normalizeConstructor(c) {
 }
 
 // --- 4. JWT AUTHENTICATION MIDDLEWARE ---
-// MISSING IN PREVIOUS VERSION: This is what actually protects the routes
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -82,7 +90,8 @@ function authenticateToken(req, res, next) {
 
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
 app.get('/auth/google', (req, res) => {
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email`;
+    // 🔴 FIX: prompt=select_account is now properly attached to the end of the URL
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email&prompt=select_account`;
     res.redirect(url);
 });
 
@@ -101,12 +110,10 @@ app.get('/auth/google/callback', async (req, res) => {
         
         const googleUser = userResponse.data;
         
-        // Upsert User based on name to avoid UNIQUE crashes
         await db.execute({ sql: `INSERT INTO f1_drivers (name, auth_id) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET auth_id=excluded.auth_id`, args: [googleUser.name, `google_${googleUser.id}`] });
         
         const token = jwt.sign({ name: googleUser.name, id: `google_${googleUser.id}` }, JWT_SECRET, { expiresIn: '30d' });
         
-        // Send them back to the frontend with their token
         res.redirect(`/?token=${token}&name=${encodeURIComponent(googleUser.name)}`);
     } catch (error) { res.redirect('/?error=oauth_failed'); }
 });
@@ -234,10 +241,9 @@ app.get('/api/next-race', (req, res) => {
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
-// MISSING IN PREVIOUS VERSION: 'authenticateToken' is now successfully injecting the user's secure token
 app.post('/predict', authenticateToken, async (req, res) => {
   const d = req.body;
-  const userName = req.user.name; // Securely pulled from Google Token
+  const userName = req.user.name;
 
   const now = new Date();
   const currentRace = f1Calendar2026.find(r => {
