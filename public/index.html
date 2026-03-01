@@ -934,9 +934,9 @@
     
     function logout() { localStorage.clear(); window.location.href = window.location.pathname; }
     
-    function checkAdm() { 
-    // Unlocks the panel ONLY for you
-    if(f1_name === 'HARSH KHANDELWAL') {
+   function checkAdm() { 
+    // .toLowerCase() safely bypasses any invisible formatting or capitalization
+    if(f1_name && f1_name.toLowerCase().includes('harsh')) {
         document.getElementById('admin-panel').classList.remove('hidden'); 
         loadAdminUserList(); 
     }
