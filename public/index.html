@@ -935,11 +935,12 @@
     function logout() { localStorage.clear(); window.location.href = window.location.pathname; }
     
     function checkAdm() { 
-        if(f1_name && f1_name.toLowerCase().includes('admin')) {
-            document.getElementById('admin-panel').classList.remove('hidden'); 
-            loadAdminUserList(); 
-        }
+    // Unlocks the panel ONLY for you
+    if(f1_name === 'HARSH KHANDELWAL') {
+        document.getElementById('admin-panel').classList.remove('hidden'); 
+        loadAdminUserList(); 
     }
+}
 
     async function loadAdminUserList() {
         try {
