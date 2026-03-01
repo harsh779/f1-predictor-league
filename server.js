@@ -286,7 +286,8 @@ app.get('/api/predictions', async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-  const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
+  // Added "AND has_participated = 1" to hide users who haven't submitted their first prediction yet
+  const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
   res.json(r.rows);
 });
 
