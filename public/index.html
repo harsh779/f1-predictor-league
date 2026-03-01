@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 3.2 - Home Dashboard Update (No AI)
+        // Version 3.3 - P21/P22 22-Car Grid Update
         (function() {
-            const currentVersion = "3.2"; 
+            const currentVersion = "3.3"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -324,8 +324,8 @@
 
                     <div class="predict-group">
                         <h3>⚠️ The Backmarkers</h3>
-                        <label>P19</label><input type="text" id="p19" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p19', 'driver', 'Select P19')" required>
-                        <label>P20 Last Place</label><input type="text" id="p20" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p20', 'driver', 'Select P20 Last Place')" required>
+                        <label>P21</label><input type="text" id="p21" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p21', 'driver', 'Select P21')" required>
+                        <label>P22 Last Place</label><input type="text" id="p22" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p22', 'driver', 'Select P22 Last Place')" required>
                     </div>
                 </div>
 
@@ -367,12 +367,14 @@
             <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0; font-size: 1.5rem;">⚠️ STEWARDS CONTROL</h3>
             <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">🏁 Finalize Race Weekend</button>
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
-            <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;"></div>
+            <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
+                </div>
         </div>
     </div>
 
     <div id="standings" class="tab">
         <h2 class="section-title">2026 World Championship</h2>
+        
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -412,7 +414,7 @@
                 <li><strong>Differential Penalty:</strong> <span style="color: var(--red); font-weight: bold;">-1 Point</span> for every position your prediction misses by.</li>
             </ul>
             <h3 style="margin-top:20px;">💥 3. The 'Engine Blow' (DNF Rule)</h3>
-            <ul><li>If a driver retires, crashes, or fails to classify (DNF), the Stewards automatically score them as finishing in <strong>P20</strong>.</li></ul>
+            <ul><li>If a driver retires, crashes, or fails to classify (DNF), the Stewards automatically score them as finishing in <strong>P22</strong>.</li></ul>
             <h3 style="margin-top:20px;">🛠️ 4. Constructor Scoring</h3>
             <ul><li>Constructor performance is ranked purely by combining the finishing positions of their two cars in that specific race session.</li></ul>
             <h3 style="margin-top:20px;">🃏 5. Strategic Wildcards</h3>
@@ -610,9 +612,36 @@
         }
     }
 
+    async function fetchWeather(locationQuery) {
+        try {
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1`);
+            const geoData = await geoRes.json();
+            if(!geoData.results || geoData.results.length === 0) throw new Error("Location not found");
+            const { latitude, longitude } = geoData.results[0];
+
+            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,weather_code,wind_speed_10m`);
+            const wData = await weatherRes.json();
+            const curr = wData.current;
+
+            const code = curr.weather_code;
+            let icon = '☁️';
+            if(code === 0) icon = '☀️';
+            else if(code > 0 && code < 4) icon = '⛅';
+            else if(code >= 51 && code <= 67) icon = '🌧️';
+            else if(code >= 71 && code <= 77) icon = '❄️';
+            else if(code >= 95) icon = '⛈️';
+
+            document.getElementById('weather-widget').innerHTML = `
+                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${icon} ${curr.temperature_2m}°C</div>
+                <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
+            `;
+        } catch(e) {
+            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Radar offline.</span>";
+        }
+    }
+
     async function loadHomeData() {
         try {
-            // CACHE BUSTER ADDED TO FETCH
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
             document.getElementById('h-round').innerText = `Round ${r.round} of 24`;
             document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
@@ -640,27 +669,7 @@
                 document.getElementById('locked-msg').classList.remove('hidden');
             }
 
-            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(r.country)}&count=1`);
-            const geoData = await geoRes.json();
-            if(geoData.results) {
-                const { latitude, longitude } = geoData.results[0];
-                const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,weather_code,wind_speed_10m`);
-                const wData = await weatherRes.json();
-                const curr = wData.current;
-
-                const code = curr.weather_code;
-                let icon = '☁️';
-                if(code === 0) icon = '☀️';
-                else if(code > 0 && code < 4) icon = '⛅';
-                else if(code >= 51 && code <= 67) icon = '🌧️';
-                else if(code >= 71 && code <= 77) icon = '❄️';
-                else if(code >= 95) icon = '⛈️';
-
-                document.getElementById('weather-widget').innerHTML = `
-                    <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${icon} ${curr.temperature_2m}°C</div>
-                    <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
-                `;
-            }
+            fetchWeather(r.country);
 
             const d = await fetch('/api/season-leaderboard?t=' + new Date().getTime()).then(res=>res.json());
             const podiumUI = document.getElementById('h-top-3');
@@ -676,7 +685,6 @@
                 `).join('');
             }
 
-            // Real RSS News Integration
             const rssUrl = 'https://api.rss2json.com/v1/api.json?rss_url=https://www.motorsport.com/rss/f1/news/';
             const newsRes = await fetch(rssUrl).then(res=>res.json());
             if(newsRes.status === 'ok' && newsRes.items) {
@@ -746,7 +754,7 @@
                             <div style="line-height:1.8; color: var(--text-main);">
                                 <span style="color:var(--text-muted)">P1:</span> <b>${x.p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${x.p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${x.p3}</b><br>
                                 <span style="color:var(--text-muted)">P11:</span> <b>${x.p11}</b> | <span style="color:var(--text-muted)">P12:</span> <b>${x.p12}</b><br>
-                                <span style="color:var(--text-muted)">P19:</span> <b>${x.p19}</b> | <span style="color:var(--text-muted)">P20:</span> <b>${x.p20}</b>
+                                <span style="color:var(--text-muted)">P21:</span> <b>${x.p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b>${x.p22}</b>
                             </div>
                         </div>
 
@@ -838,7 +846,8 @@
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
         
-        const requiredInputs = ['p1', 'p2', 'p3', 'p11', 'p12', 'p19', 'p20', 'c1', 'c2', 'c5', 'c6', 'c10', 'wl'];
+        // P21 and P22 added to required checks
+        const requiredInputs = ['p1', 'p2', 'p3', 'p11', 'p12', 'p21', 'p22', 'c1', 'c2', 'c5', 'c6', 'c10', 'wl'];
         if (!document.getElementById('sprint-box').classList.contains('hidden')) { 
             requiredInputs.push('sg', 'sl'); 
         }
@@ -852,7 +861,7 @@
 
         const body = {
             user_name: user.name, password: user.password,
-            p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p19:val('p19'), p20:val('p20'),
+            p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p21:val('p21'), p22:val('p22'),
             c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
             w_race_loser:val('wl'), w_sprint_gainer: val('sg'), w_sprint_loser: val('sl')
         };
