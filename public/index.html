@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 4.0 - Google OAuth, P21/P22, No AI, Full Functions Retained
+        // Version 4.4 - Google OAuth Secured, Functions Retained
         (function() {
-            const currentVersion = "4.0"; 
+            const currentVersion = "4.4"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -110,7 +110,6 @@
         .dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
         .dash-card-title { font-size: 1.1rem; color: var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
 
-        /* News Widget */
         .news-item { display: flex; gap: 15px; border-bottom: 1px solid var(--border); padding: 15px 0; align-items: center;}
         .news-item:last-child { border-bottom: none; padding-bottom: 0; }
         .news-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; flex-shrink: 0;}
@@ -118,7 +117,6 @@
         .news-item-content a { color: var(--text-main); text-decoration: none; font-weight: 700; transition: color 0.2s;}
         .news-item-content a:hover { color: var(--red); }
         
-        /* Top 3 Podium */
         .podium-list { display: flex; flex-direction: column; gap: 10px; }
         .podium-item { display: flex; justify-content: space-between; padding: 15px; border-radius: 8px; background: var(--surface-inner); border-left: 4px solid var(--border); font-size: 1.1rem; font-weight: 700;}
         .podium-1 { border-color: #c59b27; background: rgba(197, 155, 39, 0.05); }
@@ -175,40 +173,8 @@
         .modal-grid-btn.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(100%); transform: none; box-shadow: none; border-color: var(--border); }
         .modal-grid-btn .num { background: var(--team-color); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 4px; font-weight: 900; font-size: 0.9rem; }
 
-        .modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(5px); display:flex; justify-content:center; align-items:center; z-index:999; }
-        .modal-box { background:var(--surface); padding:40px; border-radius:12px; width:90%; max-width:400px; text-align:center; border:1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.2);}
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
-
-        /* GOOGLE OAUTH UI */
-        .auth-backdrop { 
-            position:fixed; top:0; left:0; width:100%; height:100%; 
-            background: radial-gradient(circle at top, rgba(30,30,40,0.95) 0%, rgba(15,15,20,1) 100%); 
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            display:flex; justify-content:center; align-items:center; z-index:9999; 
-        }
-        .auth-card { 
-            background: #15151e; padding: 45px 35px; border-radius: 16px; width: 90%; max-width: 400px; 
-            border: 1px solid #333; box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); 
-            position: relative; overflow: hidden; animation: authSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
-            box-sizing: border-box; text-align: center;
-        }
-        .auth-card::before { 
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; 
-            background: linear-gradient(90deg, #e10600, #ff4d4d); 
-        }
-        .auth-header h1 { font-size: 2.4rem; color: #fff; margin: 0 0 8px 0; font-style: italic; letter-spacing: 1px; }
-        .auth-header h1 span { color: var(--red); }
-        .auth-header p { color: #888; font-size: 0.85rem; margin: 0 0 35px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
-        
-        .btn-auth-google { 
-            background: #ffffff; color: #333; border: 1px solid #ddd; padding: 18px; width: 100%; 
-            font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; 
-            cursor: pointer; border-radius: 8px; font-size: 1.1rem; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;
-        }
-        .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; }
-
-        @keyframes authSlideUp { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
         /* --- 7. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
@@ -236,9 +202,37 @@
             #h-header { font-size: 1.8rem !important; }
             .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
-            
-            .auth-card { padding: 35px 25px; }
         }
+
+        /* --- 8. GOOGLE OAUTH MODAL UI --- */
+        .auth-backdrop { 
+            position:fixed; top:0; left:0; width:100%; height:100%; 
+            background: radial-gradient(circle at top, rgba(30,30,40,0.95) 0%, rgba(15,15,20,1) 100%); 
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            display:flex; justify-content:center; align-items:center; z-index:9999; 
+        }
+        .auth-card { 
+            background: #15151e; padding: 45px 35px; border-radius: 16px; width: 90%; max-width: 400px; 
+            border: 1px solid #333; box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); 
+            position: relative; overflow: hidden; animation: authSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
+            box-sizing: border-box; text-align: center;
+        }
+        .auth-card::before { 
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; 
+            background: linear-gradient(90deg, #e10600, #ff4d4d); 
+        }
+        .auth-header h1 { font-size: 2.4rem; color: #fff; margin: 0 0 8px 0; font-style: italic; letter-spacing: 1px; }
+        .auth-header h1 span { color: var(--red); }
+        .auth-header p { color: #888; font-size: 0.85rem; margin: 0 0 35px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+        
+        .btn-auth-google { 
+            background: #ffffff; color: #333; border: 1px solid #ddd; padding: 18px; width: 100%; 
+            font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; 
+            cursor: pointer; border-radius: 8px; font-size: 1.1rem; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; }
+        
+        @keyframes authSlideUp { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
     </style>
 </head>
 <body>
@@ -406,7 +400,6 @@
 
     <div id="standings" class="tab">
         <h2 class="section-title">2026 World Championship</h2>
-        
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -550,7 +543,7 @@
     let f1_name = localStorage.getItem('f1_name');
     let raceLock = null;
 
-    // Capture OAuth Tokens
+    // Capture OAuth Tokens from URL after Google Login
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('token') && urlParams.has('name')) {
         f1_token = urlParams.get('token');
@@ -572,7 +565,7 @@
     function showSupportModal() { showToast('Constructors Fund integration coming soon. Thank you for the support!', 'success'); }
 
     document.addEventListener('DOMContentLoaded', () => {
-        if(!f1_token) { 
+        if(!f1_token || !f1_name) { 
             document.getElementById('auth').style.display = 'flex'; 
         } else { 
             document.getElementById('logged-in-name').innerText = f1_name;
@@ -902,13 +895,12 @@
         }
 
         const body = {
-            user_name: f1_name,
             p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p21:val('p21'), p22:val('p22'),
             c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
             w_race_loser:val('wl'), w_sprint_gainer: val('sg'), w_sprint_loser: val('sl')
         };
         
-        // Using JWT Token from Google Auth
+        // Pass JWT Token in Header
         const res = await fetch('/predict', { 
             method:'POST', 
             headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
@@ -924,23 +916,19 @@
         if(!confirm('⚠️ WARNING: Finalize the race weekend and calculate scores?')) return;
         showToast('Processing telemetry...', 'success');
         
-        // Pass admin credentials via bypass route
         const res = await fetch('/api/finalize', { 
             method:'POST', 
             headers:{'Content-Type':'application/json'}, 
-            body:JSON.stringify({user_name: 'admin', password: 'Open@0761'}) 
+            body:JSON.stringify({ password: 'Open@0761' }) 
         });
         const d = await res.json();
         if(res.ok) { showToast('✅ Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
         else { showToast('❌ Error: ' + d.message, 'error'); }
     }
     
-    // login(), reg(), and forgotPassword() are handled by Google OAuth redirect now.
-    
     function logout() { localStorage.clear(); window.location.href = window.location.pathname; }
     
     function checkAdm() { 
-        // Shows admin panel if the Google Account name includes 'admin' (or you can override manually)
         if(f1_name && f1_name.toLowerCase().includes('admin')) {
             document.getElementById('admin-panel').classList.remove('hidden'); 
             loadAdminUserList(); 
@@ -949,7 +937,7 @@
 
     async function loadAdminUserList() {
         try {
-            const resp = await fetch(`/api/admin/users?user=admin&pass=Open@0761&t=` + new Date().getTime());
+            const resp = await fetch(`/api/admin/users?pass=Open@0761&t=` + new Date().getTime());
             if(!resp.ok) return;
             const users = await resp.json();
             const list = document.getElementById('admin-user-list');
@@ -983,7 +971,7 @@
         try {
             await fetch('/api/admin/toggle-vip', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminUser: 'admin', adminPass: 'Open@0761', targetUser, vipStatus: !currentStatus })
+                body: JSON.stringify({ adminPass: 'Open@0761', targetUser, vipStatus: !currentStatus })
             });
             loadAdminUserList();
             showToast(`VIP Status updated for ${targetUser}`, 'success');
@@ -995,7 +983,7 @@
         try {
             await fetch('/api/admin/reset-user', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminUser: 'admin', adminPass: 'Open@0761', targetUser })
+                body: JSON.stringify({ adminPass: 'Open@0761', targetUser })
             });
             loadAdminUserList();
             showToast(`${targetUser} has been reset to 0 points.`, 'success');
