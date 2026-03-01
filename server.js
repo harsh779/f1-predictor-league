@@ -21,19 +21,20 @@ async function setupDatabase() {
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
 
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v2 (
+    // Bumped to v3 to handle the 22-car grid
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v3 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         user_name TEXT UNIQUE, 
         p1 TEXT, p2 TEXT, p3 TEXT, 
         p11 TEXT, p12 TEXT, 
-        p19 TEXT, p20 TEXT, 
+        p21 TEXT, p22 TEXT, 
         c1 TEXT, c2 TEXT, c5 TEXT, c6 TEXT, c10 TEXT, 
         w_race_loser TEXT, 
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
     
     await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
-    console.log("✅ Database Synced.");
+    console.log("✅ Database Synced for 22-Car Grid.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -98,22 +99,22 @@ async function sendDiscordNotification(msg) {
 // --- 4. SCORING ENGINE ---
 async function performFinalization() {
   try {
-    // 🟢 LIVE SEASON MODE: Pulls the most recently completed F1 race
     const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
     if (!races || races.length === 0) return { success: false, message: "No data from F1 API." };
     
     const raceData = races[0];
     const results = raceData.Results;
-    const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v2");
+    const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v3");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
 
     const actualDriverPositions = {};
     results.forEach(r => {
         const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
         let pos = parseInt(r.position);
+        // DNF Rule changed to 22
         if (r.positionText === 'R' || r.positionText === 'D' || r.status.startsWith('Retired') || r.status.startsWith('Collision') || r.status.startsWith('Accident')) {
-            pos = 20; 
+            pos = 22; 
         }
         actualDriverPositions[name] = pos;
     });
@@ -122,7 +123,8 @@ async function performFinalization() {
     results.forEach(r => {
       const c = normalizeConstructor(r.Constructor.name);
       let pos = parseInt(r.position);
-       if (r.positionText === 'R' || r.positionText === 'D') pos = 20; 
+       // DNF Rule changed to 22
+       if (r.positionText === 'R' || r.positionText === 'D') pos = 22; 
       constructorSums[c] = (constructorSums[c] || 0) + pos;
     });
 
@@ -136,7 +138,8 @@ async function performFinalization() {
     results.forEach(r => {
        if (parseInt(r.grid) > 0) {
            let finish = parseInt(r.position);
-           if (r.positionText === 'R' || r.positionText === 'D') finish = 20;
+           // DNF Rule changed to 22
+           if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
            const drop = finish - parseInt(r.grid);
            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
            if (drop > maxDrop) { maxDrop = drop; raceLosers = [name]; }
@@ -144,7 +147,7 @@ async function performFinalization() {
        }
     });
 
-    const predictions = await db.execute("SELECT * FROM f1_predictions_v2").then(r => r.rows);
+    const predictions = await db.execute("SELECT * FROM f1_predictions_v3").then(r => r.rows);
     let scores = {}; let lowest = Infinity;
 
     predictions.forEach(p => {
@@ -156,10 +159,11 @@ async function performFinalization() {
             return -diff;
         };
 
+        // Added P21 and P22 to scoring matrix
         const driversToScore = [
             { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
             { pred: p.p11, rank: 11 }, { pred: p.p12, rank: 12 },
-            { pred: p.p19, rank: 19 }, { pred: p.p20, rank: 20 }
+            { pred: p.p21, rank: 21 }, { pred: p.p22, rank: 22 }
         ];
         
         driversToScore.forEach(item => {
@@ -184,6 +188,7 @@ async function performFinalization() {
     });
 
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
+    
     const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
     
     for (const d of activeDrivers) {
@@ -193,129 +198,128 @@ async function performFinalization() {
         }
     }
 
-    await db.execute("DELETE FROM f1_predictions_v2");
-    await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!** Points have been officially updated on the Standings board.`);
+    await db.execute("DELETE FROM f1_predictions_v3");
+    
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
 }
 
 // --- 5. CORE ROUTES ---
 app.get('/api/next-race', (req, res) => {
-    const now = new Date();
-    // Safety Buffer: Keep current round on screen until 4 hours AFTER the race starts
-    const next = f1Calendar2026.find(r => {
-        const raceEndBuffer = new Date(r.sessions.race);
-        raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
-        return raceEndBuffer > now;
-    }) || f1Calendar2026[f1Calendar2026.length-1];
-    
-    const payload = { ...next, lockTime: next.sessions.quali };
-    res.json(payload);
+  const now = new Date();
+  const next = f1Calendar2026.find(r => {
+      const raceEndBuffer = new Date(r.sessions.race);
+      raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
+      return raceEndBuffer > now;
+  }) || f1Calendar2026[f1Calendar2026.length-1];
+  
+  const payload = { ...next, lockTime: next.sessions.quali };
+  res.json(payload);
 });
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
 app.post('/predict', async (req, res) => {
-    const d = req.body;
-    const auth = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [d.user_name, d.password] });
-    if (auth.rows.length === 0) return res.status(401).json({ success: false, message: "Login failed" });
+  const d = req.body;
+  const auth = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [d.user_name, d.password] });
+  if (auth.rows.length === 0) return res.status(401).json({ success: false, message: "Login failed" });
 
-    const now = new Date();
-    const currentRace = f1Calendar2026.find(r => {
-        const raceEndBuffer = new Date(r.sessions.race);
-        raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
-        return raceEndBuffer > now;
-    }); 
-    if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
+  const now = new Date();
+  const currentRace = f1Calendar2026.find(r => {
+      const raceEndBuffer = new Date(r.sessions.race);
+      raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
+      return raceEndBuffer > now;
+  }); 
+  if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
-    const lockTime = new Date(currentRace.sessions.quali);
-    if (now > lockTime) {
-        return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
-    }
+  const lockTime = new Date(currentRace.sessions.quali);
+  if (now > lockTime) {
+      return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
+  }
 
-    try {
-        await db.execute({
-            sql: `INSERT INTO f1_predictions_v2 (user_name, p1, p2, p3, p11, p12, p19, p20, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-                  ON CONFLICT(user_name) DO UPDATE SET 
-                  p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p11=excluded.p11, p12=excluded.p12, p19=excluded.p19, p20=excluded.p20, 
-                  c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c10=excluded.c10, 
-                  w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
-            args: [d.user_name, d.p1, d.p2, d.p3, d.p11, d.p12, d.p19, d.p20, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
-        });
-        
-        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [d.user_name] });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  try {
+      await db.execute({
+          sql: `INSERT INTO f1_predictions_v3 (user_name, p1, p2, p3, p11, p12, p21, p22, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+                ON CONFLICT(user_name) DO UPDATE SET 
+                p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p11=excluded.p11, p12=excluded.p12, p21=excluded.p21, p22=excluded.p22, 
+                c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c10=excluded.c10, 
+                w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
+          args: [d.user_name, d.p1, d.p2, d.p3, d.p11, d.p12, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
+      });
+      
+      await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [d.user_name] });
+      res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/finalize', async (req, res) => {
-    if (req.body.user_name !== 'admin' || req.body.password !== 'Open@0761') return res.status(403).json({ success: false });
-    const result = await performFinalization();
-    res.status(result.success ? 200 : 400).json(result);
+  if (req.body.user_name !== 'admin' || req.body.password !== 'Open@0761') return res.status(403).json({ success: false });
+  const result = await performFinalization();
+  res.status(result.success ? 200 : 400).json(result);
 });
 
 app.post('/register', async (req, res) => {
-    try { 
-        await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES (?, ?, 0, 0)", args: [req.body.name, req.body.password] }); 
-        res.json({ success: true, message: "Registered!" }); 
-    } catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
+  try { 
+      await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES (?, ?, 0, 0)", args: [req.body.name, req.body.password] }); 
+      res.json({ success: true, message: "Registered!" }); 
+  } catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
 });
 
 app.post('/login', async (req, res) => {
-    const r = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [req.body.name, req.body.password] });
-    if (r.rows.length > 0) res.json({ success: true, driver: r.rows[0] });
-    else res.status(401).json({ success: false });
+  const r = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [req.body.name, req.body.password] });
+  if (r.rows.length > 0) res.json({ success: true, driver: r.rows[0] });
+  else res.status(401).json({ success: false });
 });
 
 app.get('/api/predictions', async (req, res) => {
-    const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v2 p JOIN f1_drivers d ON p.user_name = d.name");
-    res.json(r.rows);
+  const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v3 p JOIN f1_drivers d ON p.user_name = d.name");
+  res.json(r.rows);
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-    const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
-    res.json(r.rows);
+  const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+  res.json(r.rows);
 });
 
 // --- 6. ADMIN ROUTES ---
 app.get('/api/admin/users', async (req, res) => {
-  const { user, pass } = req.query;
-  if (user !== 'admin' || pass !== 'Open@0761') return res.status(403).send("Unauthorized");
-  try {
-      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY name ASC");
-      res.json(r.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+const { user, pass } = req.query;
+if (user !== 'admin' || pass !== 'Open@0761') return res.status(403).send("Unauthorized");
+try {
+    const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY name ASC");
+    res.json(r.rows);
+} catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/toggle-vip', async (req, res) => {
-  const { adminUser, adminPass, targetUser, vipStatus } = req.body;
-  if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-  try {
-      await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [vipStatus ? 1 : 0, targetUser] });
-      res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+const { adminUser, adminPass, targetUser, vipStatus } = req.body;
+if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+try {
+    await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [vipStatus ? 1 : 0, targetUser] });
+    res.json({ success: true });
+} catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/reset-user', async (req, res) => {
-  const { adminUser, adminPass, targetUser } = req.body;
-  if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-  try {
-      await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [targetUser] });
-      res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+const { adminUser, adminPass, targetUser } = req.body;
+if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+try {
+    await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [targetUser] });
+    res.json({ success: true });
+} catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- 7. AUTOMATED CRON JOB ---
 const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 setInterval(async () => {
-    const now = new Date();
-    const active = f1Calendar2026.find(r => { 
-        const raceTime = new Date(r.sessions.race); 
-        return now > raceTime && now - raceTime < (24 * 60 * 60 * 1000); 
-    });
-    if (active) await performFinalization();
-    fetch(`${APP_URL}/api/next-race`).catch(() => {});
+  const now = new Date();
+  const active = f1Calendar2026.find(r => { 
+      const raceTime = new Date(r.sessions.race); 
+      return now > raceTime && now - raceTime < (24 * 60 * 60 * 1000); 
+  });
+  if (active) await performFinalization();
+  fetch(`${APP_URL}/api/next-race`).catch(() => {});
 }, 15 * 60 * 1000);
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
