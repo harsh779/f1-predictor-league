@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version bumped to force UI updates
+        // Version 3.2 - Home Dashboard Update (No AI)
         (function() {
-            const currentVersion = "2.1"; 
+            const currentVersion = "3.2"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -94,18 +94,42 @@
             nav button { font-size: 0.95rem; padding: 10px 20px; }
         }
 
-        /* --- 3. LAYOUT --- */
+        /* --- 3. LAYOUT & UTILS --- */
         main { padding: 30px 20px; max-width: 1200px; margin: 0 auto; min-height: 80vh; }
         .tab { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); } 
         .active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* --- 4. PREDICT FORM & CARDS --- */
+        .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
+        
+        .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
+        
+        /* --- 4. DASHBOARD GRID SYSTEM --- */
+        .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 30px; }
+        .dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .dash-card-title { font-size: 1.1rem; color: var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
+
+        /* News Widget */
+        .news-item { display: flex; gap: 15px; border-bottom: 1px solid var(--border); padding: 15px 0; align-items: center;}
+        .news-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .news-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; flex-shrink: 0;}
+        .news-item-content h4 { margin: 0 0 5px 0; font-size: 1.05rem; line-height: 1.3; }
+        .news-item-content a { color: var(--text-main); text-decoration: none; font-weight: 700; transition: color 0.2s;}
+        .news-item-content a:hover { color: var(--red); }
+        
+        /* Top 3 Podium */
+        .podium-list { display: flex; flex-direction: column; gap: 10px; }
+        .podium-item { display: flex; justify-content: space-between; padding: 15px; border-radius: 8px; background: var(--surface-inner); border-left: 4px solid var(--border); font-size: 1.1rem; font-weight: 700;}
+        .podium-1 { border-color: #c59b27; background: rgba(197, 155, 39, 0.05); }
+        .podium-2 { border-color: #999999; }
+        .podium-3 { border-color: #b87333; }
+
+        /* --- 5. PREDICT FORM CARDS --- */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         .predict-group { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
         .predict-group h3 { margin: 0 0 20px 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
         label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; display: block; text-transform: uppercase; margin-top: 15px; margin-bottom: 5px; letter-spacing: 1px;}
-        
         input.selector-input { 
             width: 100%; padding: 14px 45px 14px 16px; background-color: var(--surface); border: 2px solid var(--border); 
             color: var(--text-main); border-radius: 8px; font-family: 'Titillium Web', sans-serif; font-size: 1.05rem; 
@@ -116,16 +140,7 @@
         input.selector-input:focus, input.selector-input:active { border-color: var(--red); box-shadow: 0 0 0 4px var(--red-glow); background-color: #fffafA;}
         input.selector-input[value]:not([value=""]) { border-color: var(--text-main); background-image: url('data:image/svg+xml;utf8,<svg fill="%2300e160" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>');}
         
-        .btn { background: linear-gradient(45deg, #e10600, #c20000); color: white; border: none; padding: 18px; width: 100%; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 8px; font-size: 1.2rem; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(225, 6, 0, 0.25); }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
-        
-        /* --- 5. LIVE TAB GRID --- */
-        .live-grid-container { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 20px; font-size: 0.95rem; }
-        .live-card-section { background: var(--surface-inner); padding: 18px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box;}
-        .live-card-title { color: var(--text-muted); display: block; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
-
         /* --- 6. TABLES & GLOBALS --- */
-        .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);}
         table { width: 100%; border-collapse: collapse; }
         th { background: var(--surface-inner); color: var(--text-muted); padding: 16px; text-align: left; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; font-weight: 700; border-bottom: 2px solid var(--border);}
@@ -180,14 +195,16 @@
             nav button { flex: 0 0 auto !important; font-size: 0.85rem !important; padding: 10px 15px !important; }
             main { padding: 15px 12px !important; }
             
+            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
+            .dash-card { padding: 18px !important; }
             .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            #dash-container { flex-direction: column !important; padding: 15px !important; }
             .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
             .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
             #grid-container { grid-template-columns: 1fr !important; }
             
             input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
-            #r-header { font-size: 1.5rem !important; }
+            #h-header { font-size: 1.8rem !important; }
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
         }
     </style>
@@ -217,39 +234,76 @@
     </div>
 
     <nav id="main-nav">
-        <button onclick="tab('predict', this)" class="active-nav">Predict</button>
+        <button onclick="tab('home', this)" class="active-nav">Home</button>
+        <button onclick="tab('predict', this)">Predict</button>
         <button onclick="tab('live', this)">Live</button>
         <button onclick="tab('standings', this)">Standings</button>
         <button onclick="tab('calendar', this)">📅 Calendar</button>
         <button onclick="tab('grid', this)">🏎️ The Grid</button>
         <button onclick="tab('rules', this)">📜 Rules</button>
         <button onclick="tab('archive', this)">🏆 Archive</button>
-        <button onclick="showSupportModal()" class="btn-support">☕ Support</button>
         <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">📲 Install App</button>
     </nav>
 </header>
 
 <main>
-    <div id="predict" class="tab active">
-        <div id="dash-container" style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 30px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
-            
+    <div id="home" class="tab active">
+        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
             <div style="flex: 1; min-width: 250px;">
-                <p id="r-round" style="color: var(--red); font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
-                <h2 id="r-header" style="margin: 0 0 10px 0; font-size: 2.2rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
-                <p id="r-record" style="margin: 0; color: var(--text-muted); font-size: 1rem;"><div class="skeleton" style="width: 40%; margin-top: 10px;"></div></p>
-                
-                <div id="r-deadline" style="margin: 15px 0 0 0; font-size: 1.05rem;"><div class="skeleton" style="width: 50%; height: 20px; margin-top: 10px;"></div></div>
+                <p id="h-round" style="color: var(--red); font-weight: 900; font-size: 1.1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
+                <h2 id="h-header" style="margin: 0 0 10px 0; font-size: 2.5rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
+                <div id="h-deadline" style="margin: 15px 0 0 0; font-size: 1.1rem;"><div class="skeleton" style="width: 50%; height: 20px; margin-top: 10px;"></div></div>
+            </div>
+            
+            <div style="display: flex; align-items: center;">
+                <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 20px 40px; font-size: 1.3rem;">🎯 Lock Strategy</button>
+            </div>
+        </div>
+
+        <div class="dash-grid">
+            <div style="display: flex; flex-direction: column; gap: 25px;">
+                <div class="dash-card">
+                    <h3 class="dash-card-title">Circuit Intelligence</h3>
+                    <div id="h-track-intel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 1.05rem; line-height: 1.6;">
+                        <div class="skeleton" style="width: 80%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 70%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 90%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 60%; height: 20px;"></div>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <h3 class="dash-card-title">Live Track Conditions</h3>
+                    <div id="weather-widget">
+                        <div class="skeleton" style="width: 80%; height: 25px; margin-bottom: 8px;"></div>
+                        <div class="skeleton" style="width: 60%; height: 15px;"></div>
+                    </div>
+                </div>
             </div>
 
-            <div style="background: var(--surface-inner); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 220px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);">
-                <h4 style="margin:0 0 12px 0; color:var(--text-main); text-transform:uppercase; font-size:0.85rem; letter-spacing:1px; border-bottom:1px solid var(--border); padding-bottom:6px;">Live Track Conditions</h4>
-                <div id="weather-widget">
-                    <div class="skeleton" style="width: 80%; height: 25px; margin-bottom: 8px;"></div>
-                    <div class="skeleton" style="width: 60%; height: 15px;"></div>
+            <div class="dash-card" style="border-top: 4px solid var(--gold);">
+                <h3 class="dash-card-title" style="color: var(--gold); border-bottom-color: rgba(197, 155, 39, 0.3);">Championship Leaders</h3>
+                <div id="h-top-3" class="podium-list">
+                    <div class="skeleton" style="width: 100%; height: 50px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 50px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 50px;"></div>
+                </div>
+                <div style="margin-top: 15px; text-align: center;">
+                    <a href="#" onclick="tab('standings', document.querySelectorAll('#main-nav button')[3])" style="color: var(--text-muted); text-decoration: none; font-weight: 700; font-size: 0.9rem; text-transform: uppercase;">View Full Standings →</a>
                 </div>
             </div>
         </div>
 
+        <div class="dash-card">
+            <h3 class="dash-card-title" style="color: var(--text-main);">📰 Latest Paddock News</h3>
+            <div id="news-feed">
+                <div class="skeleton" style="width: 100%; height: 80px; margin-bottom: 10px;"></div>
+                <div class="skeleton" style="width: 100%; height: 80px; margin-bottom: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="predict" class="tab">
         <div id="locked-msg" class="hidden" style="background:rgba(225,6,0,0.05); border: 2px solid var(--red); padding:20px; text-align:center; font-weight: 900; border-radius: 8px; margin-bottom: 25px; letter-spacing: 1px; color: var(--red);">🚫 PARC FERMÉ: PREDICTIONS LOCKED</div>
         
         <form id="p-form">
@@ -311,28 +365,14 @@
         
         <div id="admin-panel" class="hidden" style="margin-top:40px; border:2px solid var(--red); padding:30px; background:rgba(225,6,0,0.05); border-radius:12px; text-align: center;">
             <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0; font-size: 1.5rem;">⚠️ STEWARDS CONTROL</h3>
-            <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">🏁 Finalize Race Weekend</button>
-            <button onclick="resetStory()" style="background:var(--surface-inner); color:var(--text-main); border:1px solid var(--border); padding:12px 20px; border-radius:8px; cursor:pointer; font-family: 'Titillium Web'; font-weight:bold; transition: all 0.2s; width: 100%; margin-bottom: 30px; font-size: 1rem;">🧹 Clear AI Story (Pre-Season Reset)</button>
-
+            <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">🏁 Finalize Race Weekend</button>
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
-            <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
-                </div>
+            <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;"></div>
         </div>
     </div>
 
     <div id="standings" class="tab">
         <h2 class="section-title">2026 World Championship</h2>
-        
-        <div style="background: linear-gradient(135deg, #15151e 0%, #2b2b36 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid var(--red); box-shadow: 0 8px 20px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
-            <div style="position: absolute; top: -10px; right: -10px; font-size: 5rem; opacity: 0.05;">🎙️</div>
-            <h3 style="margin: 0 0 15px 0; color: var(--red); text-transform: uppercase; letter-spacing: 2px; font-size: 1.1rem; font-weight: 900;">Paddock Post-Race Analysis</h3>
-            <div id="dts-storyline" style="font-family: serif; font-size: 1.05rem; line-height: 1.6; font-style: italic; color: #d1d1d6;">
-                <div class="skeleton" style="width:100%; height:15px; margin-bottom:10px;"></div>
-                <div class="skeleton" style="width:90%; height:15px; margin-bottom:10px;"></div>
-                <div class="skeleton" style="width:60%; height:15px;"></div>
-            </div>
-        </div>
-
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -389,12 +429,7 @@
             <div class="table-wrapper" style="margin: 0; box-shadow: none; border: none; border-radius: 0;">
                 <table>
                     <thead>
-                        <tr>
-                            <th style="width: 10%; text-align: center;">Pos</th>
-                            <th style="width: 45%;">Driver</th>
-                            <th>Team</th>
-                            <th style="width: 15%; text-align: right;">Pts</th>
-                        </tr>
+                        <tr><th style="width: 10%; text-align: center;">Pos</th><th style="width: 45%;">Driver</th><th>Team</th><th style="width: 15%; text-align: right;">Pts</th></tr>
                     </thead>
                     <tbody>
                         <tr><td style="text-align:center; font-weight:900; color: #c59b27;">1</td><td style="font-weight: 700; color: var(--text-main); border-left: 4px solid #FF8000;">Lando Norris</td><td style="color: var(--text-muted);">McLaren</td><td style="text-align:right; font-weight:900; font-size: 1.1rem;">423</td></tr>
@@ -503,11 +538,10 @@
 
     function start() { 
         checkAdm(); 
-        loadRace(); 
-        loadBoard(); 
+        loadHomeData(); 
         buildGridTab(); 
         
-        const savedTab = localStorage.getItem('f1_active_tab') || 'predict';
+        const savedTab = localStorage.getItem('f1_active_tab') || 'home';
         tab(savedTab); 
     }
 
@@ -576,52 +610,90 @@
         }
     }
 
-    async function fetchWeather(locationQuery) {
-        try {
-            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1`);
-            const geoData = await geoRes.json();
-            if(!geoData.results || geoData.results.length === 0) throw new Error("Location not found");
-            const { latitude, longitude } = geoData.results[0];
-
-            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,weather_code,wind_speed_10m`);
-            const wData = await weatherRes.json();
-            const curr = wData.current;
-
-            const code = curr.weather_code;
-            let icon = '☁️';
-            if(code === 0) icon = '☀️';
-            else if(code > 0 && code < 4) icon = '⛅';
-            else if(code >= 51 && code <= 67) icon = '🌧️';
-            else if(code >= 71 && code <= 77) icon = '❄️';
-            else if(code >= 95) icon = '⛈️';
-
-            document.getElementById('weather-widget').innerHTML = `
-                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${icon} ${curr.temperature_2m}°C</div>
-                <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
-            `;
-        } catch(e) {
-            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Radar offline.</span>";
-        }
-    }
-
-    async function loadRace() {
+    async function loadHomeData() {
         try {
             // CACHE BUSTER ADDED TO FETCH
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
-            document.getElementById('r-round').innerText = `Round ${r.round} of 24`;
-            document.getElementById('r-header').innerText = `${r.circuit}, ${r.country}`;
-            document.getElementById('r-record').innerHTML = `⏱️ <b>Lap Record:</b> ${r.record || 'No record available'}`;
+            document.getElementById('h-round').innerText = `Round ${r.round} of 24`;
+            document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
             
+            if(r.trackDetails) {
+                document.getElementById('h-track-intel').innerHTML = `
+                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Track Length</span><b style="color:var(--text-main);">${r.trackDetails.length}</b></div>
+                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Race Laps</span><b style="color:var(--text-main);">${r.trackDetails.laps}</b></div>
+                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Corners</span><b style="color:var(--text-main);">${r.trackDetails.corners}</b></div>
+                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">First GP</span><b style="color:var(--text-main);">${r.trackDetails.firstGP}</b></div>
+                    <div style="grid-column: 1 / -1;"><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Lap Record</span><b style="color:var(--text-main);">${r.trackDetails.record}</b></div>
+                `;
+            }
+
             if (r.lockTime) {
                 raceLock = new Date(r.lockTime);
                 const dlFormat = raceLock.toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                document.getElementById('r-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
+                document.getElementById('h-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
             } else {
-                document.getElementById('r-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
+                document.getElementById('h-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
             }
             
-            fetchWeather(r.country);
-            
+            if (raceLock && new Date() >= raceLock) {
+                document.getElementById('p-form').style.display = 'none';
+                document.getElementById('locked-msg').classList.remove('hidden');
+            }
+
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(r.country)}&count=1`);
+            const geoData = await geoRes.json();
+            if(geoData.results) {
+                const { latitude, longitude } = geoData.results[0];
+                const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,weather_code,wind_speed_10m`);
+                const wData = await weatherRes.json();
+                const curr = wData.current;
+
+                const code = curr.weather_code;
+                let icon = '☁️';
+                if(code === 0) icon = '☀️';
+                else if(code > 0 && code < 4) icon = '⛅';
+                else if(code >= 51 && code <= 67) icon = '🌧️';
+                else if(code >= 71 && code <= 77) icon = '❄️';
+                else if(code >= 95) icon = '⛈️';
+
+                document.getElementById('weather-widget').innerHTML = `
+                    <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${icon} ${curr.temperature_2m}°C</div>
+                    <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
+                `;
+            }
+
+            const d = await fetch('/api/season-leaderboard?t=' + new Date().getTime()).then(res=>res.json());
+            const podiumUI = document.getElementById('h-top-3');
+            if (d.length === 0) { 
+                podiumUI.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">No telemetry data available yet.</div>'; 
+            } else {
+                const top3 = d.slice(0, 3);
+                podiumUI.innerHTML = top3.map((x, i) => `
+                    <div class="podium-item podium-${i+1}">
+                        <span><span style="display:inline-block; width: 25px; color: ${i===0?'#c59b27':i===1?'#999999':'#b87333'};">${i+1}.</span> <span style="color:var(--text-main);">${x.name}</span></span>
+                        <span style="color:var(--text-main);">${x.total_score} pts</span>
+                    </div>
+                `).join('');
+            }
+
+            // Real RSS News Integration
+            const rssUrl = 'https://api.rss2json.com/v1/api.json?rss_url=https://www.motorsport.com/rss/f1/news/';
+            const newsRes = await fetch(rssUrl).then(res=>res.json());
+            if(newsRes.status === 'ok' && newsRes.items) {
+                const items = newsRes.items.slice(0, 4);
+                document.getElementById('news-feed').innerHTML = items.map(n => `
+                    <div class="news-item">
+                        <img src="${n.thumbnail || n.enclosure || 'https://via.placeholder.com/80'}" alt="News" onerror="this.src='https://via.placeholder.com/80?text=F1'">
+                        <div class="news-item-content">
+                            <h4><a href="${n.link}" target="_blank">${n.title}</a></h4>
+                            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">${new Date(n.pubDate).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                document.getElementById('news-feed').innerHTML = '<div style="color: var(--text-muted);">Paddock news feed currently offline.</div>'; 
+            }
+
             if (r.hasSprint) { 
                 document.getElementById('sprint-box').classList.remove('hidden');
                 document.getElementById('sg').required = true;
@@ -631,12 +703,8 @@
                 document.getElementById('sg').required = false;
                 document.getElementById('sl').required = false;
             }
-            
-            if (raceLock && new Date() >= raceLock) {
-                document.getElementById('p-form').style.display = 'none';
-                document.getElementById('locked-msg').classList.remove('hidden');
-            }
-        } catch (e) { showToast("Failed to load circuit telemetry.", "error"); }
+
+        } catch (e) { showToast("Telemetry sync failed.", "error"); }
     }
 
     function tab(t, btnElement) {
@@ -663,7 +731,6 @@
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
-        // CACHE BUSTER ADDED TO FETCH
         const d = await fetch('/api/predictions?t=' + new Date().getTime()).then(r=>r.json());
         
         if (d.length === 0) { 
@@ -707,18 +774,10 @@
     }
 
     async function loadBoard() {
-        try {
-            // CACHE BUSTER ADDED TO FETCH
-            const storyRes = await fetch('/api/storyline?t=' + new Date().getTime()).then(r=>r.json());
-            const formattedStory = storyRes.story.replace(/\n/g, '<br>');
-            document.getElementById('dts-storyline').innerHTML = formattedStory;
-        } catch(e) {}
-
         const board = document.getElementById('leaderboard');
         const skel = `<tr><td><div class="skeleton" style="width:30px;"></div></td><td><div class="skeleton" style="width:150px;"></div></td><td><div class="skeleton" style="width:40px; float:right;"></div></td></tr>`;
         board.innerHTML = skel.repeat(5);
         
-        // CACHE BUSTER ADDED TO FETCH
         const d = await fetch('/api/season-leaderboard?t=' + new Date().getTime()).then(r=>r.json());
         if (d.length === 0) { board.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color: var(--text-muted);">No telemetry data available yet.</td></tr>'; } 
         else {
@@ -735,7 +794,6 @@
         const body = document.getElementById('cal-body');
         body.innerHTML = `<tr><td colspan="2"><div class="skeleton" style="width:100%; height:40px; margin-bottom:10px;"></div><div class="skeleton" style="width:100%; height:40px;"></div></td></tr>`;
         
-        // CACHE BUSTER ADDED TO FETCH
         const d = await fetch('/api/calendar?t=' + new Date().getTime()).then(r=>r.json());
         body.innerHTML = d.map(x => {
             const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
@@ -870,7 +928,6 @@
 
     async function loadAdminUserList() {
         try {
-            // CACHE BUSTER ADDED TO FETCH
             const resp = await fetch(`/api/admin/users?user=${encodeURIComponent(user.name)}&pass=${encodeURIComponent(user.password)}&t=` + new Date().getTime());
             if(!resp.ok) return;
             const users = await resp.json();
@@ -922,18 +979,6 @@
             loadAdminUserList();
             showToast(`${targetUser} has been reset to 0 points.`, 'success');
         } catch (e) { showToast('Error resetting user', 'error'); }
-    }
-
-    async function resetStory() {
-        if(!confirm('⚠️ Are you sure you want to wipe the current AI story and reset it to the default pre-season message?')) return;
-        try {
-            await fetch('/api/admin/reset-story', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminUser: user.name, adminPass: user.password })
-            });
-            showToast(`AI Story has been cleared.`, 'success');
-            setTimeout(() => location.reload(), 1500);
-        } catch (e) { showToast('Error resetting story', 'error'); }
     }
 
     let deferredPrompt;

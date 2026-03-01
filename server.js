@@ -1,10 +1,6 @@
 const express = require('express');
 const { createClient } = require('@libsql/client');
 const path = require('path');
-const { OpenAI } = require('openai');
-
-// Initialize OpenAI
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -36,43 +32,38 @@ async function setupDatabase() {
         w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
     
-    await db.execute(`CREATE TABLE IF NOT EXISTS league_story (id INTEGER PRIMARY KEY, narrative TEXT)`);
-    try {
-        await db.execute("INSERT INTO league_story (id, narrative) VALUES (1, 'The 2026 season is about to begin. The paddock is silent, but the tension between the strategists is already palpable.') ON CONFLICT(id) DO NOTHING");
-        await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
-        console.log("✅ Admin & Story Engine Ready.");
-    } catch (e) {}
+    await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
     console.log("✅ Database Synced.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
 
-// --- 2. FULL 2026 CALENDAR ---
+// --- 2. FULL 2026 CALENDAR (ENRICHED WITH CIRCUIT INTEL) ---
 const f1Calendar2026 = [
-  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-06T07:00:00+05:30", circuit: "Albert Park Circuit", country: "Australia", record: "Charles Leclerc (Ferrari) - 1:19.813 (2024)", sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
-  { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-13T09:00:00+05:30", circuit: "Shanghai International Circuit", country: "China", record: "Michael Schumacher (Ferrari) - 1:32.238 (2004)", sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
-  { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-27T08:00:00+05:30", circuit: "Suzuka International Racing Course", country: "Japan", record: "Lewis Hamilton (Mercedes) - 1:30.983 (2019)", sessions: { fp1: "2026-03-27T08:00:00+05:30", fp2: "2026-03-27T11:30:00+05:30", fp3: "2026-03-28T08:00:00+05:30", quali: "2026-03-28T11:30:00+05:30", race: "2026-03-29T10:30:00+05:30" } },
-  { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-10T17:00:00+05:30", circuit: "Bahrain International Circuit", country: "Bahrain", record: "Pedro de la Rosa (McLaren) - 1:31.447 (2005)", sessions: { fp1: "2026-04-10T17:00:00+05:30", fp2: "2026-04-10T20:30:00+05:30", fp3: "2026-04-11T17:30:00+05:30", quali: "2026-04-11T21:30:00+05:30", race: "2026-04-12T20:30:00+05:30" } },
-  { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-17T19:00:00+05:30", circuit: "Jeddah Corniche Circuit", country: "Saudi Arabia", record: "Lewis Hamilton (Mercedes) - 1:30.734 (2021)", sessions: { fp1: "2026-04-17T19:00:00+05:30", fp2: "2026-04-17T22:30:00+05:30", fp3: "2026-04-18T19:00:00+05:30", quali: "2026-04-18T22:30:00+05:30", race: "2026-04-19T22:30:00+05:30" } },
-  { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-01T22:00:00+05:30", circuit: "Miami International Autodrome", country: "United States", record: "Max Verstappen (Red Bull) - 1:29.708 (2023)", sessions: { fp1: "2026-05-01T22:00:00+05:30", sprintQuali: "2026-05-02T02:00:00+05:30", sprint: "2026-05-02T21:30:00+05:30", quali: "2026-05-03T01:30:00+05:30", race: "2026-05-04T01:30:00+05:30" } },
-  { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-22T23:00:00+05:30", circuit: "Circuit Gilles-Villeneuve", country: "Canada", record: "Valtteri Bottas (Mercedes) - 1:13.078 (2019)", sessions: { fp1: "2026-05-22T23:00:00+05:30", sprintQuali: "2026-05-23T03:00:00+05:30", sprint: "2026-05-23T21:30:00+05:30", quali: "2026-05-24T01:30:00+05:30", race: "2026-05-24T23:30:00+05:30" } },
-  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-05T17:00:00+05:30", circuit: "Circuit de Monaco", country: "Monaco", record: "Lewis Hamilton (Mercedes) - 1:12.909 (2021)", sessions: { fp1: "2026-06-05T17:00:00+05:30", fp2: "2026-06-05T20:30:00+05:30", fp3: "2026-06-06T16:00:00+05:30", quali: "2026-06-06T19:30:00+05:30", race: "2026-06-07T18:30:00+05:30" } },
-  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-12T17:00:00+05:30", circuit: "Circuit de Barcelona-Catalunya", country: "Spain", record: "Oscar Piastri (McLaren) - 1:15.743 (2025)", sessions: { fp1: "2026-06-12T17:00:00+05:30", fp2: "2026-06-12T20:30:00+05:30", fp3: "2026-06-13T16:00:00+05:30", quali: "2026-06-13T19:30:00+05:30", race: "2026-06-14T18:30:00+05:30" } },
-  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-26T16:00:00+05:30", circuit: "Red Bull Ring", country: "Austria", record: "Carlos Sainz (McLaren) - 1:05.619 (2020)", sessions: { fp1: "2026-06-26T16:00:00+05:30", fp2: "2026-06-26T19:30:00+05:30", fp3: "2026-06-27T16:00:00+05:30", quali: "2026-06-27T19:30:00+05:30", race: "2026-06-28T18:30:00+05:30" } },
-  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-03T17:00:00+05:30", circuit: "Silverstone Circuit", country: "Great Britain", record: "Max Verstappen (Red Bull) - 1:27.097 (2020)", sessions: { fp1: "2026-07-03T17:00:00+05:30", sprintQuali: "2026-07-03T21:00:00+05:30", sprint: "2026-07-04T16:30:00+05:30", quali: "2026-07-04T20:30:00+05:30", race: "2026-07-05T19:30:00+05:30" } },
-  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-17T17:00:00+05:30", circuit: "Circuit de Spa-Francorchamps", country: "Belgium", record: "Valtteri Bottas (Mercedes) - 1:46.286 (2018)", sessions: { fp1: "2026-07-17T17:00:00+05:30", fp2: "2026-07-17T20:30:00+05:30", fp3: "2026-07-18T16:00:00+05:30", quali: "2026-07-18T19:30:00+05:30", race: "2026-07-19T18:30:00+05:30" } },
-  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-24T17:00:00+05:30", circuit: "Hungaroring", country: "Hungary", record: "Lewis Hamilton (Mercedes) - 1:16.627 (2020)", sessions: { fp1: "2026-07-24T17:00:00+05:30", fp2: "2026-07-24T20:30:00+05:30", fp3: "2026-07-25T16:00:00+05:30", quali: "2026-07-25T19:30:00+05:30", race: "2026-07-26T18:30:00+05:30" } },
-  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-21T16:00:00+05:30", circuit: "Circuit Zandvoort", country: "Netherlands", record: "Lewis Hamilton (Mercedes) - 1:11.097 (2021)", sessions: { fp1: "2026-08-21T16:00:00+05:30", sprintQuali: "2026-08-21T20:00:00+05:30", sprint: "2026-08-22T15:30:00+05:30", quali: "2026-08-22T19:30:00+05:30", race: "2026-08-23T18:30:00+05:30" } },
-  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-04T17:00:00+05:30", circuit: "Autodromo Nazionale Monza", country: "Italy", record: "Lando Norris (McLaren) - 1:20.901 (2025)", sessions: { fp1: "2026-09-04T17:00:00+05:30", fp2: "2026-09-04T20:30:00+05:30", fp3: "2026-09-05T16:00:00+05:30", quali: "2026-09-05T19:30:00+05:30", race: "2026-09-06T18:30:00+05:30" } },
-  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-11T17:00:00+05:30", circuit: "IFEMA Madrid", country: "Spain", record: "NEW CIRCUIT - No record set", sessions: { fp1: "2026-09-11T17:00:00+05:30", fp2: "2026-09-11T20:30:00+05:30", fp3: "2026-09-12T16:00:00+05:30", quali: "2026-09-12T19:30:00+05:30", race: "2026-09-13T18:30:00+05:30" } },
-  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-25T15:00:00+05:30", circuit: "Baku City Circuit", country: "Azerbaijan", record: "Charles Leclerc (Ferrari) - 1:43.009 (2019)", sessions: { fp1: "2026-09-25T15:00:00+05:30", fp2: "2026-09-25T18:30:00+05:30", fp3: "2026-09-26T15:00:00+05:30", quali: "2026-09-26T18:30:00+05:30", race: "2026-09-27T16:30:00+05:30" } },
-  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-09T15:00:00+05:30", circuit: "Marina Bay Street Circuit", country: "Singapore", record: "Daniel Ricciardo (RB) - 1:34.486 (2024)", sessions: { fp1: "2026-10-09T15:00:00+05:30", sprintQuali: "2026-10-09T19:00:00+05:30", sprint: "2026-10-10T15:00:00+05:30", quali: "2026-10-10T19:00:00+05:30", race: "2026-10-11T17:30:00+05:30" } },
-  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-23T23:00:00+05:30", circuit: "Circuit of The Americas", country: "United States", record: "Charles Leclerc (Ferrari) - 1:36.169 (2019)", sessions: { fp1: "2026-10-23T23:00:00+05:30", fp2: "2026-10-24T03:00:00+05:30", fp3: "2026-10-24T23:30:00+05:30", quali: "2026-10-25T03:30:00+05:30", race: "2026-10-26T00:30:00+05:30" } },
-  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-10-31T00:30:00+05:30", circuit: "Autódromo Hermanos Rodríguez", country: "Mexico", record: "Valtteri Bottas (Mercedes) - 1:17.774 (2021)", sessions: { fp1: "2026-10-31T00:30:00+05:30", fp2: "2026-10-31T04:00:00+05:30", fp3: "2026-10-31T23:00:00+05:30", quali: "2026-11-01T02:30:00+05:30", race: "2026-11-02T01:30:00+05:30" } },
-  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-06T20:00:00+05:30", circuit: "Autódromo José Carlos Pace", country: "Brazil", record: "Valtteri Bottas (Mercedes) - 1:10.540 (2018)", sessions: { fp1: "2026-11-06T20:00:00+05:30", fp2: "2026-11-06T23:30:00+05:30", fp3: "2026-11-07T19:00:00+05:30", quali: "2026-11-07T23:00:00+05:30", race: "2026-11-08T22:30:00+05:30" } },
-  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-20T08:00:00+05:30", circuit: "Las Vegas Strip Circuit", country: "United States", record: "Oscar Piastri (McLaren) - 1:35.490 (2023)", sessions: { fp1: "2026-11-20T08:00:00+05:30", fp2: "2026-11-20T11:30:00+05:30", fp3: "2026-11-21T08:00:00+05:30", quali: "2026-11-21T11:30:00+05:30", race: "2026-11-22T11:30:00+05:30" } },
-  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-27T19:00:00+05:30", circuit: "Lusail International Circuit", country: "Qatar", record: "Max Verstappen (Red Bull) - 1:24.319 (2023)", sessions: { fp1: "2026-11-27T19:00:00+05:30", fp2: "2026-11-27T22:30:00+05:30", fp3: "2026-11-28T18:30:00+05:30", quali: "2026-11-28T22:30:00+05:30", race: "2026-11-29T22:30:00+05:30" } },
-  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-04T15:00:00+05:30", circuit: "Yas Marina Circuit", country: "United Arab Emirates", record: "Max Verstappen (Red Bull) - 1:26.103 (2021)", sessions: { fp1: "2026-12-04T15:00:00+05:30", fp2: "2026-12-04T18:30:00+05:30", fp3: "2026-12-05T16:00:00+05:30", quali: "2026-12-05T19:30:00+05:30", race: "2026-12-06T18:30:00+05:30" } }
+  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-06T07:00:00+05:30", circuit: "Albert Park Circuit", country: "Australia", trackDetails: { length: "5.278 km", laps: 58, corners: 14, firstGP: 1996, record: "1:19.813" }, sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
+  { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-13T09:00:00+05:30", circuit: "Shanghai International Circuit", country: "China", trackDetails: { length: "5.451 km", laps: 56, corners: 16, firstGP: 2004, record: "1:32.238" }, sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
+  { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-27T08:00:00+05:30", circuit: "Suzuka International Racing Course", country: "Japan", trackDetails: { length: "5.807 km", laps: 53, corners: 18, firstGP: 1987, record: "1:30.983" }, sessions: { fp1: "2026-03-27T08:00:00+05:30", fp2: "2026-03-27T11:30:00+05:30", fp3: "2026-03-28T08:00:00+05:30", quali: "2026-03-28T11:30:00+05:30", race: "2026-03-29T10:30:00+05:30" } },
+  { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-10T17:00:00+05:30", circuit: "Bahrain International Circuit", country: "Bahrain", trackDetails: { length: "5.412 km", laps: 57, corners: 15, firstGP: 2004, record: "1:31.447" }, sessions: { fp1: "2026-04-10T17:00:00+05:30", fp2: "2026-04-10T20:30:00+05:30", fp3: "2026-04-11T17:30:00+05:30", quali: "2026-04-11T21:30:00+05:30", race: "2026-04-12T20:30:00+05:30" } },
+  { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-17T19:00:00+05:30", circuit: "Jeddah Corniche Circuit", country: "Saudi Arabia", trackDetails: { length: "6.174 km", laps: 50, corners: 27, firstGP: 2021, record: "1:30.734" }, sessions: { fp1: "2026-04-17T19:00:00+05:30", fp2: "2026-04-17T22:30:00+05:30", fp3: "2026-04-18T19:00:00+05:30", quali: "2026-04-18T22:30:00+05:30", race: "2026-04-19T22:30:00+05:30" } },
+  { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-01T22:00:00+05:30", circuit: "Miami International Autodrome", country: "United States", trackDetails: { length: "5.412 km", laps: 57, corners: 19, firstGP: 2022, record: "1:29.708" }, sessions: { fp1: "2026-05-01T22:00:00+05:30", sprintQuali: "2026-05-02T02:00:00+05:30", sprint: "2026-05-02T21:30:00+05:30", quali: "2026-05-03T01:30:00+05:30", race: "2026-05-04T01:30:00+05:30" } },
+  { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-22T23:00:00+05:30", circuit: "Circuit Gilles-Villeneuve", country: "Canada", trackDetails: { length: "4.361 km", laps: 70, corners: 14, firstGP: 1978, record: "1:13.078" }, sessions: { fp1: "2026-05-22T23:00:00+05:30", sprintQuali: "2026-05-23T03:00:00+05:30", sprint: "2026-05-23T21:30:00+05:30", quali: "2026-05-24T01:30:00+05:30", race: "2026-05-24T23:30:00+05:30" } },
+  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-05T17:00:00+05:30", circuit: "Circuit de Monaco", country: "Monaco", trackDetails: { length: "3.337 km", laps: 78, corners: 19, firstGP: 1950, record: "1:12.909" }, sessions: { fp1: "2026-06-05T17:00:00+05:30", fp2: "2026-06-05T20:30:00+05:30", fp3: "2026-06-06T16:00:00+05:30", quali: "2026-06-06T19:30:00+05:30", race: "2026-06-07T18:30:00+05:30" } },
+  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-12T17:00:00+05:30", circuit: "Circuit de Barcelona-Catalunya", country: "Spain", trackDetails: { length: "4.657 km", laps: 66, corners: 14, firstGP: 1991, record: "1:15.743" }, sessions: { fp1: "2026-06-12T17:00:00+05:30", fp2: "2026-06-12T20:30:00+05:30", fp3: "2026-06-13T16:00:00+05:30", quali: "2026-06-13T19:30:00+05:30", race: "2026-06-14T18:30:00+05:30" } },
+  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-26T16:00:00+05:30", circuit: "Red Bull Ring", country: "Austria", trackDetails: { length: "4.318 km", laps: 71, corners: 10, firstGP: 1970, record: "1:05.619" }, sessions: { fp1: "2026-06-26T16:00:00+05:30", fp2: "2026-06-26T19:30:00+05:30", fp3: "2026-06-27T16:00:00+05:30", quali: "2026-06-27T19:30:00+05:30", race: "2026-06-28T18:30:00+05:30" } },
+  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-03T17:00:00+05:30", circuit: "Silverstone Circuit", country: "Great Britain", trackDetails: { length: "5.891 km", laps: 52, corners: 18, firstGP: 1950, record: "1:27.097" }, sessions: { fp1: "2026-07-03T17:00:00+05:30", sprintQuali: "2026-07-03T21:00:00+05:30", sprint: "2026-07-04T16:30:00+05:30", quali: "2026-07-04T20:30:00+05:30", race: "2026-07-05T19:30:00+05:30" } },
+  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-17T17:00:00+05:30", circuit: "Circuit de Spa-Francorchamps", country: "Belgium", trackDetails: { length: "7.004 km", laps: 44, corners: 19, firstGP: 1950, record: "1:46.286" }, sessions: { fp1: "2026-07-17T17:00:00+05:30", fp2: "2026-07-17T20:30:00+05:30", fp3: "2026-07-18T16:00:00+05:30", quali: "2026-07-18T19:30:00+05:30", race: "2026-07-19T18:30:00+05:30" } },
+  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-24T17:00:00+05:30", circuit: "Hungaroring", country: "Hungary", trackDetails: { length: "4.381 km", laps: 70, corners: 14, firstGP: 1986, record: "1:16.627" }, sessions: { fp1: "2026-07-24T17:00:00+05:30", fp2: "2026-07-24T20:30:00+05:30", fp3: "2026-07-25T16:00:00+05:30", quali: "2026-07-25T19:30:00+05:30", race: "2026-07-26T18:30:00+05:30" } },
+  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-21T16:00:00+05:30", circuit: "Circuit Zandvoort", country: "Netherlands", trackDetails: { length: "4.259 km", laps: 72, corners: 14, firstGP: 1952, record: "1:11.097" }, sessions: { fp1: "2026-08-21T16:00:00+05:30", sprintQuali: "2026-08-21T20:00:00+05:30", sprint: "2026-08-22T15:30:00+05:30", quali: "2026-08-22T19:30:00+05:30", race: "2026-08-23T18:30:00+05:30" } },
+  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-04T17:00:00+05:30", circuit: "Autodromo Nazionale Monza", country: "Italy", trackDetails: { length: "5.793 km", laps: 53, corners: 11, firstGP: 1950, record: "1:20.901" }, sessions: { fp1: "2026-09-04T17:00:00+05:30", fp2: "2026-09-04T20:30:00+05:30", fp3: "2026-09-05T16:00:00+05:30", quali: "2026-09-05T19:30:00+05:30", race: "2026-09-06T18:30:00+05:30" } },
+  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-11T17:00:00+05:30", circuit: "IFEMA Madrid", country: "Spain", trackDetails: { length: "5.474 km", laps: 55, corners: 20, firstGP: 2026, record: "NEW CIRCUIT" }, sessions: { fp1: "2026-09-11T17:00:00+05:30", fp2: "2026-09-11T20:30:00+05:30", fp3: "2026-09-12T16:00:00+05:30", quali: "2026-09-12T19:30:00+05:30", race: "2026-09-13T18:30:00+05:30" } },
+  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-25T15:00:00+05:30", circuit: "Baku City Circuit", country: "Azerbaijan", trackDetails: { length: "6.003 km", laps: 51, corners: 20, firstGP: 2016, record: "1:43.009" }, sessions: { fp1: "2026-09-25T15:00:00+05:30", fp2: "2026-09-25T18:30:00+05:30", fp3: "2026-09-26T15:00:00+05:30", quali: "2026-09-26T18:30:00+05:30", race: "2026-09-27T16:30:00+05:30" } },
+  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-09T15:00:00+05:30", circuit: "Marina Bay Street Circuit", country: "Singapore", trackDetails: { length: "4.940 km", laps: 62, corners: 19, firstGP: 2008, record: "1:34.486" }, sessions: { fp1: "2026-10-09T15:00:00+05:30", sprintQuali: "2026-10-09T19:00:00+05:30", sprint: "2026-10-10T15:00:00+05:30", quali: "2026-10-10T19:00:00+05:30", race: "2026-10-11T17:30:00+05:30" } },
+  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-23T23:00:00+05:30", circuit: "Circuit of The Americas", country: "United States", trackDetails: { length: "5.513 km", laps: 56, corners: 20, firstGP: 2012, record: "1:36.169" }, sessions: { fp1: "2026-10-23T23:00:00+05:30", fp2: "2026-10-24T03:00:00+05:30", fp3: "2026-10-24T23:30:00+05:30", quali: "2026-10-25T03:30:00+05:30", race: "2026-10-26T00:30:00+05:30" } },
+  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-10-31T00:30:00+05:30", circuit: "Autódromo Hermanos Rodríguez", country: "Mexico", trackDetails: { length: "4.304 km", laps: 71, corners: 17, firstGP: 1963, record: "1:17.774" }, sessions: { fp1: "2026-10-31T00:30:00+05:30", fp2: "2026-10-31T04:00:00+05:30", fp3: "2026-10-31T23:00:00+05:30", quali: "2026-11-01T02:30:00+05:30", race: "2026-11-02T01:30:00+05:30" } },
+  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-06T20:00:00+05:30", circuit: "Autódromo José Carlos Pace", country: "Brazil", trackDetails: { length: "4.309 km", laps: 71, corners: 15, firstGP: 1973, record: "1:10.540" }, sessions: { fp1: "2026-11-06T20:00:00+05:30", fp2: "2026-11-06T23:30:00+05:30", fp3: "2026-11-07T19:00:00+05:30", quali: "2026-11-07T23:00:00+05:30", race: "2026-11-08T22:30:00+05:30" } },
+  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-20T08:00:00+05:30", circuit: "Las Vegas Strip Circuit", country: "United States", trackDetails: { length: "6.201 km", laps: 50, corners: 17, firstGP: 2023, record: "1:35.490" }, sessions: { fp1: "2026-11-20T08:00:00+05:30", fp2: "2026-11-20T11:30:00+05:30", fp3: "2026-11-21T08:00:00+05:30", quali: "2026-11-21T11:30:00+05:30", race: "2026-11-22T11:30:00+05:30" } },
+  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-27T19:00:00+05:30", circuit: "Lusail International Circuit", country: "Qatar", trackDetails: { length: "5.419 km", laps: 57, corners: 16, firstGP: 2021, record: "1:24.319" }, sessions: { fp1: "2026-11-27T19:00:00+05:30", fp2: "2026-11-27T22:30:00+05:30", fp3: "2026-11-28T18:30:00+05:30", quali: "2026-11-28T22:30:00+05:30", race: "2026-11-29T22:30:00+05:30" } },
+  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-04T15:00:00+05:30", circuit: "Yas Marina Circuit", country: "United Arab Emirates", trackDetails: { length: "5.281 km", laps: 58, corners: 16, firstGP: 2009, record: "1:26.103" }, sessions: { fp1: "2026-12-04T15:00:00+05:30", fp2: "2026-12-04T18:30:00+05:30", fp3: "2026-12-05T16:00:00+05:30", quali: "2026-12-05T19:30:00+05:30", race: "2026-12-06T18:30:00+05:30" } }
 ];
 
 // --- 3. HELPERS ---
@@ -193,7 +184,6 @@ async function performFinalization() {
     });
 
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
-    
     const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
     
     for (const d of activeDrivers) {
@@ -204,44 +194,7 @@ async function performFinalization() {
     }
 
     await db.execute("DELETE FROM f1_predictions_v2");
-    
-    // --- AI: RACE SUMMARY GENERATOR ---
-    try {
-        const standingsRow = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
-
-        const podium = `${results[0].Driver.familyName}, ${results[1].Driver.familyName}, ${results[2].Driver.familyName}`;
-        const dnfs = results.filter(r => r.positionText === 'R' || r.positionText === 'D').map(r => r.Driver.familyName).join(', ') || 'No DNFs';
-        const raceHighlights = `Podium: ${podium}. DNFs: ${dnfs}.`;
-
-        const playerPerformance = standingsRow.rows.map(r => {
-            let p = predictions.find(pred => pred.user_name === r.name);
-            let roundScore = scores[r.name] !== undefined ? scores[r.name] : penalty;
-            let pickedWinner = p ? p.p1 : 'Nobody';
-            return `${r.name}: ${r.total_score} total pts (+${roundScore} this race, predicted ${pickedWinner} to win)`;
-        }).join(' | ');
-
-        const prompt = `You are an expert F1 pundit providing a post-race summary for a private F1 prediction league. 
-        The real-world "${raceData.raceName}" just finished. 
-        Real Race Events: ${raceHighlights}
-        Player Predictions & Performance: ${playerPerformance}
-        
-        Write a strictly 1-paragraph Race Summary that perfectly marries the real-world track events with our players' predictions. Explain how the actual podium or unexpected DNFs directly impacted the players' scores this weekend based on who they predicted to win. Analyze which players made brilliant strategic calls and whose predictions were ruined by the race results. Keep it engaging, analytical, and use proper F1 terminology. Do not exceed 1 paragraph.`;
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 250, 
-            temperature: 0.8
-        });
-        
-        const newStory = completion.choices[0].message.content;
-        await db.execute({ sql: "UPDATE league_story SET narrative = ? WHERE id = 1", args: [newStory] });
-        await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!**\n\n🎙️ **Paddock Post-Race Analysis:**\n${newStory}`);
-    } catch (aiErr) {
-        console.error("Story Gen Error:", aiErr);
-        await sendDiscordNotification(`🏁 The **${raceData.raceName}** has been finalized! Points updated.`);
-    }
-    
+    await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!** Points have been officially updated on the Standings board.`);
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
 }
@@ -249,6 +202,7 @@ async function performFinalization() {
 // --- 5. CORE ROUTES ---
 app.get('/api/next-race', (req, res) => {
     const now = new Date();
+    // Safety Buffer: Keep current round on screen until 4 hours AFTER the race starts
     const next = f1Calendar2026.find(r => {
         const raceEndBuffer = new Date(r.sessions.race);
         raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
@@ -324,13 +278,6 @@ app.get('/api/season-leaderboard', async (req, res) => {
     res.json(r.rows);
 });
 
-app.get('/api/storyline', async (req, res) => {
-    try {
-        const r = await db.execute("SELECT narrative FROM league_story WHERE id = 1");
-        res.json({ story: r.rows.length > 0 ? r.rows[0].narrative : "The paddock awaits..." });
-    } catch (e) { res.status(500).json({ story: "Telemetry unavailable." }); }
-});
-
 // --- 6. ADMIN ROUTES ---
 app.get('/api/admin/users', async (req, res) => {
   const { user, pass } = req.query;
@@ -357,16 +304,6 @@ app.post('/api/admin/reset-user', async (req, res) => {
       await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [targetUser] });
       res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// NEW: Global Story Reset Endpoint
-app.post('/api/admin/reset-story', async (req, res) => {
-    const { adminUser, adminPass } = req.body;
-    if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-    try {
-        await db.execute("UPDATE league_story SET narrative = 'The 2026 season is about to begin. The paddock is silent, but the tension between the strategists is already palpable.' WHERE id = 1");
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- 7. AUTOMATED CRON JOB ---
