@@ -1,40 +1,37 @@
 const express = require('express');
 const { createClient } = require('@libsql/client');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'))); 
 
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN
-});
+const db = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
 
 // --- 1. DATABASE SETUP ---
 async function setupDatabase() {
   try {
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
-    
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, auth_id TEXT UNIQUE, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
+    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN auth_id TEXT UNIQUE`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
-
-    // Bumped to v3 to handle the 22-car grid
+    
+    // P21 and P22 for the 22-car grid
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v3 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        user_name TEXT UNIQUE, 
-        p1 TEXT, p2 TEXT, p3 TEXT, 
-        p11 TEXT, p12 TEXT, 
-        p21 TEXT, p22 TEXT, 
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT UNIQUE, 
+        p1 TEXT, p2 TEXT, p3 TEXT, p11 TEXT, p12 TEXT, p21 TEXT, p22 TEXT, 
         c1 TEXT, c2 TEXT, c5 TEXT, c6 TEXT, c10 TEXT, 
-        w_race_loser TEXT, 
-        w_sprint_gainer TEXT, w_sprint_loser TEXT
+        w_race_loser TEXT, w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
     
-    await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
-    console.log("✅ Database Synced for 22-Car Grid (Standard Auth).");
+    await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
+    console.log("✅ Database Synced for Google OAuth & 22-Car Grid.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -85,18 +82,54 @@ function normalizeConstructor(c) {
   return l;
 }
 
-async function sendDiscordNotification(msg) {
-  const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
-  try {
-      await fetch(url, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) 
-      });
-  } catch (e) { console.error("Discord Error:", e); }
+// --- 4. JWT MIDDLEWARE ---
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: "Invalid Token" });
+    req.user = user;
+    next();
+  });
 }
 
-// --- 4. SCORING ENGINE ---
+// --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
+app.get('/auth/google', (req, res) => {
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email`;
+    res.redirect(url);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+    try {
+        const { code } = req.query;
+        const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            code, grant_type: 'authorization_code', redirect_uri: `${APP_URL}/auth/google/callback`
+        });
+        
+        const userResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
+        });
+        
+        const googleUser = userResponse.data;
+        
+        // Upsert User
+        await db.execute({ sql: `INSERT INTO f1_drivers (name, auth_id) VALUES (?, ?) ON CONFLICT(auth_id) DO UPDATE SET name=excluded.name`, args: [googleUser.name, `google_${googleUser.id}`] });
+        
+        const token = jwt.sign({ name: googleUser.name, id: `google_${googleUser.id}` }, JWT_SECRET, { expiresIn: '30d' });
+        res.redirect(`/?token=${token}&name=${encodeURIComponent(googleUser.name)}`);
+    } catch (error) { res.redirect('/?error=oauth_failed'); }
+});
+
+
+// --- 6. SCORING ENGINE ---
+async function sendDiscordNotification(msg) {
+  const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
+  try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) }); } catch (e) {}
+}
+
 async function performFinalization() {
   try {
     const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
@@ -112,11 +145,7 @@ async function performFinalization() {
     results.forEach(r => {
         const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
         let pos = parseInt(r.position);
-        
-        // 🔴 FIX: Changed DNF penalty from 20 to 22!
-        if (r.positionText === 'R' || r.positionText === 'D' || r.status.startsWith('Retired') || r.status.startsWith('Collision') || r.status.startsWith('Accident')) {
-            pos = 22; 
-        }
+        if (r.positionText === 'R' || r.positionText === 'D' || r.status.startsWith('Retired') || r.status.startsWith('Collision') || r.status.startsWith('Accident')) { pos = 22; }
         actualDriverPositions[name] = pos;
     });
 
@@ -124,8 +153,6 @@ async function performFinalization() {
     results.forEach(r => {
       const c = normalizeConstructor(r.Constructor.name);
       let pos = parseInt(r.position);
-      
-       // 🔴 FIX: Changed constructor DNF penalty from 20 to 22!
        if (r.positionText === 'R' || r.positionText === 'D') pos = 22; 
       constructorSums[c] = (constructorSums[c] || 0) + pos;
     });
@@ -140,8 +167,6 @@ async function performFinalization() {
     results.forEach(r => {
        if (parseInt(r.grid) > 0) {
            let finish = parseInt(r.position);
-           
-           // 🔴 FIX: Changed wildcard DNF drop math from 20 to 22!
            if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
            const drop = finish - parseInt(r.grid);
            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
@@ -162,7 +187,6 @@ async function performFinalization() {
             return -diff;
         };
 
-        // 🔴 FIX: Database lookup now correctly scores p21 and p22 instead of p19 and p20!
         const driversToScore = [
             { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
             { pred: p.p11, rank: 11 }, { pred: p.p12, rank: 12 },
@@ -202,12 +226,12 @@ async function performFinalization() {
     }
 
     await db.execute("DELETE FROM f1_predictions_v3");
-    
+    await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!** Points have been officially updated on the Standings board.`);
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-// --- 5. CORE ROUTES ---
+// --- 7. SECURE ROUTES ---
 app.get('/api/next-race', (req, res) => {
   const now = new Date();
   const next = f1Calendar2026.find(r => {
@@ -222,10 +246,9 @@ app.get('/api/next-race', (req, res) => {
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
-app.post('/predict', async (req, res) => {
+app.post('/predict', authenticateToken, async (req, res) => {
   const d = req.body;
-  const auth = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [d.user_name, d.password] });
-  if (auth.rows.length === 0) return res.status(401).json({ success: false, message: "Login failed" });
+  const userName = req.user.name;
 
   const now = new Date();
   const currentRace = f1Calendar2026.find(r => {
@@ -248,31 +271,19 @@ app.post('/predict', async (req, res) => {
                 p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p11=excluded.p11, p12=excluded.p12, p21=excluded.p21, p22=excluded.p22, 
                 c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c10=excluded.c10, 
                 w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
-          args: [d.user_name, d.p1, d.p2, d.p3, d.p11, d.p12, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
+          args: [userName, d.p1, d.p2, d.p3, d.p11, d.p12, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
       });
       
-      await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [d.user_name] });
+      await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
       res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/finalize', async (req, res) => {
+  // Legacy admin bypass for manual control if needed
   if (req.body.user_name !== 'admin' || req.body.password !== 'Open@0761') return res.status(403).json({ success: false });
   const result = await performFinalization();
   res.status(result.success ? 200 : 400).json(result);
-});
-
-app.post('/register', async (req, res) => {
-  try { 
-      await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES (?, ?, 0, 0)", args: [req.body.name, req.body.password] }); 
-      res.json({ success: true, message: "Registered!" }); 
-  } catch (e) { res.status(400).json({ success: false, message: "Username Taken" }); }
-});
-
-app.post('/login', async (req, res) => {
-  const r = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? AND password = ?", args: [req.body.name, req.body.password] });
-  if (r.rows.length > 0) res.json({ success: true, driver: r.rows[0] });
-  else res.status(401).json({ success: false });
 });
 
 app.get('/api/predictions', async (req, res) => {
@@ -281,40 +292,11 @@ app.get('/api/predictions', async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-  const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+  const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC");
   res.json(r.rows);
 });
 
-// --- 6. ADMIN ROUTES ---
-app.get('/api/admin/users', async (req, res) => {
-const { user, pass } = req.query;
-if (user !== 'admin' || pass !== 'Open@0761') return res.status(403).send("Unauthorized");
-try {
-    const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY name ASC");
-    res.json(r.rows);
-} catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/toggle-vip', async (req, res) => {
-const { adminUser, adminPass, targetUser, vipStatus } = req.body;
-if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-try {
-    await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [vipStatus ? 1 : 0, targetUser] });
-    res.json({ success: true });
-} catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/reset-user', async (req, res) => {
-const { adminUser, adminPass, targetUser } = req.body;
-if (adminUser !== 'admin' || adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
-try {
-    await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [targetUser] });
-    res.json({ success: true });
-} catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// --- 7. AUTOMATED CRON JOB ---
-const APP_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
+// --- 8. AUTOMATED CRON JOB ---
 setInterval(async () => {
   const now = new Date();
   const active = f1Calendar2026.find(r => { 
@@ -327,4 +309,4 @@ setInterval(async () => {
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(port, () => console.log(`🏁 Server 3000`));
+app.listen(port, () => console.log(`🏁 Server 3000 (Google OAuth)`));
