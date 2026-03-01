@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 4.4 - Google OAuth Secured, Functions Retained
+        // Version 5.0 - True Code Retention + Google OAuth <a> Link
         (function() {
-            const currentVersion = "4.4"; 
+            const currentVersion = "5.0"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -110,6 +110,7 @@
         .dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
         .dash-card-title { font-size: 1.1rem; color: var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
 
+        /* News Widget */
         .news-item { display: flex; gap: 15px; border-bottom: 1px solid var(--border); padding: 15px 0; align-items: center;}
         .news-item:last-child { border-bottom: none; padding-bottom: 0; }
         .news-item img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; flex-shrink: 0;}
@@ -117,6 +118,7 @@
         .news-item-content a { color: var(--text-main); text-decoration: none; font-weight: 700; transition: color 0.2s;}
         .news-item-content a:hover { color: var(--red); }
         
+        /* Top 3 Podium */
         .podium-list { display: flex; flex-direction: column; gap: 10px; }
         .podium-item { display: flex; justify-content: space-between; padding: 15px; border-radius: 8px; background: var(--surface-inner); border-left: 4px solid var(--border); font-size: 1.1rem; font-weight: 700;}
         .podium-1 { border-color: #c59b27; background: rgba(197, 155, 39, 0.05); }
@@ -176,7 +178,38 @@
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
 
-        /* --- 7. MOBILE RESPONSIVENESS FIX --- */
+        /* --- 7. GOOGLE OAUTH UI STYLES --- */
+        .auth-backdrop { 
+            position:fixed; top:0; left:0; width:100%; height:100%; 
+            background: radial-gradient(circle at top, rgba(30,30,40,0.95) 0%, rgba(15,15,20,1) 100%); 
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            display:flex; justify-content:center; align-items:center; z-index:9999; 
+        }
+        .auth-card { 
+            background: #15151e; padding: 45px 35px; border-radius: 16px; width: 90%; max-width: 400px; 
+            border: 1px solid #333; box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); 
+            position: relative; overflow: hidden; animation: authSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
+            box-sizing: border-box; text-align: center;
+        }
+        .auth-card::before { 
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; 
+            background: linear-gradient(90deg, #e10600, #ff4d4d); 
+        }
+        .auth-header h1 { font-size: 2.4rem; color: #fff; margin: 0 0 8px 0; font-style: italic; letter-spacing: 1px; }
+        .auth-header h1 span { color: var(--red); }
+        .auth-header p { color: #888; font-size: 0.85rem; margin: 0 0 35px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+        
+        .btn-auth-google { 
+            background: #ffffff; color: #333; border: 1px solid #ddd; padding: 18px; width: 100%; 
+            font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; 
+            cursor: pointer; border-radius: 8px; font-size: 1.1rem; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;
+            text-decoration: none; box-sizing: border-box;
+        }
+        .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-2px); }
+
+        @keyframes authSlideUp { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
             header { padding: 15px 15px 0 15px !important; flex-direction: row !important; flex-wrap: wrap !important; }
             h1 { font-size: 1.4rem !important; margin: 0 !important; width: auto !important; flex: 1; }
@@ -202,37 +235,8 @@
             #h-header { font-size: 1.8rem !important; }
             .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
+            .auth-card { padding: 35px 25px; }
         }
-
-        /* --- 8. GOOGLE OAUTH MODAL UI --- */
-        .auth-backdrop { 
-            position:fixed; top:0; left:0; width:100%; height:100%; 
-            background: radial-gradient(circle at top, rgba(30,30,40,0.95) 0%, rgba(15,15,20,1) 100%); 
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            display:flex; justify-content:center; align-items:center; z-index:9999; 
-        }
-        .auth-card { 
-            background: #15151e; padding: 45px 35px; border-radius: 16px; width: 90%; max-width: 400px; 
-            border: 1px solid #333; box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05); 
-            position: relative; overflow: hidden; animation: authSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
-            box-sizing: border-box; text-align: center;
-        }
-        .auth-card::before { 
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; 
-            background: linear-gradient(90deg, #e10600, #ff4d4d); 
-        }
-        .auth-header h1 { font-size: 2.4rem; color: #fff; margin: 0 0 8px 0; font-style: italic; letter-spacing: 1px; }
-        .auth-header h1 span { color: var(--red); }
-        .auth-header p { color: #888; font-size: 0.85rem; margin: 0 0 35px 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
-        
-        .btn-auth-google { 
-            background: #ffffff; color: #333; border: 1px solid #ddd; padding: 18px; width: 100%; 
-            font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; 
-            cursor: pointer; border-radius: 8px; font-size: 1.1rem; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;
-        }
-        .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; }
-        
-        @keyframes authSlideUp { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
     </style>
 </head>
 <body>
@@ -400,6 +404,7 @@
 
     <div id="standings" class="tab">
         <h2 class="section-title">2026 World Championship</h2>
+        
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -510,10 +515,10 @@
             <p>Paddock Pass Required</p>
         </div>
         
-        <button onclick="window.location.href='/auth/google'" class="btn-auth-google">
+        <a href="/auth/google" class="btn-auth-google">
             <svg width="24" height="24" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             Sign in with Google
-        </button>
+        </a>
     </div>
 </div>
 
@@ -895,6 +900,7 @@
         }
 
         const body = {
+            user_name: f1_name,
             p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p21:val('p21'), p22:val('p22'),
             c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
             w_race_loser:val('wl'), w_sprint_gainer: val('sg'), w_sprint_loser: val('sl')
