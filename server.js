@@ -292,12 +292,14 @@ app.get('/api/season-leaderboard', async (req, res) => {
 });
 
 // --- 8. ADMIN ROUTES ---
+// --- 8. ADMIN ROUTES ---
 app.get('/api/admin/users', async (req, res) => {
-  if (req.query.pass !== 'Open@0761') return res.status(403).send("Unauthorized");
-  try {
-      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' ORDER BY name ASC");
-      res.json(r.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  if (req.query.pass !== 'Open@0761') return res.status(403).send("Unauthorized");
+  try {
+      // Added AND has_participated = 1
+      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
+      res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/toggle-vip', async (req, res) => {
   if (req.body.adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
