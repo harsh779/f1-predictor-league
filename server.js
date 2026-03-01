@@ -34,7 +34,7 @@ async function setupDatabase() {
     )`);
     
     await db.execute({ sql: "INSERT INTO f1_drivers (name, password, has_participated, is_vip) VALUES ('admin', 'Open@0761', 0, 1) ON CONFLICT(name) DO NOTHING" });
-    console.log("✅ Database Synced for 22-Car Grid.");
+    console.log("✅ Database Synced for 22-Car Grid (Standard Auth).");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -112,7 +112,8 @@ async function performFinalization() {
     results.forEach(r => {
         const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
         let pos = parseInt(r.position);
-        // DNF Rule changed to 22
+        
+        // 🔴 FIX: Changed DNF penalty from 20 to 22!
         if (r.positionText === 'R' || r.positionText === 'D' || r.status.startsWith('Retired') || r.status.startsWith('Collision') || r.status.startsWith('Accident')) {
             pos = 22; 
         }
@@ -123,7 +124,8 @@ async function performFinalization() {
     results.forEach(r => {
       const c = normalizeConstructor(r.Constructor.name);
       let pos = parseInt(r.position);
-       // DNF Rule changed to 22
+      
+       // 🔴 FIX: Changed constructor DNF penalty from 20 to 22!
        if (r.positionText === 'R' || r.positionText === 'D') pos = 22; 
       constructorSums[c] = (constructorSums[c] || 0) + pos;
     });
@@ -138,7 +140,8 @@ async function performFinalization() {
     results.forEach(r => {
        if (parseInt(r.grid) > 0) {
            let finish = parseInt(r.position);
-           // DNF Rule changed to 22
+           
+           // 🔴 FIX: Changed wildcard DNF drop math from 20 to 22!
            if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
            const drop = finish - parseInt(r.grid);
            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
@@ -159,7 +162,7 @@ async function performFinalization() {
             return -diff;
         };
 
-        // Added P21 and P22 to scoring matrix
+        // 🔴 FIX: Database lookup now correctly scores p21 and p22 instead of p19 and p20!
         const driversToScore = [
             { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
             { pred: p.p11, rank: 11 }, { pred: p.p12, rank: 12 },
