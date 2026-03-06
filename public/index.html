@@ -236,165 +236,28 @@
             .auth-card { padding: 35px 25px; }
         }
 
-        /* ── Live Timing Tab — card rows ──────────────────────────────── */
-        #timing-list { margin-top: 4px; }
+        /* ── Live Timing Tab ──────────────────────────────────────────── */
+        #timing-table { width: 100%; border-collapse: collapse; font-family: 'Titillium Web', sans-serif; }
+        #timing-table thead tr {
+            font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-muted); border-bottom: 2px solid var(--border);
+        }
+        #timing-table th { padding: 7px 5px; font-weight: 900; white-space: nowrap; }
+        #timing-table td { padding: 9px 5px; font-size: 0.85rem; border-bottom: 1px solid var(--surface-inner); vertical-align: middle; }
+        #timing-table tbody tr:last-child td { border-bottom: none; }
 
-        .t-header-row {
-            display: flex;
-            align-items: center;
-            padding: 6px 0 6px 38px;
-            font-size: 0.65rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            border-bottom: 2px solid var(--border);
-            gap: 0;
+        /* Columns hidden on small phones, shown on wider screens */
+        @media (max-width: 500px) {
+            .tc-team, .tc-laps, .tc-last, .tc-spd { display: none; }
         }
-        .t-header-driver { flex: 1; min-width: 0; }
-        .t-header-right  { display: flex; flex-direction: column; align-items: flex-end; min-width: 70px; }
-
-        .t-row {
-            display: flex;
-            align-items: center;
-            padding: 9px 0;
-            border-bottom: 1px solid var(--surface-inner);
-            gap: 0;
-            transition: background 0.15s;
+        @media (max-width: 640px) {
+            .tc-team, .tc-spd { display: none; }
         }
-        .t-row:last-child { border-bottom: none; }
-        .t-row:active { background: var(--surface-inner); }
-
-        .t-pos {
-            width: 28px;
-            font-weight: 900;
-            font-size: 1rem;
-            color: var(--text-main);
-            text-align: center;
-            flex-shrink: 0;
-        }
-        .t-pos.p1 { color: var(--gold, #c59b27); }
-        .t-pos.p2 { color: #aaa; }
-        .t-pos.p3 { color: #c87533; }
-
-        .t-bar {
-            width: 4px;
-            height: 38px;
-            border-radius: 2px;
-            flex-shrink: 0;
-            margin-right: 10px;
-        }
-
-        .t-info {
-            flex: 1;
-            min-width: 0;
-        }
-        .t-info-top {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .t-acronym {
-            font-weight: 900;
-            font-size: 1rem;
-            color: var(--text-main);
-            letter-spacing: 0.5px;
-        }
-        .t-badge {
-            font-size: 0.6rem;
-            font-weight: 900;
-            padding: 1px 5px;
-            border-radius: 3px;
-            letter-spacing: 0.5px;
-        }
-        .t-badge.pit  { background: rgba(238,187,0,0.2); color: #eebb00; border: 1px solid rgba(238,187,0,0.4); }
-        .t-badge.out  { background: rgba(225,6,0,0.15);  color: #e10600; border: 1px solid rgba(225,6,0,0.3); }
-
-        .t-team-name {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-top: 1px;
-        }
-
-        .t-sub {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-top: 4px;
-            font-size: 0.72rem;
-            flex-wrap: nowrap;
-            overflow: hidden;
-        }
-        .t-best-time {
-            color: var(--text-main);
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .t-sep { color: var(--border); }
-        .t-sector {
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-
-        .t-right {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 4px;
-            flex-shrink: 0;
-            margin-left: 8px;
-            min-width: 70px;
-        }
-        .t-tyre-row {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .t-tyre {
-            width: 22px;
-            height: 22px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            font-size: 0.7rem;
-            font-weight: 900;
-            flex-shrink: 0;
-        }
-        .t-age {
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            font-weight: 700;
-        }
-        .t-gap {
-            font-weight: 900;
-            font-size: 0.82rem;
-            color: var(--red);
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .t-gap.leader { color: var(--text-muted); font-size: 0.65rem; letter-spacing: 0.3px; }
-
-        /* Wider screens: show laps count inline */
-        @media (min-width: 480px) {
-            .t-laps { display: inline !important; }
-        }
-        .t-laps { display: none; }
 
         #timing-meta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 12px;
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            flex-wrap: wrap;
-            gap: 8px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 12px; font-size: 0.72rem; color: var(--text-muted);
+            flex-wrap: wrap; gap: 8px;
         }
         .timing-legend { display: flex; gap: 12px; }
     </style>
@@ -583,17 +446,27 @@
         <h2 class="section-title">Live Timing</h2>
         <div id="timing-status" style="display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:0.88rem; font-weight:700; color:var(--text-muted); flex-wrap:wrap;"></div>
 
-        <div class="t-header-row">
-            <div class="t-header-driver">Driver</div>
-            <div class="t-header-right">
-                <span>Tyre</span>
-                <span>Gap</span>
-            </div>
-        </div>
-
-        <div id="timing-list">
-            <div style="text-align:center; padding:40px; color:var(--text-muted); font-size:0.9rem;">Loading timing data...</div>
-        </div>
+        <table id="timing-table">
+            <thead>
+                <tr>
+                    <th style="text-align:center;">P</th>
+                    <th style="text-align:left;">Driver</th>
+                    <th class="tc-team" style="text-align:left;">Team</th>
+                    <th class="tc-laps" style="text-align:center;">Laps</th>
+                    <th style="text-align:center;">Tyre</th>
+                    <th style="text-align:right;">Best</th>
+                    <th class="tc-last" style="text-align:right;">Last</th>
+                    <th style="text-align:right;">Gap</th>
+                    <th style="text-align:right;">S1</th>
+                    <th style="text-align:right;">S2</th>
+                    <th style="text-align:right;">S3</th>
+                    <th class="tc-spd" style="text-align:right;">Spd</th>
+                </tr>
+            </thead>
+            <tbody id="timing-body">
+                <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
+            </tbody>
+        </table>
 
         <div id="timing-meta">
             <div class="timing-legend">
@@ -911,7 +784,7 @@
     let timingInterval = null;
 
     async function loadTimingTab() {
-        const list    = document.getElementById('timing-list');
+        const body    = document.getElementById('timing-body');
         const status  = document.getElementById('timing-status');
         const refresh = document.getElementById('timing-refresh-label');
 
@@ -936,77 +809,66 @@
             const p1Secs = toSecs(drivers[0]?.best_lap_time);
 
             const dot = connected ? '#00cc44' : '#e10600';
-            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span>${sesType}</span>${trackMsg ? ` <span style="color:var(--red);font-weight:900;">· ${trackMsg}</span>` : ''}`;
+            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-            list.innerHTML = drivers.map(r => {
+            body.innerHTML = drivers.map(r => {
                 const pos  = parseInt(r.position) || 99;
                 const name = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
-                const team = r.team || '';
-                const teamCol = r.team_colour ? '#' + r.team_colour : '#555';
+                const team = r.team || '-';
+                const teamCol = r.team_colour ? '#' + r.team_colour : 'var(--border)';
 
-                // Tyre
                 const tyre = (r.tyre_compound || '').toUpperCase();
                 let tyreColor = '#fff', tBg = '#444';
-                const tLetter = tyre ? tyre[0] : '?';
+                const tName = tyre ? tyre[0] : '-';
                 if (tyre === 'SOFT')         { tBg = '#e10600'; }
                 if (tyre === 'MEDIUM')       { tyreColor = '#111'; tBg = '#eebb00'; }
                 if (tyre === 'HARD')         { tyreColor = '#111'; tBg = '#e8e8e8'; }
                 if (tyre === 'INTERMEDIATE') { tBg = '#00cc66'; }
                 if (tyre === 'WET')          { tBg = '#0066ff'; }
+                const tyreLaps = r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:2px;">${r.tyre_laps}L</span>` : '';
 
-                // Gap
-                let gapText = '-', isLeader = false;
-                if (pos === 1) { gapText = 'LEADER'; isLeader = true; }
+                let gapText = '-';
+                if (pos === 1) gapText = 'LEADER';
                 else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
                 else if (r.interval)      gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
                 else if (p1Secs) { const ms = toSecs(r.best_lap_time); if (ms) gapText = '+' + (ms - p1Secs).toFixed(3); }
 
-                // Status badge
-                const badge = r.retired ? '<span class="t-badge out">OUT</span>'
-                            : r.in_pit  ? '<span class="t-badge pit">PIT</span>' : '';
+                const sCell = (i) => {
+                    const s = (r.sectors || [])[i] || {};
+                    const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'inherit';
+                    const fw  = (s.overall_best || s.personal_best) ? '900' : '600';
+                    return `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${col};font-weight:${fw};white-space:nowrap;">${s.value || '-'}</td>`;
+                };
 
-                // Position CSS class
-                const posClass = pos === 1 ? 'p1' : pos === 2 ? 'p2' : pos === 3 ? 'p3' : '';
+                const bestCol   = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : 'var(--text-muted)';
+                const statusBadge = r.retired
+                    ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
+                    : r.in_pit
+                    ? ' <span style="background:rgba(238,187,0,0.15);color:#eebb00;border:1px solid rgba(238,187,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">PIT</span>'
+                    : '';
 
-                // Sectors
-                const sectorHtml = [0, 1, 2].map(i => {
-                    const s   = (r.sectors || [])[i] || {};
-                    const val = s.value || '-';
-                    const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'var(--text-muted)';
-                    return `<span class="t-sector" style="color:${col};">S${i+1}&nbsp;${val}</span>`;
-                }).join('<span class="t-sep">·</span>');
-
-                const lastLapCol = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : 'var(--text-muted)';
-
-                return `
-                <div class="t-row">
-                    <div class="t-pos ${posClass}">${pos === 99 ? '-' : pos}</div>
-                    <div class="t-bar" style="background:${teamCol};"></div>
-                    <div class="t-info">
-                        <div class="t-info-top">
-                            <span class="t-acronym">${name}</span>
-                            ${badge}
-                        </div>
-                        <div class="t-team-name">${team}</div>
-                        <div class="t-sub">
-                            <span class="t-best-time">${r.best_lap_time || '-'}</span>
-                            <span class="t-sep">·</span>
-                            ${sectorHtml}
-                        </div>
-                    </div>
-                    <div class="t-right">
-                        <div class="t-tyre-row">
-                            <span class="t-tyre" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
-                            <span class="t-age">${r.tyre_laps ? r.tyre_laps + 'L' : ''}</span>
-                        </div>
-                        <div class="t-gap ${isLeader ? 'leader' : ''}">${gapText}</div>
-                    </div>
-                </div>`;
+                return `<tr>
+                    <td style="padding:9px 5px;text-align:center;font-weight:900;color:var(--text-main);white-space:nowrap;">${pos === 99 ? '-' : pos}</td>
+                    <td style="padding:9px 5px;white-space:nowrap;">
+                        <span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>
+                        <b style="color:var(--text-main);">${name}</b>${statusBadge}
+                    </td>
+                    <td class="tc-team" style="padding:9px 5px;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">${team}</td>
+                    <td class="tc-laps" style="padding:9px 5px;text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
+                    <td style="padding:9px 5px;text-align:center;white-space:nowrap;">
+                        <span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tName}</span>${tyreLaps}
+                    </td>
+                    <td style="padding:9px 5px;text-align:right;font-weight:700;color:var(--text-main);white-space:nowrap;">${r.best_lap_time || '-'}</td>
+                    <td class="tc-last" style="padding:9px 5px;text-align:right;font-weight:700;color:${bestCol};white-space:nowrap;">${r.last_lap_time || '-'}</td>
+                    <td style="padding:9px 5px;text-align:right;font-weight:900;color:var(--red);white-space:nowrap;">${gapText}</td>
+                    ${sCell(0)}${sCell(1)}${sCell(2)}
+                    <td class="tc-spd" style="padding:9px 5px;text-align:right;color:var(--text-muted);font-size:0.8rem;white-space:nowrap;">${r.speed_traps?.fl || r.speed_traps?.st || '-'}</td>
+                </tr>`;
             }).join('');
 
         } catch(e) {
-            list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);">Awaiting live timing data...</div>`;
+            body.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
             if (status) status.innerHTML = '';
         }
     }
