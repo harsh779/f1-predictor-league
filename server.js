@@ -120,7 +120,6 @@ app.get('/auth/google/callback', async (req, res) => {
     } catch (error) { res.redirect('/?error=oauth_failed'); }
 });
 
-
 // --- 6. SCORING ENGINE (V4 NEW RULES) ---
 async function sendDiscordNotification(msg) {
   const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
@@ -298,43 +297,6 @@ app.get('/api/next-race', (req, res) => {
 });
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
-
-// --- API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
-app.get('/api/live-sessions', async (req, res) => {
-    try {
-        const apiKey = '08a9977cc0f7cd9b134cb7f9e65193b8';
-        
-        let sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
-            params: { season: '2026' },
-            headers: { 'x-apisports-key': apiKey }
-        });
-        
-        let completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
-        let displaySessionName = "";
-        
-        if (completed.length === 0) {
-            sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
-                params: { season: '2025' },
-                headers: { 'x-apisports-key': apiKey }
-            });
-            completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
-            displaySessionName = "2025 Abu Dhabi (Standby)";
-        } else {
-            displaySessionName = completed[completed.length - 1].type; 
-        }
-        
-        const lastSessionId = completed[completed.length - 1].id;
-        
-        const rankRes = await axios.get('https://v1.formula-1.api-sports.io/rankings/races', {
-            params: { race: lastSessionId },
-            headers: { 'x-apisports-key': apiKey }
-        });
-        
-        res.json({ sessionName: displaySessionName, data: rankRes.data.response });
-    } catch (e) {
-        res.status(500).json({ error: "Live fetch failed" });
-    }
-});
 
 // --- NEW: SEASON-LONG PREDICTIONS ROUTES ---
 app.get('/api/season-picks', authenticateToken, async (req, res) => {

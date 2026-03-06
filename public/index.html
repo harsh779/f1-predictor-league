@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.1 - Season Picks added
+        // Version 6.2 - Your Custom OpenF1 Wrapper API Integrated!
         (function() {
-            const currentVersion = "6.1"; 
+            const currentVersion = "6.2"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -637,14 +637,12 @@
         let items = detailedDrivers;
 
         if (type === 'team') {
-            // Exclude already picked IF it's part of the weekly form (has s-team class)
             if (document.getElementById(inputId).classList.contains('s-team')) {
                 const pickedNodes = Array.from(document.querySelectorAll('.s-team'));
                 picked = pickedNodes.map(inp => inp.value).filter(v => v !== '' && v !== document.getElementById(inputId).value);
             }
             items = detailedTeams;
         } else if (type === 'driver') {
-            // Exclude already picked IF it's part of the weekly form (has s-driver class)
             if (document.getElementById(inputId).classList.contains('s-driver')) {
                 const pickedNodes = Array.from(document.querySelectorAll('.s-driver'));
                 picked = pickedNodes.map(inp => inp.value).filter(v => v !== '' && v !== document.getElementById(inputId).value);
@@ -720,27 +718,40 @@
         }
     }
 
-    // Fetches live data from your new backend proxy
+    // --- NEW: Fetch from your Custom F1 Live Data API ---
     async function fetchLatestSession() {
         try {
-            const res = await fetch('/api/live-sessions').then(r=>r.json());
-            if(res.error) throw new Error(res.error);
-
-            const data = res.data; 
+            // Call your custom OpenF1 API directly from the frontend
+            const res = await fetch('https://f1-live-api.onrender.com/position/latest').then(r=>r.json());
+            
+            // Assume the response is an array of position objects
+            let data = Array.isArray(res) ? res : (res.data || res.response || []);
             if(!data || data.length === 0) throw new Error("No data");
 
-            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Latest: ${res.sessionName} (Top 5)</div>`;
+            // Sort by position to ensure 1 to 5 order
+            data.sort((a, b) => parseInt(a.position) - parseInt(b.position));
+
+            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Live Track Positions (Top 5)</div>`;
             
-            html += data.slice(0, 5).map(r => `
+            html += data.slice(0, 5).map(r => {
+                // OpenF1 usually provides driver_number. We match it to your detailedDrivers list!
+                let dName = "Driver " + (r.driver_number || '');
+                if (r.driver_number) {
+                    const found = detailedDrivers.find(d => d.num == r.driver_number);
+                    if (found) dName = found.name;
+                } else if (r.driver_name || r.name) {
+                    dName = r.driver_name || r.name;
+                }
+
+                return `
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-hover); font-size: 1.05rem;">
-                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${r.driver.name}</span>
-                    <span style="font-weight: 900; color: var(--red);">${r.time || r.status || ''}</span>
+                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${dName}</span>
                 </div>
-            `).join('');
+            `}).join('');
             
             document.getElementById('latest-session-results').innerHTML = html;
         } catch(e) {
-            document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
+            document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting live timing data...</span>';
         }
     }
 
@@ -841,7 +852,6 @@
         if(t==='calendar') loadCalendar();
     }
 
-    // NEW: Load and check lock for season picks
     async function loadSeasonPicks() {
         if(!f1_token) return;
         try {
@@ -857,7 +867,6 @@
             }
         } catch(e) {}
         
-        // Permanent Lock Check
         const ausQuali = new Date("2026-03-07T10:30:00+05:30");
         if (new Date() > ausQuali) {
             document.getElementById('s_driver').onclick = null;
@@ -867,7 +876,6 @@
         }
     }
 
-    // NEW: Save season picks
     async function saveSeasonPicks() {
         const sd = document.getElementById('s_driver').value;
         const st = document.getElementById('s_team').value;
@@ -943,7 +951,6 @@
                 let nameHtml = isVip ? `<span class="vip-gold">${x.name}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${x.name}</span>`;
                 let posColor = i===0 ? '#c59b27' : (i===1 ? '#999999' : (i===2 ? '#b87333' : 'var(--text-muted)'));
                 
-                // Show their season picks on the standings page
                 let seasonPicks = `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
                                      WDC: <b style="color: var(--text-main)">${x.season_driver || 'TBC'}</b> | 
                                      WCC: <b style="color: var(--text-main)">${x.season_constructor || 'TBC'}</b>
