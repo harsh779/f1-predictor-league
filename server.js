@@ -139,7 +139,8 @@ app.get('/auth/google/callback', async (req, res) => {
 
 // --- 6. SCORING ENGINE (V4 NEW RULES) ---
 async function sendDiscordNotification(msg) {
-  const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
+  const url = process.env.DISCORD_WEBHOOK;
+  if (!url) return;
   try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) }); } catch (e) {}
 }
 
@@ -318,7 +319,7 @@ app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 // --- API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
 app.get('/api/live-sessions', async (req, res) => {
     try {
-        const apiKey = '08a9977cc0f7cd9b134cb7f9e65193b8';
+        const apiKey = process.env.API_SPORTS_KEY;
         
         let sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
             params: { season: '2026' },
@@ -413,8 +414,8 @@ app.post('/predict', authenticateToken, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-app.post('/api/finalize', async (req, res) => {
-  if (req.body.password !== 'Open@0761') return res.status(403).json({ success: false });
+app.post('/api/finalize', authenticateToken, async (req, res) => {
+  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).json({ success: false });
   const result = await performFinalization();
   res.status(result.success ? 200 : 400).json(result);
 });
@@ -430,22 +431,22 @@ app.get('/api/season-leaderboard', async (req, res) => {
 });
 
 // --- 8. ADMIN ROUTES ---
-app.get('/api/admin/users', async (req, res) => {
-  if (req.query.pass !== 'Open@0761') return res.status(403).send("Unauthorized");
+app.get('/api/admin/users', authenticateToken, async (req, res) => {
+  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
   try {
       const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
       res.json(r.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/admin/toggle-vip', async (req, res) => {
-  if (req.body.adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+app.post('/api/admin/toggle-vip', authenticateToken, async (req, res) => {
+  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
   try {
       await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [req.body.vipStatus ? 1 : 0, req.body.targetUser] });
       res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/admin/reset-user', async (req, res) => {
-  if (req.body.adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
+app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
+  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
   try {
       await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [req.body.targetUser] });
       res.json({ success: true });

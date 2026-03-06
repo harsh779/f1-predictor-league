@@ -1120,10 +1120,10 @@
         if(!confirm('⚠️ WARNING: Finalize the race weekend and calculate scores?')) return;
         showToast('Processing telemetry...', 'success');
         
-        const res = await fetch('/api/finalize', { 
-            method:'POST', 
-            headers:{'Content-Type':'application/json'}, 
-            body:JSON.stringify({ password: 'Open@0761' }) 
+        const res = await fetch('/api/finalize', {
+            method:'POST',
+            headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`},
+            body:JSON.stringify({})
         });
         const d = await res.json();
         if(res.ok) { showToast('✅ Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
@@ -1141,7 +1141,7 @@
 
     async function loadAdminUserList() {
         try {
-            const resp = await fetch(`/api/admin/users?pass=Open@0761&t=` + new Date().getTime());
+            const resp = await fetch(`/api/admin/users?t=` + new Date().getTime(), { headers: { 'Authorization': `Bearer ${f1_token}` } });
             if(!resp.ok) return;
             const users = await resp.json();
             const list = document.getElementById('admin-user-list');
@@ -1174,8 +1174,8 @@
         if(!confirm(`Toggle VIP status for ${targetUser}?`)) return;
         try {
             await fetch('/api/admin/toggle-vip', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminPass: 'Open@0761', targetUser, vipStatus: !currentStatus })
+                method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${f1_token}`},
+                body: JSON.stringify({ targetUser, vipStatus: !currentStatus })
             });
             loadAdminUserList();
             showToast(`VIP Status updated for ${targetUser}`, 'success');
@@ -1186,8 +1186,8 @@
         if(!confirm(`⚠️ ARE YOU SURE? This completely resets ${targetUser}'s score to 0.`)) return;
         try {
             await fetch('/api/admin/reset-user', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminPass: 'Open@0761', targetUser })
+                method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${f1_token}`},
+                body: JSON.stringify({ targetUser })
             });
             loadAdminUserList();
             showToast(`${targetUser} has been reset to 0 points.`, 'success');
