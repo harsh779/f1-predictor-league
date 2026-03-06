@@ -469,16 +469,46 @@ app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- 9. AUTOMATED CRON JOB ---
+// --- 9. AUTOMATED RACE DETECTION & FINALIZATION ---
+// Polls the F1 live timing API every 6 minutes.
+// When a Race session transitions to "Finalised", scoring is triggered automatically.
+let lastFinalizedSessionKey = null;
+let finalizationPending = false;
+
 setInterval(async () => {
-  const now = new Date();
-  const active = f1Calendar2026.find(r => { 
-      const raceTime = new Date(r.sessions.race); 
-      return now > raceTime && now - raceTime < (24 * 60 * 60 * 1000); 
-  });
-  if (active) await performFinalization();
-  fetch(`${APP_URL}/api/next-race`).catch(() => {});
-}, 15 * 60 * 1000);
+    // Keep Render server awake
+    fetch(`${APP_URL}/api/next-race`).catch(() => {});
+
+    if (finalizationPending) return;
+
+    try {
+        const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 8000 }).then(r => r.data);
+        const session = status?.session;
+
+        // Only act on Race sessions that are fully Finalised
+        if (!session || session.Type !== 'Race') return;
+        if (session.SessionStatus !== 'Finalised') return;
+
+        const sessionKey = session.Key;
+        if (lastFinalizedSessionKey === sessionKey) return; // already handled
+
+        console.log(`[AUTO] Race session ${sessionKey} finalised — triggering scoring`);
+        finalizationPending = true;
+
+        const result = await performFinalization();
+
+        if (result.success) {
+            lastFinalizedSessionKey = sessionKey;
+            console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
+        } else {
+            console.warn(`[AUTO] Scoring failed: ${result.message} — retrying in 6 min`);
+        }
+    } catch (e) {
+        console.error('[AUTO] Race detection error:', e.message);
+    } finally {
+        finalizationPending = false;
+    }
+}, 6 * 60 * 1000);
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

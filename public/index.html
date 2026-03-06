@@ -766,16 +766,27 @@
                     if (mySecs) gapText = '+' + (mySecs - p1Secs).toFixed(3);
                 }
 
+                const sectors = r.sectors || [];
+                const sectorHtml = [0, 1, 2].map(i => {
+                    const s = sectors[i] || {};
+                    const val = s.value || '-';
+                    const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'var(--text-muted)';
+                    return `<span style="color:${col}; font-weight:700;">S${i+1} ${val}</span>`;
+                }).join('<span style="color:var(--border); margin:0 4px;">|</span>');
+
                 return `
-                <div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-inner); font-size: 0.9rem;">
-                    <div style="font-weight: 900; color: var(--text-main);">${pos === 99 ? '-' : pos}</div>
-                    <div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dName}</div>
-                    <div style="color: var(--text-muted); font-weight: 700; text-align: center;">${r.laps_completed || 0}</div>
-                    <div style="text-align: center;">
-                        <span style="background: ${tBg}; color: ${tyreColor}; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: 900; border: 1px solid rgba(0,0,0,0.1);">${tName}</span>
+                <div style="padding: 8px 0; border-bottom: 1px solid var(--surface-inner);">
+                    <div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; align-items: center; font-size: 0.9rem;">
+                        <div style="font-weight: 900; color: var(--text-main);">${pos === 99 ? '-' : pos}</div>
+                        <div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dName}</div>
+                        <div style="color: var(--text-muted); font-weight: 700; text-align: center;">${r.laps_completed || 0}</div>
+                        <div style="text-align: center;">
+                            <span style="background: ${tBg}; color: ${tyreColor}; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: 900; border: 1px solid rgba(0,0,0,0.1);">${tName}</span>
+                        </div>
+                        <div style="font-weight: 600; color: var(--text-main); font-size: 0.8rem;">${r.best_lap_time || '-'}</div>
+                        <div style="font-weight: 900; color: var(--red); text-align: right; font-size: 0.8rem;">${gapText}</div>
                     </div>
-                    <div style="font-weight: 600; color: var(--text-main); font-size: 0.8rem;">${r.best_lap_time || '-'}</div>
-                    <div style="font-weight: 900; color: var(--red); text-align: right; font-size: 0.8rem;">${gapText}</div>
+                    <div style="font-size: 0.72rem; margin-top: 3px; padding-left: 28px;">${sectorHtml}</div>
                 </div>`;
             }).join('');
 
