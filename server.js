@@ -316,35 +316,17 @@ app.get('/api/next-race', (req, res) => {
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
-// --- OpenF1 Live Widget Proxy (server-side, avoids browser CORS/rate limits) ---
+// --- F1 Live Timing Widget Proxy (backed by direct F1 SignalR WebSocket feed) ---
+const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.onrender.com';
 let widgetCache = null;
 let widgetCacheTime = 0;
 app.get('/api/live-widget', async (_req, res) => {
-    if (widgetCache && Date.now() - widgetCacheTime < 30000) return res.json(widgetCache);
+    if (widgetCache && Date.now() - widgetCacheTime < 10000) return res.json(widgetCache);
     try {
-        const delay = (ms) => new Promise(r => setTimeout(r, ms));
-        const f = (url) => axios.get(url, { timeout: 20000 }).then(r => r.data).catch(() => []);
-
-        const sessions = await f('https://api.openf1.org/v1/sessions?session_key=latest');
-        const sessionKey = sessions && sessions.length > 0 ? sessions[sessions.length - 1].session_key : 'latest';
-        const sessionType = sessions && sessions.length > 0 ? sessions[sessions.length - 1].session_type : '';
-
-        await delay(300);
-        const drivers = await f(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`);
-        await delay(300);
-        const positions = await f(`https://api.openf1.org/v1/position?session_key=${sessionKey}`);
-        await delay(300);
-        const stints = await f(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`);
-        await delay(300);
-        const laps = await f(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`);
-        // intervals only meaningful during race/sprint, skip for practice to save a request
-        const intervals = (sessionType === 'Race' || sessionType === 'Sprint')
-            ? await (delay(300).then(() => f(`https://api.openf1.org/v1/intervals?session_key=${sessionKey}`)))
-            : [];
-
-        console.log(`📊 [${sessionType}] drivers:${drivers.length} pos:${positions.length} stints:${stints.length} laps:${laps.length} int:${intervals.length}`);
-
-        widgetCache = { sessions, drivers, positions, intervals, stints, laps };
+        const get = (path) => axios.get(`${F1_TIMING_API}${path}`, { timeout: 10000 }).then(r => r.data).catch(() => null);
+        const [timing, status] = await Promise.all([get('/timing'), get('/status')]);
+        if (!timing?.drivers?.length) return res.status(503).json({ error: 'No live timing data' });
+        widgetCache = { timing, status };
         widgetCacheTime = Date.now();
         res.json(widgetCache);
     } catch(e) { res.status(500).json({ error: e.message }); }
