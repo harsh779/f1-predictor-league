@@ -727,6 +727,14 @@
 
             const sessionName = d.status?.session?.Name || d.timing?.session || 'Live Session';
 
+            // Parse "1:19.729" or "19.729" → seconds for gap calculation
+            const toSecs = (t) => {
+                if (!t) return null;
+                const parts = t.split(':');
+                return parts.length === 2 ? parseInt(parts[0]) * 60 + parseFloat(parts[1]) : parseFloat(parts[0]);
+            };
+            const p1Secs = toSecs(drivers[0]?.best_lap_time);
+
             let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">${sessionName}</div>`;
             html += `<div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 900; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
                 <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Best</div><div style="text-align:right;">Gap</div>
@@ -747,9 +755,16 @@
                 if (tyre === 'WET')          { tBg = '#0066ff'; }
 
                 let gapText = '';
-                if (pos === 1) gapText = 'LEADER';
-                else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
-                else if (r.interval)      gapText = r.interval.startsWith('+')      ? r.interval      : '+' + r.interval;
+                if (pos === 1) {
+                    gapText = 'LEADER';
+                } else if (r.gap_to_leader) {
+                    gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
+                } else if (r.interval) {
+                    gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
+                } else if (p1Secs) {
+                    const mySecs = toSecs(r.best_lap_time);
+                    if (mySecs) gapText = '+' + (mySecs - p1Secs).toFixed(3);
+                }
 
                 return `
                 <div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-inner); font-size: 0.9rem;">
