@@ -266,10 +266,10 @@
         <button onclick="tab('predict', this)">Predict</button>
         <button onclick="tab('live', this)">Live</button>
         <button onclick="tab('standings', this)">Standings</button>
-        <button onclick="tab('calendar', this)">📅 Calendar</button>
-        <button onclick="tab('grid', this)">🏎️ The Grid</button>
-        <button onclick="tab('rules', this)">📜 Rules</button>
-        <button onclick="tab('archive', this)">🏆 Archive</button>
+        <button onclick="tab('calendar', this)">Calendar</button>
+        <button onclick="tab('grid', this)">The Grid</button>
+        <button onclick="tab('rules', this)">Rules</button>
+        <button onclick="tab('archive', this)">Archive</button>
         <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">📲 Install App</button>
     </nav>
 </header>
@@ -331,7 +331,7 @@
         </div>
 
         <div class="dash-card">
-            <h3 class="dash-card-title" style="color: var(--text-main);">📰 Latest Paddock News</h3>
+            <h3 class="dash-card-title" style="color: var(--text-main);">Latest Paddock News</h3>
             <div id="news-feed">
                 <div class="skeleton" style="width: 100%; height: 80px; margin-bottom: 10px;"></div>
                 <div class="skeleton" style="width: 100%; height: 80px; margin-bottom: 10px;"></div>
@@ -361,20 +361,20 @@
             <div class="form-grid">
                 <div>
                     <div class="predict-group">
-                        <h3>🏆 The Podium</h3>
+                        <h3>The Podium</h3>
                         <label>P1 Winner</label><input type="text" id="p1" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p1', 'driver', 'Select P1 Winner')" required>
                         <label>P2 Runner Up</label><input type="text" id="p2" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p2', 'driver', 'Select P2 Runner Up')" required>
                         <label>P3 Third</label><input type="text" id="p3" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p3', 'driver', 'Select P3 Third')" required>
                     </div>
 
                     <div class="predict-group">
-                        <h3>🎯 The Points Bubble</h3>
+                        <h3>The Points Bubble</h3>
                         <label>P10 (Final Point)</label><input type="text" id="p10" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p10', 'driver', 'Select P10 (Final Point)')" required>
                         <label>P11 (Heartbreak)</label><input type="text" id="p11" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p11', 'driver', 'Select P11 (Just Missed Points)')" required>
                     </div>
 
                     <div class="predict-group">
-                        <h3>⚠️ The Backmarkers</h3>
+                        <h3>The Backmarkers</h3>
                         <label>P21</label><input type="text" id="p21" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p21', 'driver', 'Select P21')" required>
                         <label>P22 Last Place</label><input type="text" id="p22" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p22', 'driver', 'Select P22 Last Place')" required>
                     </div>
@@ -382,7 +382,7 @@
 
                 <div>
                     <div class="predict-group">
-                        <h3>🏭 Constructor Targets</h3>
+                        <h3>Constructor Targets</h3>
                         <label>1st Team</label><input type="text" id="c1" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c1', 'team', 'Select 1st Team')" required>
                         <label>2nd Team</label><input type="text" id="c2" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c2', 'team', 'Select 2nd Team')" required>
                         <label>5th Team</label><input type="text" id="c5" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c5', 'team', 'Select 5th Team')" required>
@@ -391,12 +391,12 @@
                     </div>
 
                     <div class="predict-group" style="border-color: var(--gold); background: rgba(197, 155, 39, 0.02);">
-                        <h3 style="color: var(--gold); border-color: rgba(197, 155, 39, 0.3);">🃏 Strategic Wildcards</h3>
+                        <h3 style="color: var(--gold); border-color: rgba(197, 155, 39, 0.3);">Strategic Wildcards</h3>
                         <label>Race: Biggest Loser</label>
                         <input type="text" id="wl" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('wl', 'wildcard', 'Select Race Biggest Loser')" required>
 
                         <div id="sprint-box" class="hidden" style="margin-top: 25px; padding-top: 25px; border-top: 1px dashed var(--border);">
-                            <h4 style="margin:0 0 15px; color:var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">⚡ Sprint Weekend Bonus</h4>
+                            <h4 style="margin:0 0 15px; color:var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">Sprint Weekend Bonus</h4>
                             <label>Sprint: Biggest Gainer</label>
                             <input type="text" id="sg" class="s-wildcard selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('sg', 'wildcard', 'Select Sprint Gainer')">
                             <label>Sprint: Biggest Loser</label>
@@ -777,15 +777,14 @@
             getArr(lapRes).forEach(l => {
                 if (l.driver_number && driverStats[l.driver_number]) {
                     driverStats[l.driver_number].laps = Math.max(driverStats[l.driver_number].laps || 0, l.lap_number || 0);
-                    if (l.lap_duration && l.lap_number > (driverStats[l.driver_number].bestLapNum || 0)) {
+                    if (l.lap_duration && (!driverStats[l.driver_number].lapTime || l.lap_duration < driverStats[l.driver_number].lapTime)) {
                         driverStats[l.driver_number].lapTime = l.lap_duration;
-                        driverStats[l.driver_number].bestLapNum = l.lap_number;
                     }
                 }
             });
 
             const formatLap = (sec) => {
-                if (!sec) return 'NO TIME';
+                if (!sec) return '--:--.---';
                 const m = Math.floor(sec / 60);
                 const s = (sec % 60).toFixed(3).padStart(6, '0');
                 return m > 0 ? `${m}:${s}` : s;
@@ -796,10 +795,19 @@
 
             if (leaderboard.length === 0) throw new Error("No positions found");
 
-            let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">⏱️ ${sessionName}</div>`;
-            
+            // Calculate gap from fastest lap times
+            const p1Fastest = leaderboard[0]?.lapTime;
+            leaderboard.forEach(r => {
+                if (r.position === 1) r.gapDisplay = 'LEADER';
+                else if (r.interval) r.gapDisplay = r.interval;
+                else if (p1Fastest && r.lapTime) r.gapDisplay = '+' + (r.lapTime - p1Fastest).toFixed(3);
+                else r.gapDisplay = '';
+            });
+
+            let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">${sessionName}</div>`;
+
             html += `<div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 900; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
-                <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Time</div><div style="text-align:right;">Gap</div>
+                <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Best</div><div style="text-align:right;">Gap</div>
             </div>`;
 
             html += `<div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">`;
@@ -809,16 +817,15 @@
 
                 let tyreColor = '#fff';
                 let tBg = '#333';
-                let tName = (r.tyre || 'U').substring(0,1).toUpperCase();
-                
+                let tName = (r.tyre || '-').substring(0,1).toUpperCase();
+
                 if(r.tyre === 'SOFT') { tyreColor = '#fff'; tBg = '#e10600'; }
                 if(r.tyre === 'MEDIUM') { tyreColor = '#111'; tBg = '#eebb00'; }
                 if(r.tyre === 'HARD') { tyreColor = '#111'; tBg = '#ffffff'; }
                 if(r.tyre === 'INTERMEDIATE') { tyreColor = '#fff'; tBg = '#00cc66'; }
                 if(r.tyre === 'WET') { tyreColor = '#fff'; tBg = '#0066ff'; }
 
-                let gapText = r.interval || '';
-                if(r.position === 1) gapText = 'LEADER';
+                let gapText = r.gapDisplay || '';
 
                 return `
                 <div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-inner); font-size: 0.9rem;">
@@ -893,7 +900,7 @@
                 const items = newsRes.items.slice(0, 4);
                 document.getElementById('news-feed').innerHTML = items.map(n => `
                     <div class="news-item">
-                        <img src="${n.thumbnail || n.enclosure || 'https://via.placeholder.com/80'}" alt="News" onerror="this.src='https://via.placeholder.com/80?text=F1'">
+                        <img src="${n.thumbnail || (typeof n.enclosure === 'object' ? n.enclosure?.link : n.enclosure) || ''}" alt="News" style="${!(n.thumbnail || n.enclosure) ? 'display:none;' : ''}" onerror="this.style.display='none'">
                         <div class="news-item-content">
                             <h4><a href="${n.link}" target="_blank">${n.title}</a></h4>
                             <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">${new Date(n.pubDate).toLocaleDateString()}</span>
