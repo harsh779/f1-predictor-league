@@ -240,6 +240,35 @@ app.get('/api/next-race', (req, res) => {
 });
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
+// --- NEW: API-Sports Live Proxy (For Widget ONLY) ---
+app.get('/api/live-sessions', async (req, res) => {
+    try {
+        const apiKey = '08a9977cc0f7cd9b134cb7f9e65193b8';
+        
+        // 1. Get all 2026 sessions
+        const sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
+            params: { season: '2026' },
+            headers: { 'x-apisports-key': apiKey }
+        });
+        
+        // 2. Find the most recently "Completed" session (FP1, FP2, SQ, etc.)
+        const completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
+        if (completed.length === 0) return res.json({ error: "No completed sessions yet" });
+        
+        const lastSessionId = completed[completed.length - 1].id;
+        
+        // 3. Fetch the rankings for that specific session
+        const rankRes = await axios.get('https://v1.formula-1.api-sports.io/rankings/races', {
+            params: { race: lastSessionId },
+            headers: { 'x-apisports-key': apiKey }
+        });
+        
+        // Include the session name so the frontend can display it (e.g. "Free Practice 1")
+        res.json({ sessionName: completed[completed.length - 1].type, data: rankRes.data.response });
+    } catch (e) {
+        res.status(500).json({ error: "Live fetch failed" });
+    }
+});
 
 app.post('/predict', authenticateToken, async (req, res) => {
   const d = req.body;

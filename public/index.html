@@ -687,19 +687,21 @@
         }
     }
 
-    // NEW FUNCTION: Fetches the latest session results from the API
+    // Fetches live data from your new backend proxy
     async function fetchLatestSession() {
         try {
-            const res = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r=>r.json());
-            const race = res.MRData.RaceTable.Races[0];
-            if(!race) throw new Error("No data");
+            const res = await fetch('/api/live-sessions').then(r=>r.json());
+            if(res.error) throw new Error(res.error);
 
-            let html = `<div style="font-weight: 700; color: var(--text-muted); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">${race.raceName} (Top 5)</div>`;
+            const data = res.data; 
+            if(!data || data.length === 0) throw new Error("No data");
+
+            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Latest: ${res.sessionName} (Top 5)</div>`;
             
-            html += race.Results.slice(0, 5).map(r => `
+            html += data.slice(0, 5).map(r => `
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-hover); font-size: 1.05rem;">
-                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${r.Driver.familyName}</span>
-                    <span style="font-weight: 900; color: var(--red);">${r.Time ? r.Time.time : r.status}</span>
+                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${r.driver.name}</span>
+                    <span style="font-weight: 900; color: var(--red);">${r.time || r.status || ''}</span>
                 </div>
             `).join('');
             
