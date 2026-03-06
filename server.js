@@ -322,15 +322,23 @@ let widgetCacheTime = 0;
 app.get('/api/live-widget', async (_req, res) => {
     if (widgetCache && Date.now() - widgetCacheTime < 15000) return res.json(widgetCache);
     try {
-        const f = (url) => axios.get(url, { timeout: 20000 }).then(r => r.data).catch(() => []);
-        const [sessions, drivers, positions, intervals, stints, laps] = await Promise.all([
-            f('https://api.openf1.org/v1/sessions?session_key=latest'),
-            f('https://api.openf1.org/v1/drivers?session_key=latest'),
-            f('https://api.openf1.org/v1/position?session_key=latest'),
-            f('https://api.openf1.org/v1/intervals?session_key=latest'),
-            f('https://api.openf1.org/v1/stints?session_key=latest'),
-            f('https://api.openf1.org/v1/laps?session_key=latest')
+        const f = (url) => axios.get(url, { timeout: 20000 }).then(r => r.data).catch((e) => { console.log(`OpenF1 fail [${url}]:`, e.message); return []; });
+
+        // Step 1: Get session key first
+        const sessions = await f('https://api.openf1.org/v1/sessions?session_key=latest');
+        const sessionKey = sessions && sessions.length > 0 ? sessions[sessions.length - 1].session_key : 'latest';
+        console.log(`🏎️ Live widget: session_key=${sessionKey}, name=${sessions[0]?.session_name}`);
+
+        // Step 2: Fetch all data with explicit session key
+        const [drivers, positions, intervals, stints, laps] = await Promise.all([
+            f(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`),
+            f(`https://api.openf1.org/v1/position?session_key=${sessionKey}`),
+            f(`https://api.openf1.org/v1/intervals?session_key=${sessionKey}`),
+            f(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`),
+            f(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`)
         ]);
+        console.log(`📊 drivers:${drivers.length} pos:${positions.length} int:${intervals.length} stints:${stints.length} laps:${laps.length}`);
+
         widgetCache = { sessions, drivers, positions, intervals, stints, laps };
         widgetCacheTime = Date.now();
         res.json(widgetCache);
