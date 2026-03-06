@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.2 - Your Custom OpenF1 Wrapper API Integrated!
+        // Version 6.3 - Full Broadcast Live Timing Widget
         (function() {
-            const currentVersion = "6.2"; 
+            const currentVersion = "6.3"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -308,8 +308,7 @@
                     </div>
                 </div>
 
-                <div class="dash-card">
-                    <h3 class="dash-card-title">⏱️ Latest Official Session</h3>
+                <div class="dash-card" style="padding: 20px;">
                     <div id="latest-session-results">
                         <div class="skeleton" style="width: 100%; height: 20px; margin-bottom: 8px;"></div>
                         <div class="skeleton" style="width: 100%; height: 20px; margin-bottom: 8px;"></div>
@@ -718,43 +717,120 @@
         }
     }
 
-    // Fetches live data and cleans up OpenF1's history log
+    // --- NEW: Fetch Comprehensive Live Timing from your F1 API ---
     async function fetchLatestSession() {
         try {
-            const res = await fetch('https://f1-live-api.onrender.com/position/latest').then(r=>r.json());
-            
-            let data = Array.isArray(res) ? res : (res.data || res.response || []);
-            if(!data || data.length === 0) throw new Error("No data");
+            // Fetch all required data endpoints simultaneously
+            const [sessionRes, posRes, intRes, stintRes, lapRes] = await Promise.all([
+                fetch('https://f1-live-api.onrender.com/sessions/latest').then(r=>r.json()),
+                fetch('https://f1-live-api.onrender.com/position/latest').then(r=>r.json()),
+                fetch('https://f1-live-api.onrender.com/intervals/latest').then(r=>r.json()),
+                fetch('https://f1-live-api.onrender.com/stints/latest').then(r=>r.json()),
+                fetch('https://f1-live-api.onrender.com/laps/latest').then(r=>r.json())
+            ]);
 
-            // 1. Clean the data: Keep only the MOST RECENT position for each driver
-            const latestPositions = {};
-            data.forEach(p => {
-                // As the array loops, it overwrites older positions, leaving only the newest one
-                if (p.driver_number && p.position) {
-                    latestPositions[p.driver_number] = p;
+            const getArr = (data) => Array.isArray(data) ? data : (data.data || data.response || []);
+
+            let sessionName = "Live Session";
+            const sessions = getArr(sessionRes);
+            if (sessions.length > 0) {
+                sessionName = sessions[sessions.length - 1].session_name || sessions[sessions.length - 1].type || "Free Practice";
+            }
+
+            const driverStats = {};
+
+            // 1. Positions (Keep only the latest entry per driver)
+            getArr(posRes).forEach(p => {
+                if (p.driver_number) {
+                    if (!driverStats[p.driver_number]) driverStats[p.driver_number] = { num: p.driver_number };
+                    driverStats[p.driver_number].position = parseInt(p.position);
                 }
             });
 
-            // 2. Convert back to an array
-            let uniqueDrivers = Object.values(latestPositions);
+            // 2. Intervals & Gaps
+            getArr(intRes).forEach(i => {
+                if (i.driver_number && driverStats[i.driver_number]) {
+                    if (driverStats[i.driver_number].position === 1) {
+                         driverStats[i.driver_number].interval = 'LEADER';
+                    } else if (i.interval) {
+                        driverStats[i.driver_number].interval = `+${parseFloat(i.interval).toFixed(3)}`;
+                    } else if (i.gap_to_leader) {
+                        driverStats[i.driver_number].interval = `+${parseFloat(i.gap_to_leader).toFixed(3)}`;
+                    }
+                }
+            });
 
-            // 3. Sort numerically by position (1, 2, 3, 4...)
-            uniqueDrivers.sort((a, b) => parseInt(a.position) - parseInt(b.position));
+            // 3. Stints (Tyres - loops sequentially, leaving the latest tyre)
+            getArr(stintRes).forEach(s => {
+                if (s.driver_number && driverStats[s.driver_number]) {
+                    driverStats[s.driver_number].tyre = s.compound;
+                }
+            });
 
-            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Live Leaderboard (Top 5)</div>`;
+            // 4. Laps (Laps completed and latest lap time)
+            getArr(lapRes).forEach(l => {
+                if (l.driver_number && driverStats[l.driver_number]) {
+                    driverStats[l.driver_number].laps = Math.max(driverStats[l.driver_number].laps || 0, l.lap_number || 0);
+                    if (l.lap_duration) {
+                        driverStats[l.driver_number].lapTime = l.lap_duration;
+                    }
+                }
+            });
+
+            const formatLap = (sec) => {
+                if (!sec) return 'NO TIME';
+                const m = Math.floor(sec / 60);
+                const s = (sec % 60).toFixed(3).padStart(6, '0');
+                return m > 0 ? `${m}:${s}` : s;
+            };
+
+            let leaderboard = Object.values(driverStats).filter(d => d.position);
+            leaderboard.sort((a, b) => a.position - b.position);
+
+            if (leaderboard.length === 0) throw new Error("No positions found");
+
+            let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">⏱️ ${sessionName}</div>`;
             
-            // 4. Display the top 5
-            html += uniqueDrivers.slice(0, 5).map(r => {
-                // Match the driver number to your master list for their name
-                let dName = "Driver " + r.driver_number;
-                const found = detailedDrivers.find(d => d.num == r.driver_number);
-                if (found) dName = found.name;
+            // Header Row
+            html += `<div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 900; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Time</div><div style="text-align:right;">Gap</div>
+            </div>`;
+
+            // Scrollable Container for all 20/22 drivers
+            html += `<div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">`;
+
+            html += leaderboard.map(r => {
+                let dName = "DRV " + r.num;
+                const found = detailedDrivers.find(d => d.num == r.num);
+                if (found) dName = found.name.split(" ").pop(); // Last Name
+
+                let tyreColor = '#fff';
+                let tBg = '#333';
+                let tName = (r.tyre || 'U').substring(0,1).toUpperCase();
+                
+                if(r.tyre === 'SOFT') { tyreColor = '#fff'; tBg = '#e10600'; }
+                if(r.tyre === 'MEDIUM') { tyreColor = '#111'; tBg = '#eebb00'; }
+                if(r.tyre === 'HARD') { tyreColor = '#111'; tBg = '#ffffff'; }
+                if(r.tyre === 'INTERMEDIATE') { tyreColor = '#fff'; tBg = '#00cc66'; }
+                if(r.tyre === 'WET') { tyreColor = '#fff'; tBg = '#0066ff'; }
+
+                let gapText = r.interval || '';
+                if(r.position === 1) gapText = 'LEADER';
 
                 return `
-                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-hover); font-size: 1.05rem;">
-                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${dName}</span>
+                <div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-inner); font-size: 0.9rem;">
+                    <div style="font-weight: 900; color: var(--text-main);">${r.position}</div>
+                    <div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dName}</div>
+                    <div style="color: var(--text-muted); font-weight: 700; text-align: center;">${r.laps || 0}</div>
+                    <div style="text-align: center;">
+                        <span style="background: ${tBg}; color: ${tyreColor}; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: 900; border: 1px solid rgba(0,0,0,0.1);">${tName}</span>
+                    </div>
+                    <div style="font-family: monospace; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">${formatLap(r.lapTime)}</div>
+                    <div style="font-family: monospace; font-weight: 900; color: var(--red); text-align: right; font-size: 0.8rem;">${gapText}</div>
                 </div>
             `}).join('');
+            
+            html += `</div>`;
             
             document.getElementById('latest-session-results').innerHTML = html;
         } catch(e) {
