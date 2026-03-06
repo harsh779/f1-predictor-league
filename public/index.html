@@ -745,25 +745,35 @@
             getArr(posRes).forEach(p => {
                 if (p.driver_number) {
                     if (!driverStats[p.driver_number]) driverStats[p.driver_number] = { num: p.driver_number };
-                    driverStats[p.driver_number].position = parseInt(p.position);
+                    if (!driverStats[p.driver_number].posDate || p.date > driverStats[p.driver_number].posDate) {
+                        driverStats[p.driver_number].position = parseInt(p.position);
+                        driverStats[p.driver_number].posDate = p.date;
+                    }
                 }
             });
 
             getArr(intRes).forEach(i => {
                 if (i.driver_number && driverStats[i.driver_number]) {
-                    if (driverStats[i.driver_number].position === 1) {
-                         driverStats[i.driver_number].interval = 'LEADER';
-                    } else if (i.interval) {
-                        driverStats[i.driver_number].interval = `+${parseFloat(i.interval).toFixed(3)}`;
-                    } else if (i.gap_to_leader) {
-                        driverStats[i.driver_number].interval = `+${parseFloat(i.gap_to_leader).toFixed(3)}`;
+                    if (!driverStats[i.driver_number].intDate || i.date > driverStats[i.driver_number].intDate) {
+                        driverStats[i.driver_number].intDate = i.date;
+                        if (driverStats[i.driver_number].position === 1) {
+                            driverStats[i.driver_number].interval = 'LEADER';
+                        } else if (i.interval !== null && i.interval !== undefined) {
+                            driverStats[i.driver_number].interval = `+${parseFloat(i.interval).toFixed(3)}`;
+                        } else if (i.gap_to_leader !== null && i.gap_to_leader !== undefined) {
+                            driverStats[i.driver_number].interval = `+${parseFloat(i.gap_to_leader).toFixed(3)}`;
+                        }
                     }
                 }
             });
 
             getArr(stintRes).forEach(s => {
-                if (s.driver_number && driverStats[s.driver_number]) {
-                    driverStats[s.driver_number].tyre = s.compound;
+                if (s.driver_number && driverStats[s.driver_number] && s.compound) {
+                    const current = driverStats[s.driver_number];
+                    if (!current.stintNum || s.stint_number >= current.stintNum) {
+                        current.tyre = s.compound;
+                        current.stintNum = s.stint_number;
+                    }
                 }
             });
 
