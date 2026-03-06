@@ -31,6 +31,10 @@ async function setupDatabase() {
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
     
+    // 🌍 NEW: Columns for Season-Long Predictions
+    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_driver TEXT`); } catch(e) {}
+    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_constructor TEXT`); } catch(e) {}
+    
     // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT UNIQUE, 
@@ -40,7 +44,7 @@ async function setupDatabase() {
     )`);
     
     await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
-    console.log("✅ Database Synced for V4 Scoring & Google OAuth.");
+    console.log("✅ Database Synced for V4 Scoring, Season Picks & Google OAuth.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -295,7 +299,7 @@ app.get('/api/next-race', (req, res) => {
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
-// --- NEW: API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
+// --- API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
 app.get('/api/live-sessions', async (req, res) => {
     try {
         const apiKey = '08a9977cc0f7cd9b134cb7f9e65193b8';
@@ -332,6 +336,30 @@ app.get('/api/live-sessions', async (req, res) => {
     }
 });
 
+// --- NEW: SEASON-LONG PREDICTIONS ROUTES ---
+app.get('/api/season-picks', authenticateToken, async (req, res) => {
+    try {
+        const r = await db.execute({ sql: "SELECT season_driver, season_constructor FROM f1_drivers WHERE name = ?", args: [req.user.name] });
+        res.json(r.rows[0] || {});
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/season-picks', authenticateToken, async (req, res) => {
+    const ausQuali = new Date("2026-03-07T10:30:00+05:30");
+    if (new Date() > ausQuali) {
+        return res.status(403).json({ success: false, message: "Season predictions are permanently locked." });
+    }
+    
+    try {
+        await db.execute({
+            sql: "UPDATE f1_drivers SET season_driver = ?, season_constructor = ? WHERE name = ?",
+            args: [req.body.season_driver, req.body.season_constructor, req.user.name]
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// --- RACE PREDICTION SUBMIT ---
 app.post('/predict', authenticateToken, async (req, res) => {
   const d = req.body;
   const userName = req.user.name;
@@ -381,7 +409,7 @@ app.get('/api/predictions', async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-  const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+  const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
   res.json(r.rows);
 });
 
