@@ -718,30 +718,37 @@
         }
     }
 
-    // --- NEW: Fetch from your Custom F1 Live Data API ---
+    // Fetches live data and cleans up OpenF1's history log
     async function fetchLatestSession() {
         try {
-            // Call your custom OpenF1 API directly from the frontend
             const res = await fetch('https://f1-live-api.onrender.com/position/latest').then(r=>r.json());
             
-            // Assume the response is an array of position objects
             let data = Array.isArray(res) ? res : (res.data || res.response || []);
             if(!data || data.length === 0) throw new Error("No data");
 
-            // Sort by position to ensure 1 to 5 order
-            data.sort((a, b) => parseInt(a.position) - parseInt(b.position));
-
-            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Live Track Positions (Top 5)</div>`;
-            
-            html += data.slice(0, 5).map(r => {
-                // OpenF1 usually provides driver_number. We match it to your detailedDrivers list!
-                let dName = "Driver " + (r.driver_number || '');
-                if (r.driver_number) {
-                    const found = detailedDrivers.find(d => d.num == r.driver_number);
-                    if (found) dName = found.name;
-                } else if (r.driver_name || r.name) {
-                    dName = r.driver_name || r.name;
+            // 1. Clean the data: Keep only the MOST RECENT position for each driver
+            const latestPositions = {};
+            data.forEach(p => {
+                // As the array loops, it overwrites older positions, leaving only the newest one
+                if (p.driver_number && p.position) {
+                    latestPositions[p.driver_number] = p;
                 }
+            });
+
+            // 2. Convert back to an array
+            let uniqueDrivers = Object.values(latestPositions);
+
+            // 3. Sort numerically by position (1, 2, 3, 4...)
+            uniqueDrivers.sort((a, b) => parseInt(a.position) - parseInt(b.position));
+
+            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Live Leaderboard (Top 5)</div>`;
+            
+            // 4. Display the top 5
+            html += uniqueDrivers.slice(0, 5).map(r => {
+                // Match the driver number to your master list for their name
+                let dName = "Driver " + r.driver_number;
+                const found = detailedDrivers.find(d => d.num == r.driver_number);
+                if (found) dName = found.name;
 
                 return `
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-hover); font-size: 1.05rem;">
