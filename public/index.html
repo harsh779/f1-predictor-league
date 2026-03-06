@@ -255,9 +255,9 @@
     <h1><span>F1</span> 2026 LEAGUE</h1>
     
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        👤 <span id="logged-in-name" style="margin-left: 5px; color: var(--red);"></span>
+        <span id="logged-in-name" style="color: var(--red);"></span>
         <div id="user-dropdown-content" class="user-dropdown-content">
-            <button onclick="logout()">🚪 Logout</button>
+            <button onclick="logout()">Logout</button>
         </div>
     </div>
 
@@ -270,7 +270,7 @@
         <button onclick="tab('grid', this)">The Grid</button>
         <button onclick="tab('rules', this)">Rules</button>
         <button onclick="tab('archive', this)">Archive</button>
-        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">📲 Install App</button>
+        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">Install App</button>
     </nav>
 </header>
 
@@ -284,7 +284,7 @@
             </div>
             
             <div style="display: flex; align-items: center;">
-                <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 20px 40px; font-size: 1.3rem;">🎯 Lock Strategy</button>
+                <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 20px 40px; font-size: 1.3rem;">Lock Strategy</button>
             </div>
         </div>
 
@@ -342,7 +342,7 @@
     <div id="predict" class="tab">
         
         <div id="season-predict-box" class="predict-group" style="border-color: #009940; background: rgba(0, 153, 64, 0.03);">
-            <h3 style="color: #009940; border-color: rgba(0, 153, 64, 0.3);">🌍 2026 World Champions</h3>
+            <h3 style="color: #009940; border-color: rgba(0, 153, 64, 0.3);">2026 World Champions</h3>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0; margin-bottom: 15px;">Locks permanently at Australian GP Qualifying!</p>
             
             <label>World Drivers' Champion (+50 pts)</label>
@@ -351,11 +351,11 @@
             <label>World Constructors' Champion (+25 pts)</label>
             <input type="text" id="s_team" class="selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('s_team', 'team', 'Select Constructors Champion')">
             
-            <button type="button" id="save-season-btn" class="btn" style="margin-top: 20px; background: linear-gradient(45deg, #009940, #00cc55); padding: 12px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(0, 153, 64, 0.3);" onclick="saveSeasonPicks()">💾 Save Champions</button>
-            <div id="season-locked-msg" class="hidden" style="margin-top: 15px; color: var(--red); font-weight: bold; text-align: center;">🔒 Season picks are permanently locked.</div>
+            <button type="button" id="save-season-btn" class="btn" style="margin-top: 20px; background: linear-gradient(45deg, #009940, #00cc55); padding: 12px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(0, 153, 64, 0.3);" onclick="saveSeasonPicks()">Save Champions</button>
+            <div id="season-locked-msg" class="hidden" style="margin-top: 15px; color: var(--red); font-weight: bold; text-align: center;">Season picks are permanently locked.</div>
         </div>
 
-        <div id="locked-msg" class="hidden" style="background:rgba(225,6,0,0.05); border: 2px solid var(--red); padding:20px; text-align:center; font-weight: 900; border-radius: 8px; margin-bottom: 25px; letter-spacing: 1px; color: var(--red);">🚫 PARC FERMÉ: PREDICTIONS LOCKED</div>
+        <div id="locked-msg" class="hidden" style="background:rgba(225,6,0,0.05); border: 2px solid var(--red); padding:20px; text-align:center; font-weight: 900; border-radius: 8px; margin-bottom: 25px; letter-spacing: 1px; color: var(--red);">PARC FERMÉ: PREDICTIONS LOCKED</div>
         
         <form id="p-form">
             <div class="form-grid">
@@ -405,7 +405,7 @@
                     </div>
                 </div>
             </div>
-            <button type="submit" class="btn" id="sub-btn">🔒 Transmit Strategy</button>
+            <button type="submit" class="btn" id="sub-btn">Transmit Strategy</button>
         </form>
     </div>
 
@@ -415,8 +415,8 @@
         <div id="live-list"></div>
         
         <div id="admin-panel" class="hidden" style="margin-top:40px; border:2px solid var(--red); padding:30px; background:rgba(225,6,0,0.05); border-radius:12px; text-align: center;">
-            <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0; font-size: 1.5rem;">⚠️ STEWARDS CONTROL</h3>
-            <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">🏁 Finalize Race Weekend</button>
+            <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0; font-size: 1.5rem;">STEWARDS CONTROL</h3>
+            <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">Finalize Race Weekend</button>
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
             <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
                 </div>
@@ -457,28 +457,28 @@
     <div id="rules" class="tab">
         <h2 class="section-title">Sporting Regulations</h2>
         <div class="predict-group" style="line-height: 1.8;">
-            <h3>⏰ 1. Parc Fermé (The Deadline)</h3>
+            <h3>1. Parc Fermé (The Deadline)</h3>
             <ul>
                 <li>Strategies are <strong>strictly locked</strong> at the start of Qualifying. You can change your team any number of times before this.</li>
                 <li>Incomplete submissions will be rejected. If you fail to submit a team, your score will be <strong>5 points lower than the lowest scoring player</strong> that week.</li>
             </ul>
-            <h3 style="margin-top:20px;">🏎️ 2. Driver Scoring (P1, P2, P3, P10, P11, P21, P22)</h3>
+            <h3 style="margin-top:20px;">2. Driver Scoring (P1, P2, P3, P10, P11, P21, P22)</h3>
             <ul>
                 <li><strong>Exact Match Bonus:</strong> <span style="color: #009940; font-weight: bold;">+2 Points</span>.</li>
                 <li><strong>Differential Penalty:</strong> <span style="color: var(--red); font-weight: bold;">-1 Point</span> for every position your prediction misses by. Target is to minimize negative points!</li>
                 <li>All DNFs (or pre-announced non-participating drivers) will automatically be scored as finishing in <strong>P22</strong>.</li>
             </ul>
-            <h3 style="margin-top:20px;">🛠️ 3. Constructor Scoring (1st, 2nd, 5th, 6th, 11th)</h3>
+            <h3 style="margin-top:20px;">3. Constructor Scoring (1st, 2nd, 5th, 6th, 11th)</h3>
             <ul>
                 <li>Constructors are ranked based on the sum of both their cars' race positions (lower sum = better rank).</li>
                 <li><strong>The Span Rule (Ties):</strong> If teams tie for a rank (e.g., tie for 4th), they occupy ranks 4 AND 5. Predicting either team in 4th OR 5th awards full points!</li>
             </ul>
-            <h3 style="margin-top:20px;">🃏 4. Strategic Wildcards</h3>
+            <h3 style="margin-top:20px;">4. Strategic Wildcards</h3>
             <ul>
                 <li><strong>Race Biggest Loser:</strong> <span style="color: #009940; font-weight: bold;">+5 Points</span> for correctly predicting the driver whose rank falls the most from their starting grid position. Ties award points to all involved!</li>
                 <li><strong>Sprint Weekends:</strong> +5 Points each for predicting the Sprint's Biggest Gainer and Biggest Loser.</li>
             </ul>
-            <h3 style="margin-top:20px;">🏆 5. Championship Prize</h3>
+            <h3 style="margin-top:20px;">5. Championship Prize</h3>
             <ul>
                 <li>The overall tournament winner will receive <strong>₹500</strong> from each of the other players.</li>
                 <li><strong>Season-Long Predictions:</strong> Predict the World Drivers' Champion (+50 pts) and World Constructors' Champion (+25 pts). This form permanently locks at the start of Australian GP Qualifying!</li>
@@ -491,7 +491,7 @@
         <p style="color: var(--text-muted); margin-bottom: 30px;">The official final classification of the previous F1 season.</p>
 
         <div class="predict-group" style="padding: 0; overflow: hidden;">
-            <h3 style="padding: 20px 25px; margin: 0; background: var(--surface-inner); border-bottom: 1px solid var(--border); color: var(--red); font-size: 1.3rem;">🏆 Drivers' Championship</h3>
+            <h3 style="padding: 20px 25px; margin: 0; background: var(--surface-inner); border-bottom: 1px solid var(--border); color: var(--red); font-size: 1.3rem;">Drivers' Championship</h3>
             <div class="table-wrapper" style="margin: 0; box-shadow: none; border: none; border-radius: 0;">
                 <table>
                     <thead>
@@ -514,7 +514,7 @@
         </div>
 
         <div class="predict-group" style="padding: 0; overflow: hidden; margin-top: 35px;">
-            <h3 style="padding: 20px 25px; margin: 0; background: var(--surface-inner); border-bottom: 1px solid var(--border); color: var(--red); font-size: 1.3rem;">🏭 Constructors' Championship</h3>
+            <h3 style="padding: 20px 25px; margin: 0; background: var(--surface-inner); border-bottom: 1px solid var(--border); color: var(--red); font-size: 1.3rem;">Constructors' Championship</h3>
             <div class="table-wrapper" style="margin: 0; box-shadow: none; border: none; border-radius: 0;">
                 <table>
                     <thead>
@@ -701,15 +701,15 @@
             const curr = wData.current;
 
             const code = curr.weather_code;
-            let icon = '☁️';
-            if(code === 0) icon = '☀️';
-            else if(code > 0 && code < 4) icon = '⛅';
-            else if(code >= 51 && code <= 67) icon = '🌧️';
-            else if(code >= 71 && code <= 77) icon = '❄️';
-            else if(code >= 95) icon = '⛈️';
+            let condition = 'Cloudy';
+            if(code === 0) condition = 'Clear';
+            else if(code > 0 && code < 4) condition = 'Partly Cloudy';
+            else if(code >= 51 && code <= 67) condition = 'Rain';
+            else if(code >= 71 && code <= 77) condition = 'Snow';
+            else if(code >= 95) condition = 'Thunderstorm';
 
             document.getElementById('weather-widget').innerHTML = `
-                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${icon} ${curr.temperature_2m}°C</div>
+                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${curr.temperature_2m}°C <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">${condition}</span></div>
                 <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
             `;
         } catch(e) {
@@ -867,9 +867,9 @@
             if (r.lockTime) {
                 raceLock = new Date(r.lockTime);
                 const dlFormat = raceLock.toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                document.getElementById('h-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
+                document.getElementById('h-deadline').innerHTML = `<b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
             } else {
-                document.getElementById('h-deadline').innerHTML = `🔒 <b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
+                document.getElementById('h-deadline').innerHTML = `<b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
             }
             
             if (raceLock && new Date() >= raceLock) {
@@ -972,7 +972,7 @@
     async function saveSeasonPicks() {
         const sd = document.getElementById('s_driver').value;
         const st = document.getElementById('s_team').value;
-        if(!sd || !st) { showToast('⚠️ Select both champions!', 'error'); return; }
+        if(!sd || !st) { showToast('Select both champions!', 'error'); return; }
         
         try {
             const res = await fetch('/api/season-picks', {
@@ -981,7 +981,7 @@
                 body: JSON.stringify({ season_driver: sd, season_constructor: st })
             });
             const d = await res.json();
-            if(d.success) showToast('✅ Season Champions Locked!', 'success');
+            if(d.success) showToast('Season Champions Locked!', 'success');
             else showToast(d.message, 'error');
         } catch(e) { showToast('Failed to save', 'error'); }
     }
@@ -996,7 +996,7 @@
         } else {
             list.innerHTML = d.map(x=>`
                 <div class="predict-group" style="border-left: 4px solid var(--red); padding: 20px;">
-                    <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;">🏎️ <span style="text-transform:uppercase;">${x.user_name}</span></h3>
+                    <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><span style="text-transform:uppercase;">${x.user_name}</span></h3>
                     <div class="live-grid-container">
                         
                         <div class="live-card-section">
@@ -1111,7 +1111,7 @@
         
         for (let id of requiredInputs) {
             if (!val(id)) { 
-                showToast('⚠️ Strategy Incomplete. Please fill all required fields.', 'error'); 
+                showToast('Strategy Incomplete. Please fill all required fields.', 'error');
                 return; 
             }
         }
@@ -1128,14 +1128,14 @@
             headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
             body:JSON.stringify(body) 
         });
-        if(res.ok) { showToast('✅ Strategy Transmitted and Locked', 'success'); } 
+        if(res.ok) { showToast('Strategy Transmitted and Locked', 'success'); }
         else { const err = await res.json(); showToast('Error: ' + (err.message || 'Locked or Failed'), 'error'); }
     });
     
     function val(id) { return document.getElementById(id).value; }
 
     async function finalize() {
-        if(!confirm('⚠️ WARNING: Finalize the race weekend and calculate scores?')) return;
+        if(!confirm('WARNING: Finalize the race weekend and calculate scores?')) return;
         showToast('Processing telemetry...', 'success');
         
         const res = await fetch('/api/finalize', {
@@ -1144,8 +1144,8 @@
             body:JSON.stringify({})
         });
         const d = await res.json();
-        if(res.ok) { showToast('✅ Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
-        else { showToast('❌ Error: ' + d.message, 'error'); }
+        if(res.ok) { showToast('Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); }
+        else { showToast('Error: ' + d.message, 'error'); }
     }
     
     function logout() { localStorage.clear(); window.location.href = window.location.pathname; }
@@ -1172,7 +1172,7 @@
             list.innerHTML = users.map(u => `
                 <div style="background: var(--surface); padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 10px;">
                     <div>
-                        <strong style="color:var(--text-main); font-size:1.1rem; display: block; margin-bottom: 4px;">${u.name} ${u.is_vip ? '🏆' : ''}</strong> 
+                        <strong style="color:var(--text-main); font-size:1.1rem; display: block; margin-bottom: 4px;">${u.name}${u.is_vip ? ' (VIP)' : ''}</strong>
                         <span style="color:var(--text-muted); font-size:0.9rem; font-weight: 700;">Score: ${u.total_score} pts</span>
                     </div>
                     <div style="display:flex; gap:10px;">
@@ -1201,7 +1201,7 @@
     }
 
     async function resetPoints(targetUser) {
-        if(!confirm(`⚠️ ARE YOU SURE? This completely resets ${targetUser}'s score to 0.`)) return;
+        if(!confirm(`ARE YOU SURE? This completely resets ${targetUser}'s score to 0.`)) return;
         try {
             await fetch('/api/admin/reset-user', {
                 method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${f1_token}`},
@@ -1233,9 +1233,9 @@
                 deferredPrompt = null;
             });
         } else if (isIos()) {
-            showToast('🍎 iOS: Tap the "Share" icon at the bottom of Safari, then scroll down and tap "Add to Home Screen".', 'success');
+            showToast('iOS: Tap the Share icon in Safari, then tap "Add to Home Screen".', 'success');
         } else {
-            showToast('🤖 Android: Tap the 3 dots (⋮) in your browser menu and tap "Add to Home screen" or "Install App".', 'success');
+            showToast('Android: Tap the browser menu and tap "Add to Home Screen" or "Install App".', 'success');
         }
     }
 </script>
