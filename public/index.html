@@ -718,27 +718,36 @@
     }
 
     async function fetchLatestSession() {
-        const fetchWithTimeout = (url, ms = 8000) => {
+        const fetchJSON = (url, ms = 15000) => {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), ms);
-            return fetch(url, { signal: controller.signal }).then(r => { clearTimeout(timeout); return r.json(); });
+            return fetch(url, { signal: controller.signal })
+                .then(r => { clearTimeout(timeout); return r.json(); })
+                .catch(() => []);
         };
         try {
-            const [sessionRes, posRes, intRes, stintRes, lapRes] = await Promise.all([
-                fetchWithTimeout('https://api.openf1.org/v1/sessions?session_key=latest'),
-                fetchWithTimeout('https://api.openf1.org/v1/position?session_key=latest'),
-                fetchWithTimeout('https://api.openf1.org/v1/intervals?session_key=latest'),
-                fetchWithTimeout('https://api.openf1.org/v1/stints?session_key=latest'),
-                fetchWithTimeout('https://api.openf1.org/v1/laps?session_key=latest')
+            const [sessionRes, driverRes, posRes, intRes, stintRes, lapRes] = await Promise.all([
+                fetchJSON('https://api.openf1.org/v1/sessions?session_key=latest'),
+                fetchJSON('https://api.openf1.org/v1/drivers?session_key=latest'),
+                fetchJSON('https://api.openf1.org/v1/position?session_key=latest'),
+                fetchJSON('https://api.openf1.org/v1/intervals?session_key=latest'),
+                fetchJSON('https://api.openf1.org/v1/stints?session_key=latest'),
+                fetchJSON('https://api.openf1.org/v1/laps?session_key=latest')
             ]);
 
-            const getArr = (data) => Array.isArray(data) ? data : (data.data || data.response || []);
+            const getArr = (data) => Array.isArray(data) ? data : [];
 
             let sessionName = "Live Session";
             const sessions = getArr(sessionRes);
             if (sessions.length > 0) {
-                sessionName = sessions[sessions.length - 1].session_name || sessions[sessions.length - 1].type || "Free Practice";
+                sessionName = sessions[sessions.length - 1].session_name || "Session";
             }
+
+            // Build name map from OpenF1 drivers endpoint (most accurate)
+            const nameMap = {};
+            getArr(driverRes).forEach(d => {
+                if (d.driver_number) nameMap[d.driver_number] = d.last_name || d.name_acronym || ('DRV ' + d.driver_number);
+            });
 
             const driverStats = {};
 
@@ -758,10 +767,10 @@
                         driverStats[i.driver_number].intDate = i.date;
                         if (driverStats[i.driver_number].position === 1) {
                             driverStats[i.driver_number].interval = 'LEADER';
-                        } else if (i.interval !== null && i.interval !== undefined) {
-                            driverStats[i.driver_number].interval = `+${parseFloat(i.interval).toFixed(3)}`;
-                        } else if (i.gap_to_leader !== null && i.gap_to_leader !== undefined) {
+                        } else if (i.gap_to_leader != null) {
                             driverStats[i.driver_number].interval = `+${parseFloat(i.gap_to_leader).toFixed(3)}`;
+                        } else if (i.interval != null) {
+                            driverStats[i.driver_number].interval = `+${parseFloat(i.interval).toFixed(3)}`;
                         }
                     }
                 }
@@ -769,10 +778,10 @@
 
             getArr(stintRes).forEach(s => {
                 if (s.driver_number && driverStats[s.driver_number] && s.compound) {
-                    const current = driverStats[s.driver_number];
-                    if (!current.stintNum || s.stint_number >= current.stintNum) {
-                        current.tyre = s.compound;
-                        current.stintNum = s.stint_number;
+                    const cur = driverStats[s.driver_number];
+                    if (!cur.stintNum || s.stint_number >= cur.stintNum) {
+                        cur.tyre = s.compound.toUpperCase();
+                        cur.stintNum = s.stint_number;
                     }
                 }
             });
@@ -780,8 +789,9 @@
             getArr(lapRes).forEach(l => {
                 if (l.driver_number && driverStats[l.driver_number]) {
                     driverStats[l.driver_number].laps = Math.max(driverStats[l.driver_number].laps || 0, l.lap_number || 0);
-                    if (l.lap_duration) {
+                    if (l.lap_duration && l.lap_number > (driverStats[l.driver_number].bestLapNum || 0)) {
                         driverStats[l.driver_number].lapTime = l.lap_duration;
+                        driverStats[l.driver_number].bestLapNum = l.lap_number;
                     }
                 }
             });
@@ -807,9 +817,7 @@
             html += `<div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">`;
 
             html += leaderboard.map(r => {
-                let dName = "DRV " + r.num;
-                const found = detailedDrivers.find(d => d.num == r.num);
-                if (found) dName = found.name.split(" ").pop(); 
+                let dName = nameMap[r.num] || (() => { const f = detailedDrivers.find(d => d.num == r.num); return f ? f.name.split(" ").pop() : "DRV " + r.num; })();
 
                 let tyreColor = '#fff';
                 let tBg = '#333';
