@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 5.1 - Session Widget Added
+        // Version 6.0 - V4 Rules Update (P10, P11, C11)
         (function() {
-            const currentVersion = "5.1"; 
+            const currentVersion = "6.0"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -355,8 +355,8 @@
 
                     <div class="predict-group">
                         <h3>🎯 The Points Bubble</h3>
+                        <label>P10 (Final Point)</label><input type="text" id="p10" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p10', 'driver', 'Select P10 (Final Point)')" required>
                         <label>P11 (Heartbreak)</label><input type="text" id="p11" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p11', 'driver', 'Select P11 (Just Missed Points)')" required>
-                        <label>P12</label><input type="text" id="p12" class="s-driver selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('p12', 'driver', 'Select P12')" required>
                     </div>
 
                     <div class="predict-group">
@@ -373,7 +373,7 @@
                         <label>2nd Team</label><input type="text" id="c2" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c2', 'team', 'Select 2nd Team')" required>
                         <label>5th Team</label><input type="text" id="c5" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c5', 'team', 'Select 5th Team')" required>
                         <label>6th Team</label><input type="text" id="c6" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c6', 'team', 'Select 6th Team')" required>
-                        <label>10th Team</label><input type="text" id="c10" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c10', 'team', 'Select 10th Team')" required>
+                        <label>11th Team</label><input type="text" id="c11" class="s-team selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('c11', 'team', 'Select 11th Team')" required>
                     </div>
 
                     <div class="predict-group" style="border-color: var(--gold); background: rgba(197, 155, 39, 0.02);">
@@ -444,18 +444,31 @@
         <h2 class="section-title">Sporting Regulations</h2>
         <div class="predict-group" style="line-height: 1.8;">
             <h3>⏰ 1. Parc Fermé (The Deadline)</h3>
-            <ul><li>Strategies are <strong>strictly locked</strong> the exact minute that <strong>Qualifying</strong> begins. No exceptions.</li></ul>
-            <h3 style="margin-top:20px;">🏎️ 2. Driver Scoring Matrix</h3>
+            <ul>
+                <li>Strategies are <strong>strictly locked</strong> at the start of Qualifying. You can change your team any number of times before this.</li>
+                <li>Incomplete submissions will be rejected. If you fail to submit a team, your score will be <strong>5 points lower than the lowest scoring player</strong> that week.</li>
+            </ul>
+            <h3 style="margin-top:20px;">🏎️ 2. Driver Scoring (P1, P2, P3, P10, P11, P21, P22)</h3>
             <ul>
                 <li><strong>Exact Match Bonus:</strong> <span style="color: #009940; font-weight: bold;">+2 Points</span>.</li>
-                <li><strong>Differential Penalty:</strong> <span style="color: var(--red); font-weight: bold;">-1 Point</span> for every position your prediction misses by.</li>
+                <li><strong>Differential Penalty:</strong> <span style="color: var(--red); font-weight: bold;">-1 Point</span> for every position your prediction misses by. Target is to minimize negative points!</li>
+                <li>All DNFs (or pre-announced non-participating drivers) will automatically be scored as finishing in <strong>P22</strong>.</li>
             </ul>
-            <h3 style="margin-top:20px;">💥 3. The 'Engine Blow' (DNF Rule)</h3>
-            <ul><li>If a driver retires, crashes, or fails to classify (DNF), the Stewards automatically score them as finishing in <strong>P22</strong>.</li></ul>
-            <h3 style="margin-top:20px;">🛠️ 4. Constructor Scoring</h3>
-            <ul><li>Constructor performance is ranked purely by combining the finishing positions of their two cars in that specific race session.</li></ul>
-            <h3 style="margin-top:20px;">🃏 5. Strategic Wildcards</h3>
-            <ul><li><strong>Biggest Race Loser:</strong> <span style="color: #009940; font-weight: bold;">+5 Points</span> for correctly identifying the driver who plummets the most positions from their grid start to the checkered flag.</li></ul>
+            <h3 style="margin-top:20px;">🛠️ 3. Constructor Scoring (1st, 2nd, 5th, 6th, 11th)</h3>
+            <ul>
+                <li>Constructors are ranked based on the sum of both their cars' race positions (lower sum = better rank).</li>
+                <li><strong>The Span Rule (Ties):</strong> If teams tie for a rank (e.g., tie for 4th), they occupy ranks 4 AND 5. Predicting either team in 4th OR 5th awards full points!</li>
+            </ul>
+            <h3 style="margin-top:20px;">🃏 4. Strategic Wildcards</h3>
+            <ul>
+                <li><strong>Race Biggest Loser:</strong> <span style="color: #009940; font-weight: bold;">+5 Points</span> for correctly predicting the driver whose rank falls the most from their starting grid position. Ties award points to all involved!</li>
+                <li><strong>Sprint Weekends:</strong> +5 Points each for predicting the Sprint's Biggest Gainer and Biggest Loser.</li>
+            </ul>
+            <h3 style="margin-top:20px;">🏆 5. Championship Prize</h3>
+            <ul>
+                <li>The overall tournament winner will receive <strong>₹500</strong> from each of the other players.</li>
+                <li>*Note: Season-long predictions (Constructor/Driver winners for +25/+50 pts) are recorded separately.*</li>
+            </ul>
         </div>
     </div>
 
@@ -825,7 +838,7 @@
                             <strong class="live-card-title">Drivers</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
                                 <span style="color:var(--text-muted)">P1:</span> <b>${x.p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${x.p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${x.p3}</b><br>
-                                <span style="color:var(--text-muted)">P11:</span> <b>${x.p11}</b> | <span style="color:var(--text-muted)">P12:</span> <b>${x.p12}</b><br>
+                                <span style="color:var(--text-muted)">P10:</span> <b>${x.p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b>${x.p11}</b><br>
                                 <span style="color:var(--text-muted)">P21:</span> <b>${x.p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b>${x.p22}</b>
                             </div>
                         </div>
@@ -835,7 +848,7 @@
                             <div style="line-height:1.8; color: var(--text-main);">
                                 <span style="color:var(--text-muted)">1st:</span> <b>${x.c1}</b> | <span style="color:var(--text-muted)">2nd:</span> <b>${x.c2}</b><br>
                                 <span style="color:var(--text-muted)">5th:</span> <b>${x.c5}</b> | <span style="color:var(--text-muted)">6th:</span> <b>${x.c6}</b><br>
-                                <span style="color:var(--text-muted)">10th:</span> <b>${x.c10}</b>
+                                <span style="color:var(--text-muted)">11th:</span> <b>${x.c11}</b>
                             </div>
                         </div>
 
@@ -918,7 +931,7 @@
     document.getElementById('p-form').addEventListener('submit', async(e)=>{
         e.preventDefault();
         
-        const requiredInputs = ['p1', 'p2', 'p3', 'p11', 'p12', 'p21', 'p22', 'c1', 'c2', 'c5', 'c6', 'c10', 'wl'];
+        const requiredInputs = ['p1', 'p2', 'p3', 'p10', 'p11', 'p21', 'p22', 'c1', 'c2', 'c5', 'c6', 'c11', 'wl'];
         if (!document.getElementById('sprint-box').classList.contains('hidden')) { 
             requiredInputs.push('sg', 'sl'); 
         }
@@ -932,8 +945,8 @@
 
         const body = {
             user_name: f1_name,
-            p1:val('p1'), p2:val('p2'), p3:val('p3'), p11:val('p11'), p12:val('p12'), p21:val('p21'), p22:val('p22'),
-            c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c10:val('c10'),
+            p1:val('p1'), p2:val('p2'), p3:val('p3'), p10:val('p10'), p11:val('p11'), p21:val('p21'), p22:val('p22'),
+            c1:val('c1'), c2:val('c2'), c5:val('c5'), c6:val('c6'), c11:val('c11'),
             w_race_loser:val('wl'), w_sprint_gainer: val('sg'), w_sprint_loser: val('sl')
         };
         

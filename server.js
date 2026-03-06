@@ -7,7 +7,7 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026'; // Match this in Render Env
+const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026'; 
 
 app.use(express.json());
 
@@ -26,22 +26,21 @@ const db = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: proces
 // --- 1. DATABASE SETUP ---
 async function setupDatabase() {
   try {
-    // Removed UNIQUE from auth_id to prevent SQLite crash on existing tables
     await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, auth_id TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN auth_id TEXT`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
     try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
     
-    // P21 and P22 for the 22-car grid
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v3 (
+    // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT UNIQUE, 
-        p1 TEXT, p2 TEXT, p3 TEXT, p11 TEXT, p12 TEXT, p21 TEXT, p22 TEXT, 
-        c1 TEXT, c2 TEXT, c5 TEXT, c6 TEXT, c10 TEXT, 
+        p1 TEXT, p2 TEXT, p3 TEXT, p10 TEXT, p11 TEXT, p21 TEXT, p22 TEXT, 
+        c1 TEXT, c2 TEXT, c5 TEXT, c6 TEXT, c11 TEXT, 
         w_race_loser TEXT, w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
     
     await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
-    console.log("✅ Database Synced for Google OAuth & 22-Car Grid.");
+    console.log("✅ Database Synced for V4 Scoring & Google OAuth.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -90,7 +89,6 @@ function authenticateToken(req, res, next) {
 
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
 app.get('/auth/google', (req, res) => {
-    // 🔴 FIX: prompt=select_account is now properly attached to the end of the URL
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email&prompt=select_account`;
     res.redirect(url);
 });
@@ -119,7 +117,7 @@ app.get('/auth/google/callback', async (req, res) => {
 });
 
 
-// --- 6. SCORING ENGINE ---
+// --- 6. SCORING ENGINE (V4 NEW RULES) ---
 async function sendDiscordNotification(msg) {
   const url = "https://discord.com/api/webhooks/1476880265409335306/3N7tM1n8LUYucuCYCEWF3UzfDt9adgtzGKdqV433CG95J57SOwcyXOzSEbOgAiYK3MK3";
   try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) }); } catch (e) {}
@@ -127,90 +125,146 @@ async function sendDiscordNotification(msg) {
 
 async function performFinalization() {
   try {
+    // 1. Fetch Race Data
     const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
     const races = raceRes.MRData.RaceTable.Races;
-    if (!races || races.length === 0) return { success: false, message: "No data from F1 API." };
-    
+    if (!races || races.length === 0) return { success: false, message: "No race data found." };
     const raceData = races[0];
     const results = raceData.Results;
-    const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v3");
+
+    // 2. Fetch Sprint Data
+    let sprintResults = [];
+    try {
+        const sprintRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/sprint.json').then(r => r.json());
+        if (sprintRes.MRData.RaceTable.Races.length > 0) {
+            sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
+        }
+    } catch(e) { console.log("No sprint data available"); }
+
+    const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
 
+    // --- DRIVER MATH (DNFs = 22) ---
     const actualDriverPositions = {};
     results.forEach(r => {
         const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
         let pos = parseInt(r.position);
-        if (r.positionText === 'R' || r.positionText === 'D' || r.status.startsWith('Retired') || r.status.startsWith('Collision') || r.status.startsWith('Accident')) { pos = 22; }
+        if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W' || r.status.startsWith('Retired') || r.status.startsWith('Collision')) { 
+            pos = 22; 
+        }
         actualDriverPositions[name] = pos;
     });
 
+    // --- CONSTRUCTOR MATH (Tie Range Logic) ---
     const constructorSums = {};
     results.forEach(r => {
       const c = normalizeConstructor(r.Constructor.name);
       let pos = parseInt(r.position);
-       if (r.positionText === 'R' || r.positionText === 'D') pos = 22; 
+      if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W') pos = 22; 
       constructorSums[c] = (constructorSums[c] || 0) + pos;
     });
 
-    const sortedC = Object.keys(constructorSums).sort((a, b) => constructorSums[a] - constructorSums[b]);
-    const actualCRanks = {};
-    for (let i = 0; i < sortedC.length; i++) {
-        actualCRanks[sortedC[i]] = (i > 0 && constructorSums[sortedC[i]] === constructorSums[sortedC[i-1]]) ? actualCRanks[sortedC[i-1]] : i + 1;
+    const sumGroups = {};
+    for (const [c, sum] of Object.entries(constructorSums)) {
+        if (!sumGroups[sum]) sumGroups[sum] = [];
+        sumGroups[sum].push(c);
     }
+    
+    const sortedSums = Object.keys(sumGroups).map(Number).sort((a, b) => a - b);
+    const actualCRanges = {};
+    let currentRank = 1;
+    
+    sortedSums.forEach(sum => {
+        const teams = sumGroups[sum];
+        const numTeams = teams.length;
+        teams.forEach(team => {
+            actualCRanges[team] = { min: currentRank, max: currentRank + numTeams - 1 };
+        });
+        currentRank += numTeams;
+    });
 
-    let raceLosers = []; let maxDrop = -999;
+    // --- WILDCARDS ---
+    let raceLosers = []; let maxRaceDrop = -999;
     results.forEach(r => {
        if (parseInt(r.grid) > 0) {
            let finish = parseInt(r.position);
            if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
            const drop = finish - parseInt(r.grid);
            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-           if (drop > maxDrop) { maxDrop = drop; raceLosers = [name]; }
-           else if (drop === maxDrop) raceLosers.push(name);
+           if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; }
+           else if (drop === maxRaceDrop) raceLosers.push(name);
        }
     });
 
-    const predictions = await db.execute("SELECT * FROM f1_predictions_v3").then(r => r.rows);
+    let sprintGainers = []; let maxSprintGain = -999;
+    let sprintLosers = []; let maxSprintDrop = -999;
+    sprintResults.forEach(r => {
+       if (parseInt(r.grid) > 0) {
+           let finish = parseInt(r.position);
+           if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
+           const gain = parseInt(r.grid) - finish;
+           const drop = finish - parseInt(r.grid);
+           const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+           
+           if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; }
+           else if (gain === maxSprintGain) sprintGainers.push(name);
+           if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; }
+           else if (drop === maxSprintDrop) sprintLosers.push(name);
+       }
+    });
+
+    // --- SCORE CALCULATION ---
+    const predictions = await db.execute("SELECT * FROM f1_predictions_v4").then(r => r.rows);
     let scores = {}; let lowest = Infinity;
 
     predictions.forEach(p => {
         let score = 0;
-        const calc = (pred, actual) => {
-            if (!actual) return 0;
-            const diff = Math.abs(pred - actual);
-            if (diff === 0) return 2;
-            return -diff;
-        };
 
         const driversToScore = [
             { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
-            { pred: p.p11, rank: 11 }, { pred: p.p12, rank: 12 },
+            { pred: p.p10, rank: 10 }, { pred: p.p11, rank: 11 },
             { pred: p.p21, rank: 21 }, { pred: p.p22, rank: 22 }
         ];
         
         driversToScore.forEach(item => {
-            const act = actualDriverPositions[normalizeStr(item.pred)];
-            if (act) score += calc(item.rank, act);
+            if (!item.pred) return;
+            let act = actualDriverPositions[normalizeStr(item.pred)];
+            if (!act) act = 22; // Replacement defaults
+            
+            const diff = Math.abs(item.rank - act);
+            if (diff === 0) score += 2;
+            else score -= diff;
         });
 
         const teamsToScore = [
             { pred: p.c1, rank: 1 }, { pred: p.c2, rank: 2 },
-            { pred: p.c5, rank: 5 }, { pred: p.c6, rank: 6 }, { pred: p.c10, rank: 10 }
+            { pred: p.c5, rank: 5 }, { pred: p.c6, rank: 6 }, { pred: p.c11, rank: 11 }
         ];
         
         teamsToScore.forEach(item => {
-            const act = actualCRanks[normalizeConstructor(item.pred)];
-            if (act) score += calc(item.rank, act);
+            if (!item.pred) return;
+            const range = actualCRanges[normalizeConstructor(item.pred)];
+            if (!range) return;
+            
+            let diff = 0;
+            if (item.rank >= range.min && item.rank <= range.max) diff = 0;
+            else if (item.rank < range.min) diff = range.min - item.rank;
+            else diff = item.rank - range.max;
+            
+            if (diff === 0) score += 2;
+            else score -= diff;
         });
 
         if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) score += 5;
+        if (p.w_sprint_gainer && sprintGainers.includes(normalizeStr(p.w_sprint_gainer))) score += 5;
+        if (p.w_sprint_loser && sprintLosers.includes(normalizeStr(p.w_sprint_loser))) score += 5;
 
         scores[p.user_name] = score;
         if (score < lowest) lowest = score;
     });
 
+    // Apply "Lowest - 5" Penalty
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
-    
     const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
     
     for (const d of activeDrivers) {
@@ -220,8 +274,8 @@ async function performFinalization() {
         }
     }
 
-    await db.execute("DELETE FROM f1_predictions_v3");
-    await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!** Points have been officially updated on the Standings board.`);
+    await db.execute("DELETE FROM f1_predictions_v4");
+    await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!** Points distributed!`);
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
 }
@@ -240,31 +294,39 @@ app.get('/api/next-race', (req, res) => {
 });
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
-// --- NEW: API-Sports Live Proxy (For Widget ONLY) ---
+
+// --- NEW: API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
 app.get('/api/live-sessions', async (req, res) => {
     try {
         const apiKey = '08a9977cc0f7cd9b134cb7f9e65193b8';
         
-        // 1. Get all 2026 sessions
-        const sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
+        let sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
             params: { season: '2026' },
             headers: { 'x-apisports-key': apiKey }
         });
         
-        // 2. Find the most recently "Completed" session (FP1, FP2, SQ, etc.)
-        const completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
-        if (completed.length === 0) return res.json({ error: "No completed sessions yet" });
+        let completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
+        let displaySessionName = "";
+        
+        if (completed.length === 0) {
+            sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
+                params: { season: '2025' },
+                headers: { 'x-apisports-key': apiKey }
+            });
+            completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
+            displaySessionName = "2025 Abu Dhabi (Standby)";
+        } else {
+            displaySessionName = completed[completed.length - 1].type; 
+        }
         
         const lastSessionId = completed[completed.length - 1].id;
         
-        // 3. Fetch the rankings for that specific session
         const rankRes = await axios.get('https://v1.formula-1.api-sports.io/rankings/races', {
             params: { race: lastSessionId },
             headers: { 'x-apisports-key': apiKey }
         });
         
-        // Include the session name so the frontend can display it (e.g. "Free Practice 1")
-        res.json({ sessionName: completed[completed.length - 1].type, data: rankRes.data.response });
+        res.json({ sessionName: displaySessionName, data: rankRes.data.response });
     } catch (e) {
         res.status(500).json({ error: "Live fetch failed" });
     }
@@ -286,16 +348,20 @@ app.post('/predict', authenticateToken, async (req, res) => {
   if (now > lockTime) {
       return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
   }
+  
+  if (!d.p1 || !d.p10 || !d.c11 || !d.w_race_loser) {
+      return res.status(400).json({ success: false, message: "Invalid: Incomplete predictions." });
+  }
 
   try {
       await db.execute({
-          sql: `INSERT INTO f1_predictions_v3 (user_name, p1, p2, p3, p11, p12, p21, p22, c1, c2, c5, c6, c10, w_race_loser, w_sprint_gainer, w_sprint_loser) 
+          sql: `INSERT INTO f1_predictions_v4 (user_name, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
                 ON CONFLICT(user_name) DO UPDATE SET 
-                p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p11=excluded.p11, p12=excluded.p12, p21=excluded.p21, p22=excluded.p22, 
-                c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c10=excluded.c10, 
+                p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p10=excluded.p10, p11=excluded.p11, p21=excluded.p21, p22=excluded.p22, 
+                c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c11=excluded.c11, 
                 w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
-          args: [userName, d.p1, d.p2, d.p3, d.p11, d.p12, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c10, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
+          args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
       });
       
       await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
@@ -310,25 +376,22 @@ app.post('/api/finalize', async (req, res) => {
 });
 
 app.get('/api/predictions', async (req, res) => {
-  const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v3 p JOIN f1_drivers d ON p.user_name = d.name");
+  const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name");
   res.json(r.rows);
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-  // Added "AND has_participated = 1" to hide users who haven't submitted their first prediction yet
   const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
   res.json(r.rows);
 });
 
 // --- 8. ADMIN ROUTES ---
-// --- 8. ADMIN ROUTES ---
 app.get('/api/admin/users', async (req, res) => {
-  if (req.query.pass !== 'Open@0761') return res.status(403).send("Unauthorized");
-  try {
-      // Added AND has_participated = 1
-      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
-      res.json(r.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  if (req.query.pass !== 'Open@0761') return res.status(403).send("Unauthorized");
+  try {
+      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
+      res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/toggle-vip', async (req, res) => {
   if (req.body.adminPass !== 'Open@0761') return res.status(403).send("Unauthorized");
