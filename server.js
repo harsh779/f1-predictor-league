@@ -316,6 +316,27 @@ app.get('/api/next-race', (req, res) => {
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
+// --- OpenF1 Live Widget Proxy (server-side, avoids browser CORS/rate limits) ---
+let widgetCache = null;
+let widgetCacheTime = 0;
+app.get('/api/live-widget', async (_req, res) => {
+    if (widgetCache && Date.now() - widgetCacheTime < 15000) return res.json(widgetCache);
+    try {
+        const f = (url) => axios.get(url, { timeout: 20000 }).then(r => r.data).catch(() => []);
+        const [sessions, drivers, positions, intervals, stints, laps] = await Promise.all([
+            f('https://api.openf1.org/v1/sessions?session_key=latest'),
+            f('https://api.openf1.org/v1/drivers?session_key=latest'),
+            f('https://api.openf1.org/v1/position?session_key=latest'),
+            f('https://api.openf1.org/v1/intervals?session_key=latest'),
+            f('https://api.openf1.org/v1/stints?session_key=latest'),
+            f('https://api.openf1.org/v1/laps?session_key=latest')
+        ]);
+        widgetCache = { sessions, drivers, positions, intervals, stints, laps };
+        widgetCacheTime = Date.now();
+        res.json(widgetCache);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // --- API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
 app.get('/api/live-sessions', async (req, res) => {
     try {
