@@ -265,6 +265,7 @@
         <button onclick="tab('home', this)" class="active-nav">Home</button>
         <button onclick="tab('predict', this)">Predict</button>
         <button onclick="tab('live', this)">Live</button>
+        <button onclick="tab('timing', this)">Timing</button>
         <button onclick="tab('standings', this)">Standings</button>
         <button onclick="tab('calendar', this)">Calendar</button>
         <button onclick="tab('grid', this)">The Grid</button>
@@ -420,6 +421,39 @@
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
             <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
                 </div>
+        </div>
+    </div>
+
+    <div id="timing" class="tab">
+        <h2 class="section-title">Live Timing</h2>
+        <div id="timing-status" style="display:flex; align-items:center; gap:10px; margin-bottom:20px; font-size:0.9rem; font-weight:700; color:var(--text-muted);"></div>
+        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table id="timing-table" style="width:100%; min-width:750px; border-collapse:collapse; font-family:'Titillium Web',sans-serif;">
+                <thead>
+                    <tr style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); border-bottom:2px solid var(--border);">
+                        <th style="padding:8px 6px; text-align:center; font-weight:900;">P</th>
+                        <th style="padding:8px 6px; text-align:left; font-weight:900;">Driver</th>
+                        <th style="padding:8px 6px; text-align:left; font-weight:900;">Team</th>
+                        <th style="padding:8px 6px; text-align:center; font-weight:900;">Laps</th>
+                        <th style="padding:8px 6px; text-align:center; font-weight:900;">Tyre</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">Best Lap</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">Last Lap</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">Gap</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">S1</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">S2</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">S3</th>
+                        <th style="padding:8px 6px; text-align:right; font-weight:900;">Top Spd</th>
+                    </tr>
+                </thead>
+                <tbody id="timing-body">
+                    <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:12px; font-size:0.75rem; color:var(--text-muted); display:flex; gap:16px; flex-wrap:wrap;">
+            <span><span style="color:#9b59b6; font-weight:900;">■</span> Overall fastest</span>
+            <span><span style="color:#00cc44; font-weight:900;">■</span> Personal best</span>
+            <span style="margin-left:auto;" id="timing-refresh-label"></span>
         </div>
     </div>
 
@@ -745,6 +779,8 @@
             const p1Secs = toSecs(drivers[0]?.best_lap_time);
 
             let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">${sessionName}</div>`;
+            html += `<div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">`;
+            html += `<div style="min-width: 380px;">`;
             html += `<div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 900; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
                 <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Best</div><div style="text-align:right;">Gap</div>
             </div>`;
@@ -780,8 +816,8 @@
                     const s = sectors[i] || {};
                     const val = s.value || '-';
                     const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'var(--text-muted)';
-                    return `<span style="color:${col}; font-weight:700;">S${i+1} ${val}</span>`;
-                }).join('<span style="color:var(--border); margin:0 4px;">|</span>');
+                    return `<span style="color:${col};font-weight:700;">S${i+1} ${val}</span>`;
+                }).join('<span style="color:var(--border);margin:0 4px;">|</span>');
 
                 return `
                 <div style="padding: 8px 0; border-bottom: 1px solid var(--surface-inner);">
@@ -799,10 +835,100 @@
                 </div>`;
             }).join('');
 
-            html += `</div>`;
+            html += `</div></div></div>`;
             document.getElementById('latest-session-results').innerHTML = html;
         } catch(e) {
             document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting live timing data...</span>';
+        }
+    }
+
+    // --- TIMING TAB ---
+    let timingInterval = null;
+
+    async function loadTimingTab() {
+        const body    = document.getElementById('timing-body');
+        const status  = document.getElementById('timing-status');
+        const refresh = document.getElementById('timing-refresh-label');
+
+        try {
+            const d = await fetch('/api/live-widget?t=' + Date.now()).then(r => r.json());
+            if (d.error) throw new Error(d.error);
+
+            const drivers = d.timing?.drivers || [];
+            if (drivers.length === 0) throw new Error('No data');
+
+            const session  = d.status?.session;
+            const sesName  = session?.Name || d.timing?.session || '';
+            const sesType  = session?.Type || '';
+            const connected = d.status?.connected;
+            const trackMsg  = d.status?.track_status?.Message || '';
+
+            const toSecs = (t) => {
+                if (!t) return null;
+                const p = t.split(':');
+                return p.length === 2 ? parseInt(p[0]) * 60 + parseFloat(p[1]) : parseFloat(p[0]);
+            };
+            const p1Secs = toSecs(drivers[0]?.best_lap_time);
+
+            const dot = connected ? '#00cc44' : '#e10600';
+            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${dot};display:inline-block;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
+            refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            body.innerHTML = drivers.map(r => {
+                const pos  = parseInt(r.position) || 99;
+                const name = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
+                const team = r.team || '-';
+                const teamCol = r.team_colour ? '#' + r.team_colour : 'var(--border)';
+
+                const tyre = (r.tyre_compound || '').toUpperCase();
+                let tyreColor = '#fff', tBg = '#444';
+                const tName = tyre ? tyre.substring(0, 1) : '-';
+                if (tyre === 'SOFT')         { tBg = '#e10600'; }
+                if (tyre === 'MEDIUM')       { tyreColor = '#111'; tBg = '#eebb00'; }
+                if (tyre === 'HARD')         { tyreColor = '#111'; tBg = '#ffffff'; }
+                if (tyre === 'INTERMEDIATE') { tBg = '#00cc66'; }
+                if (tyre === 'WET')          { tBg = '#0066ff'; }
+                const tyreLaps = r.tyre_laps ? ` <span style="color:var(--text-muted);font-size:0.7rem;">${r.tyre_laps}L</span>` : '';
+
+                let gapText = '-';
+                if (pos === 1) gapText = 'LEADER';
+                else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
+                else if (r.interval)      gapText = r.interval.startsWith('+')      ? r.interval      : '+' + r.interval;
+                else if (p1Secs) { const ms = toSecs(r.best_lap_time); if (ms) gapText = '+' + (ms - p1Secs).toFixed(3); }
+
+                const sCell = (i) => {
+                    const s = (r.sectors || [])[i] || {};
+                    const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'inherit';
+                    const fw  = (s.overall_best || s.personal_best) ? '900' : '600';
+                    return `<td style="padding:8px 6px;text-align:right;font-size:0.82rem;color:${col};font-weight:${fw};">${s.value || '-'}</td>`;
+                };
+
+                const bestCol  = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : 'var(--text-muted)';
+                const statusFlag = r.retired ? ' <span style="color:#e10600;font-size:0.65rem;font-weight:900;">OUT</span>'
+                                 : r.in_pit  ? ' <span style="color:#eebb00;font-size:0.65rem;font-weight:900;">PIT</span>' : '';
+
+                return `<tr style="border-bottom:1px solid var(--surface-inner); font-size:0.85rem;">
+                    <td style="padding:8px 6px;text-align:center;font-weight:900;color:var(--text-main);">${pos === 99 ? '-' : pos}</td>
+                    <td style="padding:8px 6px;">
+                        <span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>
+                        <b style="color:var(--text-main);">${name}</b>${statusFlag}
+                    </td>
+                    <td style="padding:8px 6px;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">${team}</td>
+                    <td style="padding:8px 6px;text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
+                    <td style="padding:8px 6px;text-align:center;">
+                        <span style="background:${tBg};color:${tyreColor};padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:900;">${tName}</span>${tyreLaps}
+                    </td>
+                    <td style="padding:8px 6px;text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
+                    <td style="padding:8px 6px;text-align:right;font-weight:700;color:${bestCol};">${r.last_lap_time || '-'}</td>
+                    <td style="padding:8px 6px;text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
+                    ${sCell(0)}${sCell(1)}${sCell(2)}
+                    <td style="padding:8px 6px;text-align:right;color:var(--text-muted);font-size:0.82rem;">${r.speed_traps?.fl || r.speed_traps?.st || '-'}</td>
+                </tr>`;
+            }).join('');
+
+        } catch(e) {
+            body.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            if (status) status.innerHTML = '';
         }
     }
 
@@ -895,9 +1021,17 @@
 
         localStorage.setItem('f1_active_tab', t);
 
-        if(t==='live') loadLive(); 
-        if(t==='standings') loadBoard(); 
+        if(t==='live') loadLive();
+        if(t==='standings') loadBoard();
         if(t==='calendar') loadCalendar();
+        if(t==='timing') {
+            loadTimingTab();
+            clearInterval(timingInterval);
+            timingInterval = setInterval(loadTimingTab, 30000);
+        } else {
+            clearInterval(timingInterval);
+            timingInterval = null;
+        }
     }
 
     async function loadSeasonPicks() {
