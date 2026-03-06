@@ -582,6 +582,15 @@
     let f1_name = localStorage.getItem('f1_name');
     let raceLock = null;
 
+    function checkPredictionLock() {
+        if (raceLock && new Date() >= raceLock) {
+            document.getElementById('p-form').style.display = 'none';
+            document.getElementById('locked-msg').classList.remove('hidden');
+        }
+    }
+    // Re-check every 30 seconds so the form locks automatically when quali starts
+    setInterval(checkPredictionLock, 30000);
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('token') && urlParams.has('name')) {
         f1_token = urlParams.get('token');
@@ -821,10 +830,7 @@
                 document.getElementById('h-deadline').innerHTML = `<b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
             }
             
-            if (raceLock && new Date() >= raceLock) {
-                document.getElementById('p-form').style.display = 'none';
-                document.getElementById('locked-msg').classList.remove('hidden');
-            }
+            checkPredictionLock();
 
             fetchWeather(r.country);
             fetchLatestSession();

@@ -44,7 +44,8 @@ async function setupDatabase() {
     )`);
     
     await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
-    console.log("✅ Database Synced for V4 Scoring, Season Picks & Google OAuth.");
+    await db.execute(`CREATE TABLE IF NOT EXISTS f1_meta (key TEXT PRIMARY KEY, value TEXT)`);
+    console.log("Database synced.");
   } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
@@ -472,12 +473,12 @@ app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
 // --- 9. AUTOMATED RACE DETECTION & FINALIZATION ---
 // Polls the F1 live timing API every 6 minutes.
 // When a Race session transitions to "Finalised", scoring is triggered automatically.
-let lastFinalizedSessionKey = null;
 let finalizationPending = false;
 
 setInterval(async () => {
-    // Keep Render server awake
+    // Keep both Render servers awake
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
+    fetch(`${F1_TIMING_API}/status`).catch(() => {});
 
     if (finalizationPending) return;
 
@@ -489,8 +490,11 @@ setInterval(async () => {
         if (!session || session.Type !== 'Race') return;
         if (session.SessionStatus !== 'Finalised') return;
 
-        const sessionKey = session.Key;
-        if (lastFinalizedSessionKey === sessionKey) return; // already handled
+        const sessionKey = String(session.Key);
+
+        // Check DB to see if we already finalized this session (survives restarts)
+        const meta = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'last_finalized_session'", args: [] });
+        if (meta.rows[0]?.value === sessionKey) return;
 
         console.log(`[AUTO] Race session ${sessionKey} finalised — triggering scoring`);
         finalizationPending = true;
@@ -498,7 +502,7 @@ setInterval(async () => {
         const result = await performFinalization();
 
         if (result.success) {
-            lastFinalizedSessionKey = sessionKey;
+            await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('last_finalized_session', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [sessionKey] });
             console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
         } else {
             console.warn(`[AUTO] Scoring failed: ${result.message} — retrying in 6 min`);
