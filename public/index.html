@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.3 - Full Broadcast Live Timing Widget
+        // Version 6.4 - Calendar Fixed
         (function() {
-            const currentVersion = "6.3"; 
+            const currentVersion = "6.4"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -717,10 +717,8 @@
         }
     }
 
-    // --- NEW: Fetch Comprehensive Live Timing from your F1 API ---
     async function fetchLatestSession() {
         try {
-            // Fetch all required data endpoints simultaneously
             const [sessionRes, posRes, intRes, stintRes, lapRes] = await Promise.all([
                 fetch('https://f1-live-api.onrender.com/sessions/latest').then(r=>r.json()),
                 fetch('https://f1-live-api.onrender.com/position/latest').then(r=>r.json()),
@@ -739,7 +737,6 @@
 
             const driverStats = {};
 
-            // 1. Positions (Keep only the latest entry per driver)
             getArr(posRes).forEach(p => {
                 if (p.driver_number) {
                     if (!driverStats[p.driver_number]) driverStats[p.driver_number] = { num: p.driver_number };
@@ -747,7 +744,6 @@
                 }
             });
 
-            // 2. Intervals & Gaps
             getArr(intRes).forEach(i => {
                 if (i.driver_number && driverStats[i.driver_number]) {
                     if (driverStats[i.driver_number].position === 1) {
@@ -760,14 +756,12 @@
                 }
             });
 
-            // 3. Stints (Tyres - loops sequentially, leaving the latest tyre)
             getArr(stintRes).forEach(s => {
                 if (s.driver_number && driverStats[s.driver_number]) {
                     driverStats[s.driver_number].tyre = s.compound;
                 }
             });
 
-            // 4. Laps (Laps completed and latest lap time)
             getArr(lapRes).forEach(l => {
                 if (l.driver_number && driverStats[l.driver_number]) {
                     driverStats[l.driver_number].laps = Math.max(driverStats[l.driver_number].laps || 0, l.lap_number || 0);
@@ -791,18 +785,16 @@
 
             let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">⏱️ ${sessionName}</div>`;
             
-            // Header Row
             html += `<div style="display: grid; grid-template-columns: 20px 1fr 30px 30px 60px 60px; gap: 8px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 900; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
                 <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Time</div><div style="text-align:right;">Gap</div>
             </div>`;
 
-            // Scrollable Container for all 20/22 drivers
             html += `<div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">`;
 
             html += leaderboard.map(r => {
                 let dName = "DRV " + r.num;
                 const found = detailedDrivers.find(d => d.num == r.num);
-                if (found) dName = found.name.split(" ").pop(); // Last Name
+                if (found) dName = found.name.split(" ").pop(); 
 
                 let tyreColor = '#fff';
                 let tBg = '#333';
@@ -1049,8 +1041,10 @@
         body.innerHTML = `<tr><td colspan="2"><div class="skeleton" style="width:100%; height:40px; margin-bottom:10px;"></div><div class="skeleton" style="width:100%; height:40px;"></div></td></tr>`;
         
         const d = await fetch('/api/calendar?t=' + new Date().getTime()).then(r=>r.json());
+        
         body.innerHTML = d.map(x => {
             const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
+            
             let sess = x.hasSprint ? `
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: var(--surface-inner); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
                     <div><strong style="color:var(--text-main); width:55px; display:inline-block;">FP1</strong> ${formatTime(x.sessions?.fp1)}</div>

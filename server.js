@@ -49,7 +49,7 @@ async function setupDatabase() {
 }
 setupDatabase();
 
-// --- 2. FULL 2026 CALENDAR ---
+// --- 2. FULL 2026 CALENDAR (FULLY UPDATED WITH ALL SESSIONS) ---
 const f1Calendar2026 = [
   { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-08T09:30:00+05:30", circuit: "Albert Park Circuit", country: "Australia", trackDetails: { length: "5.278 km", laps: 58, corners: 14, firstGP: 1996, record: "1:19.813" }, sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
   { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-15T12:30:00+05:30", circuit: "Shanghai International Circuit", country: "China", trackDetails: { length: "5.451 km", laps: 56, corners: 16, firstGP: 2004, record: "1:32.238" }, sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
@@ -58,23 +58,23 @@ const f1Calendar2026 = [
   { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-19T22:30:00+05:30", circuit: "Jeddah Corniche Circuit", country: "Saudi Arabia", trackDetails: { length: "6.174 km", laps: 50, corners: 27, firstGP: 2021, record: "1:30.734" }, sessions: { fp1: "2026-04-17T19:00:00+05:30", fp2: "2026-04-17T22:30:00+05:30", fp3: "2026-04-18T19:00:00+05:30", quali: "2026-04-18T22:30:00+05:30", race: "2026-04-19T22:30:00+05:30" } },
   { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-04T01:30:00+05:30", circuit: "Miami International Autodrome", country: "United States", trackDetails: { length: "5.412 km", laps: 57, corners: 19, firstGP: 2022, record: "1:29.708" }, sessions: { fp1: "2026-05-01T22:00:00+05:30", sprintQuali: "2026-05-02T02:00:00+05:30", sprint: "2026-05-02T21:30:00+05:30", quali: "2026-05-03T01:30:00+05:30", race: "2026-05-04T01:30:00+05:30" } },
   { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-24T23:30:00+05:30", circuit: "Circuit Gilles-Villeneuve", country: "Canada", trackDetails: { length: "4.361 km", laps: 70, corners: 14, firstGP: 1978, record: "1:13.078" }, sessions: { fp1: "2026-05-22T23:00:00+05:30", sprintQuali: "2026-05-23T03:00:00+05:30", sprint: "2026-05-23T21:30:00+05:30", quali: "2026-05-24T01:30:00+05:30", race: "2026-05-24T23:30:00+05:30" } },
-  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-07T18:30:00+05:30", circuit: "Circuit de Monaco", country: "Monaco", trackDetails: { length: "3.337 km", laps: 78, corners: 19, firstGP: 1950, record: "1:12.909" }, sessions: { quali: "2026-06-06T19:30:00+05:30", race: "2026-06-07T18:30:00+05:30" } },
-  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-14T18:30:00+05:30", circuit: "Circuit de Barcelona-Catalunya", country: "Spain", trackDetails: { length: "4.657 km", laps: 66, corners: 14, firstGP: 1991, record: "1:18.149" }, sessions: { quali: "2026-06-13T19:30:00+05:30", race: "2026-06-14T18:30:00+05:30" } },
-  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-28T18:30:00+05:30", circuit: "Red Bull Ring", country: "Austria", trackDetails: { length: "4.318 km", laps: 71, corners: 10, firstGP: 1970, record: "1:05.619" }, sessions: { quali: "2026-06-27T19:00:00+05:30", race: "2026-06-28T18:30:00+05:30" } },
-  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-05T19:30:00+05:30", circuit: "Silverstone Circuit", country: "Great Britain", trackDetails: { length: "5.891 km", laps: 52, corners: 18, firstGP: 1950, record: "1:27.097" }, sessions: { quali: "2026-07-04T20:00:00+05:30", race: "2026-07-05T19:30:00+05:30" } },
-  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-19T18:30:00+05:30", circuit: "Circuit de Spa-Francorchamps", country: "Belgium", trackDetails: { length: "7.004 km", laps: 44, corners: 19, firstGP: 1950, record: "1:46.286" }, sessions: { quali: "2026-07-18T19:00:00+05:30", race: "2026-07-19T18:30:00+05:30" } },
-  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-26T18:30:00+05:30", circuit: "Hungaroring", country: "Hungary", trackDetails: { length: "4.381 km", laps: 70, corners: 14, firstGP: 1986, record: "1:16.627" }, sessions: { quali: "2026-07-25T19:30:00+05:30", race: "2026-07-26T18:30:00+05:30" } },
-  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-23T18:30:00+05:30", circuit: "Circuit Zandvoort", country: "Netherlands", trackDetails: { length: "4.259 km", laps: 72, corners: 14, firstGP: 1952, record: "1:11.097" }, sessions: { quali: "2026-08-22T18:30:00+05:30", race: "2026-08-23T18:30:00+05:30" } },
-  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-06T18:30:00+05:30", circuit: "Monza Circuit", country: "Italy", trackDetails: { length: "5.793 km", laps: 53, corners: 11, firstGP: 1950, record: "1:21.046" }, sessions: { quali: "2026-09-05T19:30:00+05:30", race: "2026-09-06T18:30:00+05:30" } },
-  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-13T18:30:00+05:30", circuit: "IFEMA Madrid", country: "Spain", trackDetails: { length: "5.474 km", laps: 55, corners: 20, firstGP: 2026, record: "TBC" }, sessions: { quali: "2026-09-12T19:30:00+05:30", race: "2026-09-13T18:30:00+05:30" } },
-  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-26T16:30:00+05:30", circuit: "Baku City Circuit", country: "Azerbaijan", trackDetails: { length: "6.003 km", laps: 51, corners: 20, firstGP: 2016, record: "1:43.009" }, sessions: { quali: "2026-09-25T17:30:00+05:30", race: "2026-09-26T16:30:00+05:30" } },
-  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-11T17:30:00+05:30", circuit: "Marina Bay Street Circuit", country: "Singapore", trackDetails: { length: "4.940 km", laps: 62, corners: 19, firstGP: 2008, record: "1:35.867" }, sessions: { quali: "2026-10-10T18:30:00+05:30", race: "2026-10-11T17:30:00+05:30" } },
-  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-25T00:30:00+05:30", circuit: "Circuit of the Americas", country: "USA", trackDetails: { length: "5.513 km", laps: 56, corners: 20, firstGP: 2012, record: "1:36.169" }, sessions: { quali: "2026-10-24T03:30:00+05:30", race: "2026-10-25T00:30:00+05:30" } },
-  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-11-01T02:30:00+05:30", circuit: "Autódromo Hermanos Rodríguez", country: "Mexico", trackDetails: { length: "4.304 km", laps: 71, corners: 17, firstGP: 1962, record: "1:17.774" }, sessions: { quali: "2026-10-31T03:30:00+05:30", race: "2026-11-01T02:30:00+05:30" } },
-  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-08T22:30:00+05:30", circuit: "Interlagos Circuit", country: "Brazil", trackDetails: { length: "4.309 km", laps: 71, corners: 15, firstGP: 1973, record: "1:10.540" }, sessions: { quali: "2026-11-07T23:30:00+05:30", race: "2026-11-08T22:30:00+05:30" } },
-  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-21T11:30:00+05:30", circuit: "Las Vegas Strip Circuit", country: "USA", trackDetails: { length: "6.201 km", laps: 50, corners: 17, firstGP: 2023, record: "1:35.490" }, sessions: { quali: "2026-11-20T14:30:00+05:30", race: "2026-11-21T11:30:00+05:30" } },
-  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-29T22:30:00+05:30", circuit: "Lusail International Circuit", country: "Qatar", trackDetails: { length: "5.419 km", laps: 57, corners: 16, firstGP: 2021, record: "1:24.319" }, sessions: { quali: "2026-11-28T22:30:00+05:30", race: "2026-11-29T22:30:00+05:30" } },
-  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-06T18:30:00+05:30", circuit: "Yas Marina Circuit", country: "Abu Dhabi", trackDetails: { length: "5.281 km", laps: 58, corners: 16, firstGP: 2009, record: "1:26.103" }, sessions: { quali: "2026-12-05T19:30:00+05:30", race: "2026-12-06T18:30:00+05:30" } }
+  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-07T18:30:00+05:30", circuit: "Circuit de Monaco", country: "Monaco", trackDetails: { length: "3.337 km", laps: 78, corners: 19, firstGP: 1950, record: "1:12.909" }, sessions: { fp1: "2026-06-05T17:00:00+05:30", fp2: "2026-06-05T20:30:00+05:30", fp3: "2026-06-06T16:00:00+05:30", quali: "2026-06-06T19:30:00+05:30", race: "2026-06-07T18:30:00+05:30" } },
+  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-14T18:30:00+05:30", circuit: "Circuit de Barcelona-Catalunya", country: "Spain", trackDetails: { length: "4.657 km", laps: 66, corners: 14, firstGP: 1991, record: "1:18.149" }, sessions: { fp1: "2026-06-12T17:00:00+05:30", fp2: "2026-06-12T20:30:00+05:30", fp3: "2026-06-13T16:00:00+05:30", quali: "2026-06-13T19:30:00+05:30", race: "2026-06-14T18:30:00+05:30" } },
+  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-28T18:30:00+05:30", circuit: "Red Bull Ring", country: "Austria", trackDetails: { length: "4.318 km", laps: 71, corners: 10, firstGP: 1970, record: "1:05.619" }, sessions: { fp1: "2026-06-26T17:00:00+05:30", fp2: "2026-06-26T20:30:00+05:30", fp3: "2026-06-27T16:00:00+05:30", quali: "2026-06-27T19:00:00+05:30", race: "2026-06-28T18:30:00+05:30" } },
+  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-05T19:30:00+05:30", circuit: "Silverstone Circuit", country: "Great Britain", trackDetails: { length: "5.891 km", laps: 52, corners: 18, firstGP: 1950, record: "1:27.097" }, sessions: { fp1: "2026-07-03T18:00:00+05:30", sprintQuali: "2026-07-03T22:00:00+05:30", sprint: "2026-07-04T16:30:00+05:30", quali: "2026-07-04T20:00:00+05:30", race: "2026-07-05T19:30:00+05:30" } },
+  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-19T18:30:00+05:30", circuit: "Circuit de Spa-Francorchamps", country: "Belgium", trackDetails: { length: "7.004 km", laps: 44, corners: 19, firstGP: 1950, record: "1:46.286" }, sessions: { fp1: "2026-07-17T17:00:00+05:30", fp2: "2026-07-17T20:30:00+05:30", fp3: "2026-07-18T16:00:00+05:30", quali: "2026-07-18T19:00:00+05:30", race: "2026-07-19T18:30:00+05:30" } },
+  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-26T18:30:00+05:30", circuit: "Hungaroring", country: "Hungary", trackDetails: { length: "4.381 km", laps: 70, corners: 14, firstGP: 1986, record: "1:16.627" }, sessions: { fp1: "2026-07-24T17:00:00+05:30", fp2: "2026-07-24T20:30:00+05:30", fp3: "2026-07-25T16:00:00+05:30", quali: "2026-07-25T19:30:00+05:30", race: "2026-07-26T18:30:00+05:30" } },
+  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-23T18:30:00+05:30", circuit: "Circuit Zandvoort", country: "Netherlands", trackDetails: { length: "4.259 km", laps: 72, corners: 14, firstGP: 1952, record: "1:11.097" }, sessions: { fp1: "2026-08-21T16:00:00+05:30", sprintQuali: "2026-08-21T19:30:00+05:30", sprint: "2026-08-22T15:30:00+05:30", quali: "2026-08-22T18:30:00+05:30", race: "2026-08-23T18:30:00+05:30" } },
+  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-06T18:30:00+05:30", circuit: "Monza Circuit", country: "Italy", trackDetails: { length: "5.793 km", laps: 53, corners: 11, firstGP: 1950, record: "1:21.046" }, sessions: { fp1: "2026-09-04T17:00:00+05:30", fp2: "2026-09-04T20:30:00+05:30", fp3: "2026-09-05T16:00:00+05:30", quali: "2026-09-05T19:30:00+05:30", race: "2026-09-06T18:30:00+05:30" } },
+  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-13T18:30:00+05:30", circuit: "IFEMA Madrid", country: "Spain", trackDetails: { length: "5.474 km", laps: 55, corners: 20, firstGP: 2026, record: "TBC" }, sessions: { fp1: "2026-09-11T17:00:00+05:30", fp2: "2026-09-11T20:30:00+05:30", fp3: "2026-09-12T16:00:00+05:30", quali: "2026-09-12T19:30:00+05:30", race: "2026-09-13T18:30:00+05:30" } },
+  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-26T16:30:00+05:30", circuit: "Baku City Circuit", country: "Azerbaijan", trackDetails: { length: "6.003 km", laps: 51, corners: 20, firstGP: 2016, record: "1:43.009" }, sessions: { fp1: "2026-09-24T15:00:00+05:30", fp2: "2026-09-24T18:30:00+05:30", fp3: "2026-09-25T14:30:00+05:30", quali: "2026-09-25T17:30:00+05:30", race: "2026-09-26T16:30:00+05:30" } },
+  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-11T17:30:00+05:30", circuit: "Marina Bay Street Circuit", country: "Singapore", trackDetails: { length: "4.940 km", laps: 62, corners: 19, firstGP: 2008, record: "1:35.867" }, sessions: { fp1: "2026-10-09T15:00:00+05:30", sprintQuali: "2026-10-09T18:30:00+05:30", sprint: "2026-10-10T14:30:00+05:30", quali: "2026-10-10T18:30:00+05:30", race: "2026-10-11T17:30:00+05:30" } },
+  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-26T00:30:00+05:30", circuit: "Circuit of the Americas", country: "USA", trackDetails: { length: "5.513 km", laps: 56, corners: 20, firstGP: 2012, record: "1:36.169" }, sessions: { fp1: "2026-10-23T23:00:00+05:30", fp2: "2026-10-24T02:30:00+05:30", fp3: "2026-10-24T23:30:00+05:30", quali: "2026-10-25T03:30:00+05:30", race: "2026-10-26T00:30:00+05:30" } },
+  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-11-02T02:30:00+05:30", circuit: "Autódromo Hermanos Rodríguez", country: "Mexico", trackDetails: { length: "4.304 km", laps: 71, corners: 17, firstGP: 1962, record: "1:17.774" }, sessions: { fp1: "2026-10-31T00:00:00+05:30", fp2: "2026-10-31T03:30:00+05:30", fp3: "2026-10-31T23:00:00+05:30", quali: "2026-11-01T03:30:00+05:30", race: "2026-11-02T02:30:00+05:30" } },
+  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-08T22:30:00+05:30", circuit: "Interlagos Circuit", country: "Brazil", trackDetails: { length: "4.309 km", laps: 71, corners: 15, firstGP: 1973, record: "1:10.540" }, sessions: { fp1: "2026-11-06T20:00:00+05:30", fp2: "2026-11-06T23:30:00+05:30", fp3: "2026-11-07T20:00:00+05:30", quali: "2026-11-07T23:30:00+05:30", race: "2026-11-08T22:30:00+05:30" } },
+  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-22T11:30:00+05:30", circuit: "Las Vegas Strip Circuit", country: "USA", trackDetails: { length: "6.201 km", laps: 50, corners: 17, firstGP: 2023, record: "1:35.490" }, sessions: { fp1: "2026-11-20T08:00:00+05:30", fp2: "2026-11-20T11:30:00+05:30", fp3: "2026-11-21T08:00:00+05:30", quali: "2026-11-21T11:30:00+05:30", race: "2026-11-22T11:30:00+05:30" } },
+  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-29T22:30:00+05:30", circuit: "Lusail International Circuit", country: "Qatar", trackDetails: { length: "5.419 km", laps: 57, corners: 16, firstGP: 2021, record: "1:24.319" }, sessions: { fp1: "2026-11-27T19:00:00+05:30", fp2: "2026-11-27T22:30:00+05:30", fp3: "2026-11-28T19:00:00+05:30", quali: "2026-11-28T22:30:00+05:30", race: "2026-11-29T22:30:00+05:30" } },
+  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-06T18:30:00+05:30", circuit: "Yas Marina Circuit", country: "Abu Dhabi", trackDetails: { length: "5.281 km", laps: 58, corners: 16, firstGP: 2009, record: "1:26.103" }, sessions: { fp1: "2026-12-04T15:00:00+05:30", fp2: "2026-12-04T18:30:00+05:30", fp3: "2026-12-05T16:00:00+05:30", quali: "2026-12-05T19:30:00+05:30", race: "2026-12-06T18:30:00+05:30" } }
 ];
 
 // --- 3. HELPERS ---
@@ -314,6 +314,43 @@ app.get('/api/next-race', (req, res) => {
 });
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
+
+// --- API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
+app.get('/api/live-sessions', async (req, res) => {
+    try {
+        const apiKey = '08a9977cc0f7cd9b134cb7f9e65193b8';
+        
+        let sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
+            params: { season: '2026' },
+            headers: { 'x-apisports-key': apiKey }
+        });
+        
+        let completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
+        let displaySessionName = "";
+        
+        if (completed.length === 0) {
+            sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
+                params: { season: '2025' },
+                headers: { 'x-apisports-key': apiKey }
+            });
+            completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
+            displaySessionName = "2025 Abu Dhabi (Standby)";
+        } else {
+            displaySessionName = completed[completed.length - 1].type; 
+        }
+        
+        const lastSessionId = completed[completed.length - 1].id;
+        
+        const rankRes = await axios.get('https://v1.formula-1.api-sports.io/rankings/races', {
+            params: { race: lastSessionId },
+            headers: { 'x-apisports-key': apiKey }
+        });
+        
+        res.json({ sessionName: displaySessionName, data: rankRes.data.response });
+    } catch (e) {
+        res.status(500).json({ error: "Live fetch failed" });
+    }
+});
 
 // --- NEW: SEASON-LONG PREDICTIONS ROUTES ---
 app.get('/api/season-picks', authenticateToken, async (req, res) => {
