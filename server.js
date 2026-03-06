@@ -320,24 +320,29 @@ app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 let widgetCache = null;
 let widgetCacheTime = 0;
 app.get('/api/live-widget', async (_req, res) => {
-    if (widgetCache && Date.now() - widgetCacheTime < 15000) return res.json(widgetCache);
+    if (widgetCache && Date.now() - widgetCacheTime < 30000) return res.json(widgetCache);
     try {
-        const f = (url) => axios.get(url, { timeout: 20000 }).then(r => r.data).catch((e) => { console.log(`OpenF1 fail [${url}]:`, e.message); return []; });
+        const delay = (ms) => new Promise(r => setTimeout(r, ms));
+        const f = (url) => axios.get(url, { timeout: 20000 }).then(r => r.data).catch(() => []);
 
-        // Step 1: Get session key first
         const sessions = await f('https://api.openf1.org/v1/sessions?session_key=latest');
         const sessionKey = sessions && sessions.length > 0 ? sessions[sessions.length - 1].session_key : 'latest';
-        console.log(`🏎️ Live widget: session_key=${sessionKey}, name=${sessions[0]?.session_name}`);
+        const sessionType = sessions && sessions.length > 0 ? sessions[sessions.length - 1].session_type : '';
 
-        // Step 2: Fetch all data with explicit session key
-        const [drivers, positions, intervals, stints, laps] = await Promise.all([
-            f(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`),
-            f(`https://api.openf1.org/v1/position?session_key=${sessionKey}`),
-            f(`https://api.openf1.org/v1/intervals?session_key=${sessionKey}`),
-            f(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`),
-            f(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`)
-        ]);
-        console.log(`📊 drivers:${drivers.length} pos:${positions.length} int:${intervals.length} stints:${stints.length} laps:${laps.length}`);
+        await delay(300);
+        const drivers = await f(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`);
+        await delay(300);
+        const positions = await f(`https://api.openf1.org/v1/position?session_key=${sessionKey}`);
+        await delay(300);
+        const stints = await f(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`);
+        await delay(300);
+        const laps = await f(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`);
+        // intervals only meaningful during race/sprint, skip for practice to save a request
+        const intervals = (sessionType === 'Race' || sessionType === 'Sprint')
+            ? await (delay(300).then(() => f(`https://api.openf1.org/v1/intervals?session_key=${sessionKey}`)))
+            : [];
+
+        console.log(`📊 [${sessionType}] drivers:${drivers.length} pos:${positions.length} stints:${stints.length} laps:${laps.length} int:${intervals.length}`);
 
         widgetCache = { sessions, drivers, positions, intervals, stints, laps };
         widgetCacheTime = Date.now();
