@@ -237,22 +237,66 @@
         }
 
         /* ── Live Timing Tab ──────────────────────────────────────────── */
-        #timing-table { width: 100%; border-collapse: collapse; font-family: 'Titillium Web', sans-serif; }
-        #timing-table thead tr {
-            font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px;
-            color: var(--text-muted); border-bottom: 2px solid var(--border);
+
+        /* Desktop: full table visible, cards hidden */
+        #timing-table-wrap { display: block; }
+        #timing-cards      { display: none; }
+        /* Mobile: cards visible, table hidden */
+        @media (max-width: 640px) {
+            #timing-table-wrap { display: none; }
+            #timing-cards      { display: block; }
         }
+
+        /* Desktop table */
+        #timing-table { width: 100%; border-collapse: collapse; font-family: 'Titillium Web', sans-serif; }
+        #timing-table thead tr { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 2px solid var(--border); }
         #timing-table th { padding: 7px 5px; font-weight: 900; white-space: nowrap; }
-        #timing-table td { padding: 9px 5px; font-size: 0.85rem; border-bottom: 1px solid var(--surface-inner); vertical-align: middle; }
+        #timing-table td { padding: 9px 5px; font-size: 0.85rem; border-bottom: 1px solid var(--surface-inner); vertical-align: middle; white-space: nowrap; }
         #timing-table tbody tr:last-child td { border-bottom: none; }
 
-        /* Columns hidden on small phones, shown on wider screens */
-        @media (max-width: 500px) {
-            .tc-team, .tc-laps, .tc-last, .tc-spd { display: none; }
+        /* Mobile card rows — ALL data, no columns hidden */
+        .tr-block {
+            display: flex;
+            align-items: stretch;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--surface-inner);
         }
-        @media (max-width: 640px) {
-            .tc-team, .tc-spd { display: none; }
+        .tr-block:last-child { border-bottom: none; }
+        .tr-pos-col {
+            width: 28px; flex-shrink: 0;
+            display: flex; align-items: flex-start; justify-content: center; padding-top: 2px;
         }
+        .tr-pos { font-weight: 900; font-size: 1rem; color: var(--text-main); }
+        .tr-bar { width: 4px; flex-shrink: 0; border-radius: 2px; margin-right: 9px; align-self: stretch; min-height: 52px; }
+        .tr-content { flex: 1; min-width: 0; }
+
+        /* Line 1: name + badge → tyre + gap */
+        .tr-line1 { display: flex; align-items: center; gap: 5px; }
+        .tr-name  { font-weight: 900; font-size: 0.95rem; color: var(--text-main); letter-spacing: 0.5px; }
+        .tr-badge { font-size: 0.6rem; font-weight: 900; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.5px; flex-shrink: 0; }
+        .tr-badge.pit { background: rgba(238,187,0,0.15); color: #eebb00; border: 1px solid rgba(238,187,0,0.35); }
+        .tr-badge.out { background: rgba(225,6,0,0.12);   color: #e10600; border: 1px solid rgba(225,6,0,0.3); }
+        .tr-line1-right { margin-left: auto; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .tr-tyre-pill {
+            width: 22px; height: 22px; display: inline-flex; align-items: center;
+            justify-content: center; border-radius: 50%; font-size: 0.72rem; font-weight: 900;
+        }
+        .tr-tyre-age { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
+        .tr-gap      { font-weight: 900; font-size: 0.88rem; color: var(--red); font-variant-numeric: tabular-nums; }
+        .tr-gap.ldr  { color: var(--text-muted); font-size: 0.7rem; letter-spacing: 0.3px; }
+
+        /* Line 2: team · best lap · last lap · laps · top spd */
+        .tr-line2 {
+            margin-top: 5px; font-size: 0.8rem;
+            display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+        }
+        /* Line 3: S1 · S2 · S3 */
+        .tr-line3 { margin-top: 4px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
+
+        .tr-sep   { color: var(--border); }
+        .tr-val   { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-main); }
+        .tr-muted { color: var(--text-muted); }
+        .tr-sec   { font-weight: 700; font-variant-numeric: tabular-nums; }
 
         #timing-meta {
             display: flex; align-items: center; justify-content: space-between;
@@ -446,27 +490,35 @@
         <h2 class="section-title">Live Timing</h2>
         <div id="timing-status" style="display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:0.88rem; font-weight:700; color:var(--text-muted); flex-wrap:wrap;"></div>
 
-        <table id="timing-table">
-            <thead>
-                <tr>
-                    <th style="text-align:center;">P</th>
-                    <th style="text-align:left;">Driver</th>
-                    <th class="tc-team" style="text-align:left;">Team</th>
-                    <th class="tc-laps" style="text-align:center;">Laps</th>
-                    <th style="text-align:center;">Tyre</th>
-                    <th style="text-align:right;">Best</th>
-                    <th class="tc-last" style="text-align:right;">Last</th>
-                    <th style="text-align:right;">Gap</th>
-                    <th style="text-align:right;">S1</th>
-                    <th style="text-align:right;">S2</th>
-                    <th style="text-align:right;">S3</th>
-                    <th class="tc-spd" style="text-align:right;">Spd</th>
-                </tr>
-            </thead>
-            <tbody id="timing-body">
-                <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
-            </tbody>
-        </table>
+        <!-- Desktop table -->
+        <div id="timing-table-wrap">
+            <table id="timing-table">
+                <thead>
+                    <tr>
+                        <th style="text-align:center;">P</th>
+                        <th style="text-align:left;">Driver</th>
+                        <th style="text-align:left;">Team</th>
+                        <th style="text-align:center;">Laps</th>
+                        <th style="text-align:center;">Tyre</th>
+                        <th style="text-align:right;">Best</th>
+                        <th style="text-align:right;">Last</th>
+                        <th style="text-align:right;">Gap</th>
+                        <th style="text-align:right;">S1</th>
+                        <th style="text-align:right;">S2</th>
+                        <th style="text-align:right;">S3</th>
+                        <th style="text-align:right;">Spd</th>
+                    </tr>
+                </thead>
+                <tbody id="timing-body">
+                    <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Mobile cards — all data, 3-line layout per driver -->
+        <div id="timing-cards">
+            <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</div>
+        </div>
 
         <div id="timing-meta">
             <div class="timing-legend">
@@ -785,6 +837,7 @@
 
     async function loadTimingTab() {
         const body    = document.getElementById('timing-body');
+        const cards   = document.getElementById('timing-cards');
         const status  = document.getElementById('timing-status');
         const refresh = document.getElementById('timing-refresh-label');
 
@@ -812,21 +865,21 @@
             status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-            body.innerHTML = drivers.map(r => {
-                const pos  = parseInt(r.position) || 99;
-                const name = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
-                const team = r.team || '-';
+            // ── shared per-driver data ─────────────────────────────────────────
+            const rows = drivers.map(r => {
+                const pos     = parseInt(r.position) || 99;
+                const name    = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
+                const team    = r.team || '-';
                 const teamCol = r.team_colour ? '#' + r.team_colour : 'var(--border)';
 
                 const tyre = (r.tyre_compound || '').toUpperCase();
                 let tyreColor = '#fff', tBg = '#444';
-                const tName = tyre ? tyre[0] : '-';
+                const tLetter = tyre ? tyre[0] : '-';
                 if (tyre === 'SOFT')         { tBg = '#e10600'; }
                 if (tyre === 'MEDIUM')       { tyreColor = '#111'; tBg = '#eebb00'; }
                 if (tyre === 'HARD')         { tyreColor = '#111'; tBg = '#e8e8e8'; }
                 if (tyre === 'INTERMEDIATE') { tBg = '#00cc66'; }
                 if (tyre === 'WET')          { tBg = '#0066ff'; }
-                const tyreLaps = r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:2px;">${r.tyre_laps}L</span>` : '';
 
                 let gapText = '-';
                 if (pos === 1) gapText = 'LEADER';
@@ -834,41 +887,85 @@
                 else if (r.interval)      gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
                 else if (p1Secs) { const ms = toSecs(r.best_lap_time); if (ms) gapText = '+' + (ms - p1Secs).toFixed(3); }
 
-                const sCell = (i) => {
+                const sectors = [0,1,2].map(i => {
                     const s = (r.sectors || [])[i] || {};
-                    const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'inherit';
-                    const fw  = (s.overall_best || s.personal_best) ? '900' : '600';
-                    return `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${col};font-weight:${fw};white-space:nowrap;">${s.value || '-'}</td>`;
-                };
+                    return { val: s.value || '-', col: s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : null, ob: s.overall_best, pb: s.personal_best };
+                });
 
-                const bestCol   = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : 'var(--text-muted)';
-                const statusBadge = r.retired
+                const lastCol = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : null;
+                const badge   = r.retired ? 'out' : r.in_pit ? 'pit' : null;
+                const topSpd  = r.speed_traps?.fl || r.speed_traps?.st || '-';
+
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r };
+            });
+
+            // ── Desktop: table rows ───────────────────────────────────────────
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
+                const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob||s.pb)?'900':'600'};">${s.val}</td>`;
+                const badgeHtml = badge === 'out'
                     ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
-                    : r.in_pit
+                    : badge === 'pit'
                     ? ' <span style="background:rgba(238,187,0,0.15);color:#eebb00;border:1px solid rgba(238,187,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">PIT</span>'
                     : '';
-
                 return `<tr>
-                    <td style="padding:9px 5px;text-align:center;font-weight:900;color:var(--text-main);white-space:nowrap;">${pos === 99 ? '-' : pos}</td>
-                    <td style="padding:9px 5px;white-space:nowrap;">
-                        <span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>
-                        <b style="color:var(--text-main);">${name}</b>${statusBadge}
-                    </td>
-                    <td class="tc-team" style="padding:9px 5px;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;">${team}</td>
-                    <td class="tc-laps" style="padding:9px 5px;text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
-                    <td style="padding:9px 5px;text-align:center;white-space:nowrap;">
-                        <span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tName}</span>${tyreLaps}
-                    </td>
-                    <td style="padding:9px 5px;text-align:right;font-weight:700;color:var(--text-main);white-space:nowrap;">${r.best_lap_time || '-'}</td>
-                    <td class="tc-last" style="padding:9px 5px;text-align:right;font-weight:700;color:${bestCol};white-space:nowrap;">${r.last_lap_time || '-'}</td>
-                    <td style="padding:9px 5px;text-align:right;font-weight:900;color:var(--red);white-space:nowrap;">${gapText}</td>
-                    ${sCell(0)}${sCell(1)}${sCell(2)}
-                    <td class="tc-spd" style="padding:9px 5px;text-align:right;color:var(--text-muted);font-size:0.8rem;white-space:nowrap;">${r.speed_traps?.fl || r.speed_traps?.st || '-'}</td>
+                    <td style="text-align:center;font-weight:900;color:var(--text-main);">${pos === 99 ? '-' : pos}</td>
+                    <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);">${name}</b>${badgeHtml}</td>
+                    <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
+                    <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
+                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
+                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
+                    <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
+                    ${sectors.map(sCell).join('')}
+                    <td style="text-align:right;color:var(--text-muted);font-size:0.8rem;">${topSpd}</td>
                 </tr>`;
             }).join('');
 
+            // ── Mobile: 3-line card rows (ALL data) ───────────────────────────
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
+                const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
+                const isLeader  = pos === 1;
+
+                const s = (i) => {
+                    const sec = sectors[i];
+                    return `<span class="tr-sec" style="color:${sec.col || 'var(--text-muted)'};">S${i+1} ${sec.val}</span>`;
+                };
+
+                return `
+                <div class="tr-block">
+                    <div class="tr-pos-col"><span class="tr-pos">${pos === 99 ? '-' : pos}</span></div>
+                    <div class="tr-bar" style="background:${teamCol};"></div>
+                    <div class="tr-content">
+                        <div class="tr-line1">
+                            <span class="tr-name">${name}</span>
+                            ${badgeHtml}
+                            <div class="tr-line1-right">
+                                <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
+                                ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
+                                <span class="tr-gap ${isLeader ? 'ldr' : ''}">${gapText}</span>
+                            </div>
+                        </div>
+                        <div class="tr-line2">
+                            <span class="tr-muted">${team}</span>
+                            <span class="tr-sep">·</span>
+                            <span class="tr-val">${r.best_lap_time || '-'}</span>
+                            <span class="tr-sep">·</span>
+                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</span>
+                            <span class="tr-sep">·</span>
+                            <span class="tr-muted">${r.laps_completed || 0}L</span>
+                            <span class="tr-sep">·</span>
+                            <span class="tr-muted">${topSpd} km/h</span>
+                        </div>
+                        <div class="tr-line3">
+                            ${s(0)}<span class="tr-sep">·</span>${s(1)}<span class="tr-sep">·</span>${s(2)}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
         } catch(e) {
-            body.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            body.innerHTML  = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
             if (status) status.innerHTML = '';
         }
     }
