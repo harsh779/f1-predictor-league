@@ -61,15 +61,12 @@
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-        }
-        .header-top {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 14px 20px;
+            display: flex; align-items: center; gap: 16px; padding: 0 20px;
         }
         h1 { margin: 0; font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); white-space: nowrap; }
         h1 span { color: var(--red); }
 
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
@@ -77,7 +74,7 @@
 
         nav {
             display: flex; gap: 8px; align-items: center;
-            padding: 0 20px 12px;
+            flex: 1; padding: 12px 0;
             overflow-x: auto; -webkit-overflow-scrolling: touch;
         }
         nav::-webkit-scrollbar { display: none; }
@@ -94,9 +91,9 @@
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
         @media (min-width: 900px) {
-            .header-top { padding: 15px 30px; }
+            header { padding: 0 30px; gap: 20px; }
             h1 { font-size: 1.8rem; }
-            nav { padding: 0 30px 14px; gap: 10px; }
+            nav { gap: 10px; }
             nav button { font-size: 0.9rem; padding: 10px 18px; }
         }
 
@@ -215,10 +212,9 @@
 
         /* --- 8. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            .header-top { padding: 12px 15px; }
-            h1 { font-size: 1.4rem; }
-            nav { padding: 0 15px 12px; gap: 8px; }
-            nav button { font-size: 0.8rem; padding: 8px 12px; }
+            header { padding: 0 12px; gap: 10px; }
+            h1 { font-size: 1.1rem; }
+            nav button { font-size: 0.75rem; padding: 7px 10px; }
             main { padding: 15px 12px !important; }
             
             .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
@@ -320,15 +316,7 @@
 </div>
 
 <header>
-    <div class="header-top">
-        <h1><span>F1</span> 2026 LEAGUE</h1>
-        <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-            <span id="logged-in-name" style="color: var(--red);"></span>
-            <div id="user-dropdown-content" class="user-dropdown-content">
-                <button onclick="logout()">Logout</button>
-            </div>
-        </div>
-    </div>
+    <h1><span>F1</span> 2026 LEAGUE</h1>
 
     <nav id="main-nav">
         <button onclick="tab('home', this)" class="active-nav">Home</button>
@@ -342,6 +330,13 @@
         <button onclick="tab('archive', this)">Archive</button>
         <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">Install App</button>
     </nav>
+
+    <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
+        <span id="logged-in-name" style="color: var(--red);"></span>
+        <div id="user-dropdown-content" class="user-dropdown-content">
+            <button onclick="logout()">Logout</button>
+        </div>
+    </div>
 </header>
 
 <main>
