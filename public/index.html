@@ -333,10 +333,10 @@
     <nav id="main-nav">
         <button onclick="tab('home', this)" class="active-nav">Home</button>
         <button onclick="tab('predict', this)">Predict</button>
-        <button onclick="tab('live', this)">Live</button>
-        <button onclick="tab('timing', this)">Timing</button>
-        <button onclick="tab('standings', this)">Standings</button>
-        <button onclick="tab('calendar', this)">Calendar</button>
+        <button onclick="tab('live', this)">Current Predictions</button>
+        <button onclick="tab('timing', this)">Live</button>
+        <button onclick="tab('standings', this)">League Standings</button>
+        <button onclick="tab('calendar', this)">2026 Season Calendar</button>
         <button onclick="tab('grid', this)">The Grid</button>
         <button onclick="tab('rules', this)">Rules</button>
         <button onclick="tab('archive', this)">Archive</button>
@@ -473,7 +473,7 @@
     </div>
 
     <div id="live" class="tab">
-        <h2 class="section-title">Live Grid</h2>
+        <h2 class="section-title">Current Predictions</h2>
         <p style="color: var(--text-muted); margin-bottom: 30px;">Opponent strategies locked for this session:</p>
         <div id="live-list"></div>
         
@@ -487,7 +487,7 @@
     </div>
 
     <div id="timing" class="tab">
-        <h2 class="section-title">Live Timing</h2>
+        <h2 class="section-title">Live</h2>
         <div id="timing-status" style="display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:0.88rem; font-weight:700; color:var(--text-muted); flex-wrap:wrap;"></div>
 
         <!-- Desktop table -->
@@ -530,7 +530,7 @@
     </div>
 
     <div id="standings" class="tab">
-        <h2 class="section-title">2026 World Championship</h2>
+        <h2 class="section-title">League Standings</h2>
         
         <div class="table-wrapper">
             <table>
@@ -543,7 +543,7 @@
     </div>
 
     <div id="calendar" class="tab">
-        <h2 class="section-title">2026 Calendar</h2>
+        <h2 class="section-title">2026 Season Calendar</h2>
         <div class="table-wrapper">
             <table>
                 <thead>
