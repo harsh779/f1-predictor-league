@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.4 - Calendar Fixed
+        // Version 6.6 - Clean Header without Icons
         (function() {
-            const currentVersion = "6.4"; 
+            const currentVersion = "6.6"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -61,41 +61,45 @@
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-            display: flex; align-items: center; gap: 12px; padding: 0 16px;
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            padding: 15px 20px; gap: 15px;
         }
-        h1 { margin: 0; font-size: 1rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0; }
+        h1 { margin: 0; font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); white-space: nowrap; order: 1; flex-shrink: 0;}
         h1 span { color: var(--red); }
 
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.75rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
-        .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
+        /* Clean User Profile Chip (No Icons) */
+        .user-dropdown { position: relative; display: inline-flex; align-items: center; cursor: pointer; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.95rem; color: var(--text-main); order: 2; flex-shrink: 0;}
+        .user-chip { display:flex; align-items:center; background: var(--surface-inner); padding: 8px 16px; border-radius: 30px; border: 1px solid var(--border); transition: border-color 0.2s;}
+        .user-chip:hover { border-color: var(--red); }
+        
+        .user-dropdown-content { display: none; position: absolute; right: 0; top: calc(100% + 8px); background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
-        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
+        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web', sans-serif; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
         nav {
-            display: flex; gap: 5px; align-items: center;
-            flex: 1; padding: 8px 0;
-            overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            display: flex; gap: 8px; align-items: center; order: 3;
+            width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            padding-bottom: 5px;
         }
         nav::-webkit-scrollbar { display: none; }
         nav button {
             background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent;
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 5px 9px;
-            border-radius: 20px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0;
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 10px 18px;
+            border-radius: 30px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;
             transition: all 0.2s ease; white-space: nowrap; flex-shrink: 0;
         }
         nav button:hover { color: var(--text-main); background: #e0e2e6; }
         nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
-
+        
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        @media (min-width: 900px) {
-            header { padding: 0 24px; gap: 14px; }
-            h1 { font-size: 1.15rem; }
-            .user-dropdown { font-size: 0.8rem; }
-            nav { gap: 6px; }
-            nav button { font-size: 0.75rem; padding: 6px 11px; }
+        @media (min-width: 1000px) {
+            header { padding: 15px 30px; flex-wrap: nowrap; gap: 20px; }
+            h1 { font-size: 1.8rem; }
+            nav { order: 2; width: auto; flex: 1; padding-bottom: 0; justify-content: flex-end; margin-right: 15px; }
+            .user-dropdown { order: 3; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -219,20 +223,20 @@
 
         /* --- 8. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            header { flex-wrap: wrap; padding: 10px 15px 0; gap: 0; }
-            h1 { order: 1; flex: 1; font-size: 1.3rem; }
+            header { padding: 15px 15px 0 15px; gap: 10px; }
+            h1 { font-size: 1.4rem; flex: 1; order: 1; }
             .user-dropdown { order: 2; font-size: 0.85rem; }
-            nav { order: 3; width: 100%; flex: none; padding: 6px 0 10px; gap: 6px; }
-            nav button { font-size: 0.78rem; padding: 7px 11px; }
-            main { padding: 15px 12px !important; }
+            .user-chip { padding: 6px 12px; }
+            nav { order: 3; margin-left: -15px; margin-right: -15px; width: calc(100% + 30px); padding: 10px 15px; border-top: 1px solid var(--border); gap: 6px; }
+            nav button { font-size: 0.85rem; padding: 8px 14px; }
             
+            main { padding: 15px 12px !important; }
             .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
             .dash-card { padding: 18px !important; }
             .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
             .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
             .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
             #grid-container { grid-template-columns: 1fr !important; }
-            
             input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
             #h-header { font-size: 1.8rem !important; }
             .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
@@ -341,7 +345,9 @@
     </nav>
 
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        <span id="logged-in-name" style="color: var(--red);"></span>
+        <div class="user-chip">
+            <span id="logged-in-name" style="color: var(--red);"></span>
+        </div>
         <div id="user-dropdown-content" class="user-dropdown-content">
             <button onclick="logout()">Logout</button>
         </div>
@@ -496,7 +502,6 @@
         <h2 class="section-title">Live</h2>
         <div id="timing-status" style="display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:0.88rem; font-weight:700; color:var(--text-muted); flex-wrap:wrap;"></div>
 
-        <!-- Desktop table -->
         <div id="timing-table-wrap">
             <table id="timing-table">
                 <thead>
@@ -521,7 +526,6 @@
             </table>
         </div>
 
-        <!-- Mobile cards — all data, 3-line layout per driver -->
         <div id="timing-cards">
             <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</div>
         </div>
@@ -1244,7 +1248,7 @@
         
         for (let id of requiredInputs) {
             if (!val(id)) { 
-                showToast('Strategy Incomplete. Please fill all required fields.', 'error');
+                showToast('Strategy Incomplete. Please fill all required fields.', 'error'); 
                 return; 
             }
         }
@@ -1261,7 +1265,7 @@
             headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
             body:JSON.stringify(body) 
         });
-        if(res.ok) { showToast('Strategy Transmitted and Locked', 'success'); }
+        if(res.ok) { showToast('Strategy Transmitted and Locked', 'success'); } 
         else { const err = await res.json(); showToast('Error: ' + (err.message || 'Locked or Failed'), 'error'); }
     });
     
@@ -1271,13 +1275,13 @@
         if(!confirm('WARNING: Finalize the race weekend and calculate scores?')) return;
         showToast('Processing telemetry...', 'success');
         
-        const res = await fetch('/api/finalize', {
-            method:'POST',
-            headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`},
-            body:JSON.stringify({})
+        const res = await fetch('/api/finalize', { 
+            method:'POST', 
+            headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
+            body:JSON.stringify({ password: 'Open@0761' }) 
         });
         const d = await res.json();
-        if(res.ok) { showToast('Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); }
+        if(res.ok) { showToast('Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
         else { showToast('Error: ' + d.message, 'error'); }
     }
     
