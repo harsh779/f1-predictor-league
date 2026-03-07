@@ -61,27 +61,27 @@
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-            display: flex; align-items: center; gap: 16px; padding: 0 20px;
+            display: flex; align-items: center; gap: 12px; padding: 0 16px;
         }
-        h1 { margin: 0; font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); white-space: nowrap; }
+        h1 { margin: 0; font-size: 1rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0; }
         h1 span { color: var(--red); }
 
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.75rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
         nav {
-            display: flex; gap: 8px; align-items: center;
-            flex: 1; padding: 12px 0;
-            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            display: flex; gap: 5px; align-items: center;
+            flex: 1; padding: 8px 0;
+            overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
         }
         nav::-webkit-scrollbar { display: none; }
         nav button {
             background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent;
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 9px 15px;
-            border-radius: 30px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 5px 9px;
+            border-radius: 20px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0;
             transition: all 0.2s ease; white-space: nowrap; flex-shrink: 0;
         }
         nav button:hover { color: var(--text-main); background: #e0e2e6; }
@@ -91,10 +91,11 @@
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
         @media (min-width: 900px) {
-            header { padding: 0 30px; gap: 20px; }
-            h1 { font-size: 1.8rem; }
-            nav { gap: 10px; }
-            nav button { font-size: 0.9rem; padding: 10px 18px; }
+            header { padding: 0 24px; gap: 14px; }
+            h1 { font-size: 1.15rem; }
+            .user-dropdown { font-size: 0.8rem; }
+            nav { gap: 6px; }
+            nav button { font-size: 0.75rem; padding: 6px 11px; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -121,12 +122,18 @@
         .news-item-content a { color: var(--text-main); text-decoration: none; font-weight: 700; transition: color 0.2s;}
         .news-item-content a:hover { color: var(--red); }
         
-        /* Top 3 Podium */
-        .podium-list { display: flex; flex-direction: column; gap: 10px; }
-        .podium-item { display: flex; justify-content: space-between; padding: 15px; border-radius: 8px; background: var(--surface-inner); border-left: 4px solid var(--border); font-size: 1.1rem; font-weight: 700;}
-        .podium-1 { border-color: #c59b27; background: rgba(197, 155, 39, 0.05); }
+        /* Championship Leaders */
+        .podium-list { display: flex; flex-direction: column; gap: 7px; }
+        .podium-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px; border-radius: 8px; background: var(--surface-inner); border-left: 4px solid var(--border); font-size: 0.95rem; font-weight: 700; }
+        .podium-item .pos { width: 22px; font-size: 0.85rem; flex-shrink: 0; }
+        .podium-item .pname { flex: 1; }
+        .podium-item .ppts { font-size: 0.9rem; color: var(--text-muted); white-space: nowrap; }
+        .podium-1 { border-color: #c59b27; background: rgba(197, 155, 39, 0.07); }
+        .podium-1 .pos { color: #c59b27; }
         .podium-2 { border-color: #999999; }
+        .podium-2 .pos { color: #999999; }
         .podium-3 { border-color: #b87333; }
+        .podium-3 .pos { color: #b87333; }
 
         /* --- 5. PREDICT FORM CARDS --- */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
@@ -212,9 +219,11 @@
 
         /* --- 8. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            header { padding: 0 12px; gap: 10px; }
-            h1 { font-size: 1.1rem; }
-            nav button { font-size: 0.75rem; padding: 7px 10px; }
+            header { padding: 0 10px; gap: 8px; }
+            h1 { font-size: 0.9rem; }
+            .user-dropdown { font-size: 0.7rem; }
+            nav { gap: 4px; }
+            nav button { font-size: 0.65rem; padding: 5px 7px; }
             main { padding: 15px 12px !important; }
             
             .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
@@ -378,9 +387,11 @@
             <div class="dash-card" style="border-top: 4px solid var(--gold);">
                 <h3 class="dash-card-title" style="color: var(--gold); border-bottom-color: rgba(197, 155, 39, 0.3);">Championship Leaders</h3>
                 <div id="h-top-3" class="podium-list">
-                    <div class="skeleton" style="width: 100%; height: 50px;"></div>
-                    <div class="skeleton" style="width: 100%; height: 50px;"></div>
-                    <div class="skeleton" style="width: 100%; height: 50px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 42px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 42px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 42px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 42px;"></div>
+                    <div class="skeleton" style="width: 100%; height: 42px;"></div>
                 </div>
                 <div style="margin-top: 15px; text-align: center;">
                     <a href="#" onclick="tab('standings', document.querySelectorAll('#main-nav button')[4])" style="color: var(--text-muted); text-decoration: none; font-weight: 700; font-size: 0.9rem; text-transform: uppercase;">View Full Standings →</a>
@@ -998,11 +1009,12 @@
             if (d.length === 0) { 
                 podiumUI.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">No telemetry data available yet.</div>'; 
             } else {
-                const top3 = d.slice(0, 3);
-                podiumUI.innerHTML = top3.map((x, i) => `
-                    <div class="podium-item podium-${i+1}">
-                        <span><span style="display:inline-block; width: 25px; color: ${i===0?'#c59b27':i===1?'#999999':'#b87333'};">${i+1}.</span> <span style="color:var(--text-main);">${x.name}</span></span>
-                        <span style="color:var(--text-main);">${x.total_score} pts</span>
+                const top5 = d.slice(0, 5);
+                podiumUI.innerHTML = top5.map((x, i) => `
+                    <div class="podium-item ${i < 3 ? 'podium-'+(i+1) : ''}">
+                        <span class="pos">${i+1}.</span>
+                        <span class="pname">${x.name}</span>
+                        <span class="ppts">${x.total_score} pts</span>
                     </div>
                 `).join('');
             }
