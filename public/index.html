@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.8 - Single Line Header Fix
+        // Version 6.4 - Calendar Fixed
         (function() {
-            const currentVersion = "6.9";
+            const currentVersion = "6.4"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -61,48 +61,40 @@
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 20px; gap: 10px; flex-wrap: nowrap; /* STRICT SINGLE LINE */
+            display: flex; align-items: center; justify-content: space-between; padding: 12px 20px;
+            flex-wrap: nowrap; /* Forces everything strictly onto one line */
+            gap: 15px;
         }
-        
         h1 { margin: 0; font-size: 1.4rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0; }
         h1 span { color: var(--red); }
 
         nav {
             display: flex; gap: 6px; align-items: center; justify-content: center;
-            flex: 1; overflow: hidden; margin: 0 10px; flex-wrap: nowrap;
+            flex: 1; padding: 0 10px;
+            flex-wrap: nowrap; overflow: hidden; /* Removes the scrollbar entirely */
         }
         nav button {
-            background: transparent; color: var(--text-muted); border: none;
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; 
-            padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;
+            background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent;
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 6px 12px;
+            border-radius: 20px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0;
             transition: all 0.2s ease; white-space: nowrap; flex-shrink: 1;
         }
-        nav button:hover { color: var(--text-main); background: var(--surface-hover); }
-        nav button.active-nav { background: var(--red); color: white; box-shadow: 0 4px 10px var(--red-glow); }
+        nav button:hover { color: var(--text-main); background: #e0e2e6; }
+        nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
 
-        .user-dropdown { position: relative; display: inline-flex; align-items: center; cursor: pointer; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
-        .user-chip { background: var(--surface-inner); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); transition: border-color 0.2s;}
-        .user-chip:hover { border-color: var(--red); }
-        
-        .user-dropdown-content { display: none; position: absolute; right: 0; top: calc(100% + 8px); background-color: var(--surface); min-width: 120px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
+        .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
-        .user-dropdown-content button { width: 100%; text-align: center; padding: 12px; background: none; border: none; font-family: 'Titillium Web', sans-serif; font-size: 0.9rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; }
+        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
-        .btn-support { border: 1px solid var(--gold) !important; color: var(--gold) !important; }
+        .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        /* Mobile Breakpoint - Allows navigation to scroll only on small phones */
-        @media (max-width: 1050px) {
-            header { flex-wrap: wrap; padding: 10px 15px 0; gap: 0; }
-            h1 { font-size: 1.3rem; flex: 1; order: 1; }
-            .user-dropdown { order: 2; font-size: 0.75rem; }
-            .user-chip { padding: 4px 10px; }
-            nav { order: 3; width: 100%; flex: none; padding: 10px 0; gap: 6px; overflow-x: auto; margin: 0; justify-content: flex-start; border-top: 1px solid var(--surface-hover); margin-top: 10px; }
-            nav::-webkit-scrollbar { display: none; }
-            nav button { background: var(--nav-bg); border-radius: 30px; font-size: 0.75rem; padding: 6px 12px; flex-shrink: 0;}
-            nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); }
+        @media (min-width: 1200px) {
+            h1 { font-size: 1.6rem; }
+            nav { gap: 8px; }
+            nav button { font-size: 0.85rem; padding: 8px 16px; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -129,7 +121,7 @@
         .news-item-content a { color: var(--text-main); text-decoration: none; font-weight: 700; transition: color 0.2s;}
         .news-item-content a:hover { color: var(--red); }
         
-        /* Top 3 Podium */
+        /* Championship Leaders */
         .podium-list { display: flex; flex-direction: column; gap: 7px; }
         .podium-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px; border-radius: 8px; background: var(--surface-inner); border-left: 4px solid var(--border); font-size: 0.95rem; font-weight: 700; }
         .podium-item .pos { width: 22px; font-size: 0.85rem; flex-shrink: 0; }
@@ -224,6 +216,29 @@
         }
         .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-2px); }
 
+        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
+        @media (max-width: 850px) {
+            header { flex-wrap: wrap; padding: 10px 15px 0; gap: 0; }
+            h1 { order: 1; flex: 1; font-size: 1.3rem; }
+            .user-dropdown { order: 2; font-size: 0.85rem; }
+            nav { order: 3; width: 100%; flex: none; padding: 6px 0 10px; gap: 6px; overflow-x: auto; flex-wrap: wrap;}
+            nav button { font-size: 0.78rem; padding: 7px 11px; }
+            main { padding: 15px 12px !important; }
+            
+            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
+            .dash-card { padding: 18px !important; }
+            .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
+            #grid-container { grid-template-columns: 1fr !important; }
+            
+            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            #h-header { font-size: 1.8rem !important; }
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
+            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
+            .auth-card { padding: 35px 25px; }
+        }
+
         /* ── Live Timing Tab ──────────────────────────────────────────── */
 
         /* Desktop: full table visible, cards hidden */
@@ -314,20 +329,18 @@
     <nav id="main-nav">
         <button onclick="tab('home', this)" class="active-nav">Home</button>
         <button onclick="tab('predict', this)">Predict</button>
-        <button onclick="tab('live', this)">Picks</button>
+        <button onclick="tab('live', this)">Current Predictions</button>
         <button onclick="tab('timing', this)">Live</button>
-        <button onclick="tab('standings', this)">Standings</button>
-        <button onclick="tab('calendar', this)">Calendar</button>
-        <button onclick="tab('grid', this)">Grid</button>
+        <button onclick="tab('standings', this)">League Standings</button>
+        <button onclick="tab('calendar', this)">2026 Season Calendar</button>
+        <button onclick="tab('grid', this)">The Grid</button>
         <button onclick="tab('rules', this)">Rules</button>
         <button onclick="tab('archive', this)">Archive</button>
-        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">App</button>
+        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">Install App</button>
     </nav>
 
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        <div class="user-chip">
-            <span id="logged-in-name"></span>
-        </div>
+        <span id="logged-in-name" style="color: var(--red);"></span>
         <div id="user-dropdown-content" class="user-dropdown-content">
             <button onclick="logout()">Logout</button>
         </div>
@@ -368,6 +381,13 @@
                     </div>
                 </div>
 
+                <div class="dash-card" style="padding: 20px;">
+                    <div id="latest-session-results">
+                        <div class="skeleton" style="width: 100%; height: 20px; margin-bottom: 8px;"></div>
+                        <div class="skeleton" style="width: 100%; height: 20px; margin-bottom: 8px;"></div>
+                        <div class="skeleton" style="width: 100%; height: 20px;"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="dash-card" style="border-top: 4px solid var(--gold);">
@@ -832,15 +852,17 @@
         const refresh = document.getElementById('timing-refresh-label');
 
         try {
-            const d = await fetch('http://localhost:3000/timing').then(r => r.json());
+            const d = await fetch('https://f1-live-api.onrender.com/timing/latest').then(r => r.json());
             if (d.error) throw new Error(d.error);
 
             const drivers = d.drivers || [];
             if (drivers.length === 0) throw new Error('No data');
 
-            const sesName = d.session || 'LIVE SESSION';
+            const sesName   = "LIVE SESSION";
+            const sesType   = "";
+            const trackMsg  = "";
 
-            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#00cc44;display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b>`;
+            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#00cc44;display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             // ── shared per-driver data ─────────────────────────────────────────
@@ -863,21 +885,23 @@
                 if (pos === 1) gapText = 'LEADER';
                 else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
                 else if (r.interval)      gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
+                
+                const formatTime = (timeObj) => timeObj ? timeObj.formatted : '-';
 
                 const sectors = [0,1,2].map(i => {
-                    const s = (r.sectors || [])[i] || {};
+                    const s = (r.last_lap_sectors || [])[i] || {};
                     return { val: s.value || '-', col: s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : null, ob: s.overall_best, pb: s.personal_best };
                 });
 
                 const lastCol = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : null;
-                const badge   = r.pit_out ? 'out' : r.in_pit ? 'pit' : null;
-                const topSpd  = r.speed_traps?.st || r.speed_traps?.fl || '-';
+                const badge   = r.is_pit_out_lap ? 'out' : null;
+                const topSpd  = '-';
 
-                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r };
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, formatTime };
             });
 
             // ── Desktop: table rows ───────────────────────────────────────────
-            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, formatTime }) => {
                 const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob||s.pb)?'900':'600'};">${s.val}</td>`;
                 const badgeHtml = badge === 'out'
                     ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
@@ -889,9 +913,9 @@
                     <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);">${name}</b>${badgeHtml}</td>
                     <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
                     <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
-                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
-                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
-                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
+                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_age ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_age}L</span>` : ''}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${formatTime(r.best_lap_time)}</td>
+                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${formatTime(r.last_lap_time)}</td>
                     <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
                     ${sectors.map(sCell).join('')}
                     <td style="text-align:right;color:var(--text-muted);font-size:0.8rem;">${topSpd}</td>
@@ -899,7 +923,7 @@
             }).join('');
 
             // ── Mobile: 3-line card rows (ALL data) ───────────────────────────
-            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, formatTime }) => {
                 const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
                 const isLeader  = pos === 1;
 
@@ -918,16 +942,16 @@
                             ${badgeHtml}
                             <div class="tr-line1-right">
                                 <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
-                                ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
+                                ${r.tyre_age ? `<span class="tr-tyre-age">${r.tyre_age}L</span>` : ''}
                                 <span class="tr-gap ${isLeader ? 'ldr' : ''}">${gapText}</span>
                             </div>
                         </div>
                         <div class="tr-line2">
                             <span class="tr-muted">${team}</span>
                             <span class="tr-sep">·</span>
-                            <span class="tr-val">${r.best_lap_time || '-'}</span>
+                            <span class="tr-val">${formatTime(r.best_lap_time)}</span>
                             <span class="tr-sep">·</span>
-                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</span>
+                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${formatTime(r.last_lap_time)}</span>
                             <span class="tr-sep">·</span>
                             <span class="tr-muted">${r.laps_completed || 0}L</span>
                             <span class="tr-sep">·</span>
@@ -948,11 +972,9 @@
     }
 
     async function fetchLatestSession() {
-        const el = document.getElementById('latest-session-results');
-        if (!el) return;
         try {
             const res = await fetch('https://f1-live-api.onrender.com/timing/latest').then(r=>r.json());
-
+            
             const drivers = res.drivers;
             if(!drivers || drivers.length === 0) throw new Error("No data");
 
@@ -1001,9 +1023,9 @@
             
             html += `</div>`;
             
-            el.innerHTML = html;
+            document.getElementById('latest-session-results').innerHTML = html;
         } catch(e) {
-            el.innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
+            document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
         }
     }
 
@@ -1401,7 +1423,7 @@
         } else if (isIos()) {
             showToast('iOS: Tap the Share icon in Safari, then tap "Add to Home Screen".', 'success');
         } else {
-            showToast('Android: Tap the browser menu and tap "Add to Home Screen" or "Install App".', 'success');
+            showToast('Android: Tap the browser menu and tap "Add to Home screen" or "Install App".', 'success');
         }
     }
 </script>
