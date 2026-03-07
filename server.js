@@ -318,7 +318,7 @@ app.get('/api/next-race', (req, res) => {
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
 
 // --- F1 Live Timing Widget Proxy (backed by direct F1 SignalR WebSocket feed) ---
-const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.onrender.com';
+const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.fly.dev';
 let widgetCache = null;
 let widgetCacheTime = 0;
 app.get('/api/live-widget', async (_req, res) => {

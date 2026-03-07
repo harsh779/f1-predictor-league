@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.5 - Single Line Header Fix (JS Untouched)
+        // Version 6.6 - Remove dead session card, cleanup
         (function() {
-            const currentVersion = "6.5"; 
+            const currentVersion = "6.6";
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -381,13 +381,6 @@
                     </div>
                 </div>
 
-                <div class="dash-card" style="padding: 20px;">
-                    <div id="latest-session-results">
-                        <div class="skeleton" style="width: 100%; height: 20px; margin-bottom: 8px;"></div>
-                        <div class="skeleton" style="width: 100%; height: 20px; margin-bottom: 8px;"></div>
-                        <div class="skeleton" style="width: 100%; height: 20px;"></div>
-                    </div>
-                </div>
             </div>
 
             <div class="dash-card" style="border-top: 4px solid var(--gold);">
@@ -980,28 +973,6 @@
         }
     }
 
-    async function fetchLatestSession() {
-        try {
-            const res = await fetch('/api/live-sessions').then(r=>r.json());
-            if(res.error) throw new Error(res.error);
-
-            const data = res.data; 
-            if(!data || data.length === 0) throw new Error("No data");
-
-            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Latest: ${res.sessionName} (Top 5)</div>`;
-            
-            html += data.slice(0, 5).map(r => `
-                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-hover); font-size: 1.05rem;">
-                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${r.driver.name}</span>
-                    <span style="font-weight: 900; color: var(--red);">${r.time || r.status || ''}</span>
-                </div>
-            `).join('');
-            
-            document.getElementById('latest-session-results').innerHTML = html;
-        } catch(e) {
-            document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
-        }
-    }
 
     async function loadHomeData() {
         try {
@@ -1073,8 +1044,6 @@
                 document.getElementById('sl').required = false;
             }
             
-            fetchLatestSession();
-
         } catch (e) { showToast("Telemetry sync failed.", "error"); }
     }
 
@@ -1304,7 +1273,7 @@
         const res = await fetch('/api/finalize', { 
             method:'POST', 
             headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
-            body:JSON.stringify({ password: 'Open@0761' }) 
+            body:JSON.stringify({}) 
         });
         const d = await res.json();
         if(res.ok) { showToast('Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
