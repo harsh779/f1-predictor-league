@@ -57,39 +57,47 @@
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
         /* --- 2. HEADER & NAVIGATION --- */
-        header { 
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
-            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; 
-            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
-            flex-wrap: wrap; gap: 15px;
+        header {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
         }
-        h1 { margin: 0; font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); white-space: nowrap; order: 1; flex-shrink: 0;}
+        .header-top {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 20px;
+        }
+        h1 { margin: 0; font-size: 1.6rem; font-weight: 900; font-style: italic; letter-spacing: 1px; color: var(--text-main); white-space: nowrap; }
         h1 span { color: var(--red); }
-        
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); order: 2; flex-shrink: 0; margin-left: auto;}
+
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); }
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
-        nav { display: flex; gap: 8px; align-items: center; order: 3; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
+        nav {
+            display: flex; gap: 8px; align-items: center;
+            padding: 0 20px 12px;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
         nav::-webkit-scrollbar { display: none; }
-        nav button { 
-            background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent; 
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 10px 18px; 
-            border-radius: 30px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s ease; 
-            white-space: nowrap; flex-shrink: 0;
+        nav button {
+            background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent;
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 9px 15px;
+            border-radius: 30px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+            transition: all 0.2s ease; white-space: nowrap; flex-shrink: 0;
         }
         nav button:hover { color: var(--text-main); background: #e0e2e6; }
         nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
-        
+
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
         @media (min-width: 900px) {
-            header { padding: 15px 30px; gap: 10px; }
+            .header-top { padding: 15px 30px; }
             h1 { font-size: 1.8rem; }
-            nav button { font-size: 0.9rem; padding: 10px 16px; }
+            nav { padding: 0 30px 14px; gap: 10px; }
+            nav button { font-size: 0.9rem; padding: 10px 18px; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -207,17 +215,10 @@
 
         /* --- 8. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            header { padding: 15px 15px 0 15px !important; flex-direction: row !important; flex-wrap: wrap !important; }
-            h1 { font-size: 1.4rem !important; margin: 0 !important; width: auto !important; flex: 1; }
-            .user-dropdown { margin: 0 !important; }
-            
-            nav { 
-                width: 100vw !important; margin-left: -15px !important; margin-top: 15px !important; 
-                padding: 10px 15px 15px 15px !important; border-top: 1px solid var(--border) !important; 
-                overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; 
-                display: flex !important; flex-wrap: nowrap !important; justify-content: flex-start !important; gap: 8px !important;
-            }
-            nav button { flex: 0 0 auto !important; font-size: 0.82rem !important; padding: 9px 12px !important; }
+            .header-top { padding: 12px 15px; }
+            h1 { font-size: 1.4rem; }
+            nav { padding: 0 15px 12px; gap: 8px; }
+            nav button { font-size: 0.8rem; padding: 8px 12px; }
             main { padding: 15px 12px !important; }
             
             .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
@@ -319,12 +320,13 @@
 </div>
 
 <header>
-    <h1><span>F1</span> 2026 LEAGUE</h1>
-    
-    <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        <span id="logged-in-name" style="color: var(--red);"></span>
-        <div id="user-dropdown-content" class="user-dropdown-content">
-            <button onclick="logout()">Logout</button>
+    <div class="header-top">
+        <h1><span>F1</span> 2026 LEAGUE</h1>
+        <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
+            <span id="logged-in-name" style="color: var(--red);"></span>
+            <div id="user-dropdown-content" class="user-dropdown-content">
+                <button onclick="logout()">Logout</button>
+            </div>
         </div>
     </div>
 
