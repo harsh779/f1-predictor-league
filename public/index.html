@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.4 - Calendar Fixed
+        // Version 6.9 - Restored Mobile UI & Timing Tab CSS
         (function() {
-            const currentVersion = "6.4"; 
+            const currentVersion = "6.9"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -61,40 +61,72 @@
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-            display: flex; align-items: center; justify-content: space-between; padding: 12px 20px;
-            flex-wrap: nowrap; /* Forces everything strictly onto one line */
-            gap: 15px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 20px; gap: 10px; flex-wrap: nowrap; /* STRICT SINGLE LINE ON DESKTOP */
         }
+        
         h1 { margin: 0; font-size: 1.4rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0; }
         h1 span { color: var(--red); }
 
         nav {
             display: flex; gap: 6px; align-items: center; justify-content: center;
-            flex: 1; padding: 0 10px;
-            flex-wrap: nowrap; overflow: hidden; /* Removes the scrollbar entirely */
+            flex: 1; overflow: hidden; margin: 0 10px; flex-wrap: nowrap;
         }
         nav button {
-            background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent;
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 6px 12px;
-            border-radius: 20px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0;
+            background: transparent; color: var(--text-muted); border: none;
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; 
+            padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;
             transition: all 0.2s ease; white-space: nowrap; flex-shrink: 1;
         }
-        nav button:hover { color: var(--text-main); background: #e0e2e6; }
-        nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
+        nav button:hover { color: var(--text-main); background: var(--surface-hover); }
+        nav button.active-nav { background: var(--red); color: white; box-shadow: 0 4px 10px var(--red-glow); }
 
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
-        .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
+        .user-dropdown { position: relative; display: inline-flex; align-items: center; cursor: pointer; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
+        .user-chip { background: var(--surface-inner); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); transition: border-color 0.2s;}
+        .user-chip:hover { border-color: var(--red); }
+        
+        .user-dropdown-content { display: none; position: absolute; right: 0; top: calc(100% + 8px); background-color: var(--surface); min-width: 120px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
-        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
+        .user-dropdown-content button { width: 100%; text-align: center; padding: 12px; background: none; border: none; font-family: 'Titillium Web', sans-serif; font-size: 0.9rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
-        .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
+        .btn-support { border: 1px solid var(--gold) !important; color: var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
         @media (min-width: 1200px) {
             h1 { font-size: 1.6rem; }
             nav { gap: 8px; }
             nav button { font-size: 0.85rem; padding: 8px 16px; }
+        }
+
+        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
+        @media (max-width: 900px) {
+            header { flex-wrap: wrap; padding: 12px 15px 0 15px; gap: 0; }
+            h1 { font-size: 1.3rem; flex: 1; order: 1; }
+            .user-dropdown { order: 2; font-size: 0.75rem; }
+            .user-chip { padding: 4px 10px; }
+            
+            /* Nav drops to second line and scrolls horizontally */
+            nav { 
+                order: 3; width: 100%; flex: none; padding: 10px 0; gap: 6px; 
+                overflow-x: auto; margin: 0; justify-content: flex-start; 
+                border-top: 1px solid var(--surface-hover); margin-top: 10px; 
+            }
+            nav::-webkit-scrollbar { display: none; }
+            nav button { background: var(--nav-bg); border-radius: 30px; font-size: 0.75rem; padding: 6px 12px; flex-shrink: 0;}
+            nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: none; }
+
+            main { padding: 15px 12px !important; }
+            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
+            .dash-card { padding: 18px !important; }
+            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
+            #grid-container { grid-template-columns: 1fr !important; }
+            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            #h-header { font-size: 1.8rem !important; }
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
+            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
+            .auth-card { padding: 35px 25px; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -216,33 +248,10 @@
         }
         .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-2px); }
 
-        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
-        @media (max-width: 850px) {
-            header { flex-wrap: wrap; padding: 10px 15px 0; gap: 0; }
-            h1 { order: 1; flex: 1; font-size: 1.3rem; }
-            .user-dropdown { order: 2; font-size: 0.85rem; }
-            nav { order: 3; width: 100%; flex: none; padding: 6px 0 10px; gap: 6px; overflow-x: auto; flex-wrap: wrap;}
-            nav button { font-size: 0.78rem; padding: 7px 11px; }
-            main { padding: 15px 12px !important; }
-            
-            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
-            .dash-card { padding: 18px !important; }
-            .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
-            #grid-container { grid-template-columns: 1fr !important; }
-            
-            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
-            #h-header { font-size: 1.8rem !important; }
-            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
-            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
-            .auth-card { padding: 35px 25px; }
-        }
-
-        /* ── Live Timing Tab ──────────────────────────────────────────── */
+        /* ── RESTORED: Live Timing Tab CSS ──────────────────────────────────────────── */
 
         /* Desktop: full table visible, cards hidden */
-        #timing-table-wrap { display: block; }
+        #timing-table-wrap { display: block; overflow-x: auto; }
         #timing-cards      { display: none; }
         /* Mobile: cards visible, table hidden */
         @media (max-width: 640px) {
@@ -259,15 +268,11 @@
 
         /* Mobile card rows — ALL data, no columns hidden */
         .tr-block {
-            display: flex;
-            align-items: stretch;
-            padding: 11px 0;
-            border-bottom: 1px solid var(--surface-inner);
+            display: flex; align-items: stretch; padding: 11px 0; border-bottom: 1px solid var(--surface-inner);
         }
         .tr-block:last-child { border-bottom: none; }
         .tr-pos-col {
-            width: 28px; flex-shrink: 0;
-            display: flex; align-items: flex-start; justify-content: center; padding-top: 2px;
+            width: 28px; flex-shrink: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 2px;
         }
         .tr-pos { font-weight: 900; font-size: 1rem; color: var(--text-main); }
         .tr-bar { width: 4px; flex-shrink: 0; border-radius: 2px; margin-right: 9px; align-self: stretch; min-height: 52px; }
@@ -289,10 +294,7 @@
         .tr-gap.ldr  { color: var(--text-muted); font-size: 0.7rem; letter-spacing: 0.3px; }
 
         /* Line 2: team · best lap · last lap · laps · top spd */
-        .tr-line2 {
-            margin-top: 5px; font-size: 0.8rem;
-            display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-        }
+        .tr-line2 { margin-top: 5px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
         /* Line 3: S1 · S2 · S3 */
         .tr-line3 { margin-top: 4px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
 
@@ -303,8 +305,7 @@
 
         #timing-meta {
             display: flex; align-items: center; justify-content: space-between;
-            margin-top: 12px; font-size: 0.72rem; color: var(--text-muted);
-            flex-wrap: wrap; gap: 8px;
+            margin-top: 12px; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; gap: 8px;
         }
         .timing-legend { display: flex; gap: 12px; }
     </style>
@@ -329,18 +330,20 @@
     <nav id="main-nav">
         <button onclick="tab('home', this)" class="active-nav">Home</button>
         <button onclick="tab('predict', this)">Predict</button>
-        <button onclick="tab('live', this)">Current Predictions</button>
+        <button onclick="tab('live', this)">Picks</button>
         <button onclick="tab('timing', this)">Live</button>
-        <button onclick="tab('standings', this)">League Standings</button>
-        <button onclick="tab('calendar', this)">2026 Season Calendar</button>
-        <button onclick="tab('grid', this)">The Grid</button>
+        <button onclick="tab('standings', this)">Standings</button>
+        <button onclick="tab('calendar', this)">Calendar</button>
+        <button onclick="tab('grid', this)">Grid</button>
         <button onclick="tab('rules', this)">Rules</button>
         <button onclick="tab('archive', this)">Archive</button>
-        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">Install App</button>
+        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">App</button>
     </nav>
 
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        <span id="logged-in-name" style="color: var(--red);"></span>
+        <div class="user-chip">
+            <span id="logged-in-name"></span>
+        </div>
         <div id="user-dropdown-content" class="user-dropdown-content">
             <button onclick="logout()">Logout</button>
         </div>
