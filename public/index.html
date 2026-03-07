@@ -18,9 +18,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.9 - Crash-Proof Live API Handling
+        // Version 6.5 - Single Line Header Fix (Logic Untouched)
         (function() {
-            const currentVersion = "6.9"; 
+            const currentVersion = "6.5"; 
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -57,75 +57,40 @@
         ::-webkit-scrollbar-thumb:hover { background: var(--red); }
 
         /* --- 2. HEADER & NAVIGATION --- */
-        header {
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 20px; gap: 10px; flex-wrap: nowrap; /* STRICT SINGLE LINE ON DESKTOP */
+        header { 
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
+            padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; 
+            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+            flex-wrap: nowrap; overflow: hidden; gap: 10px; /* Enforces single line */
         }
-        
-        h1 { margin: 0; font-size: 1.4rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0; }
+        h1 { margin: 0; font-size: 1.2rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0;}
         h1 span { color: var(--red); }
-
-        nav {
-            display: flex; gap: 6px; align-items: center; justify-content: center;
-            flex: 1; overflow: hidden; margin: 0 10px; flex-wrap: nowrap;
-        }
-        nav button {
-            background: transparent; color: var(--text-muted); border: none;
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; 
-            padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;
-            transition: all 0.2s ease; white-space: nowrap; flex-shrink: 1;
-        }
-        nav button:hover { color: var(--text-main); background: var(--surface-hover); }
-        nav button.active-nav { background: var(--red); color: white; box-shadow: 0 4px 10px var(--red-glow); }
-
-        .user-dropdown { position: relative; display: inline-flex; align-items: center; cursor: pointer; font-family: 'Titillium Web', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap; }
-        .user-chip { background: var(--surface-inner); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); transition: border-color 0.2s;}
-        .user-chip:hover { border-color: var(--red); }
         
-        .user-dropdown-content { display: none; position: absolute; right: 0; top: calc(100% + 8px); background-color: var(--surface); min-width: 120px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap;}
+        .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
-        .user-dropdown-content button { width: 100%; text-align: center; padding: 12px; background: none; border: none; font-family: 'Titillium Web', sans-serif; font-size: 0.9rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; }
+        .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
-        .btn-support { border: 1px solid var(--gold) !important; color: var(--gold) !important; }
+        nav { display: flex; gap: 4px; align-items: center; flex: 1; overflow: hidden; flex-wrap: nowrap; justify-content: center; margin: 0 5px; }
+        nav button { 
+            background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent; 
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 6px 8px; 
+            border-radius: 20px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0; transition: all 0.2s ease; 
+            white-space: nowrap; flex-shrink: 1; text-overflow: ellipsis; overflow: hidden;
+        }
+        nav button:hover { color: var(--text-main); background: #e0e2e6; }
+        nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
+        
+        .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        @media (min-width: 1200px) {
+        @media (min-width: 900px) {
+            header { padding: 15px 20px; gap: 15px; }
             h1 { font-size: 1.6rem; }
-            nav { gap: 8px; }
-            nav button { font-size: 0.85rem; padding: 8px 16px; }
-        }
-
-        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
-        @media (max-width: 900px) {
-            header { flex-wrap: wrap; padding: 12px 15px 0 15px; gap: 0; }
-            h1 { font-size: 1.3rem; flex: 1; order: 1; }
-            .user-dropdown { order: 2; font-size: 0.75rem; }
-            .user-chip { padding: 4px 10px; }
-            
-            nav { 
-                order: 3; width: 100%; flex: none; padding: 10px 0; gap: 6px; 
-                overflow-x: auto; margin: 0; justify-content: flex-start; 
-                border-top: 1px solid var(--surface-hover); margin-top: 10px; 
-            }
-            nav::-webkit-scrollbar { display: none; }
-            nav button { background: var(--nav-bg); border-radius: 30px; font-size: 0.75rem; padding: 6px 12px; flex-shrink: 0;}
-            nav button.active-nav { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: none; }
-
-            main { padding: 15px 12px !important; }
-            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
-            .dash-card { padding: 18px !important; }
-            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
-            #grid-container { grid-template-columns: 1fr !important; }
-            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
-            #h-header { font-size: 1.8rem !important; }
-            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
-            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
-            .auth-card { padding: 35px 25px; }
+            nav { gap: 6px; margin: 0 15px;}
+            nav button { font-size: 0.85rem; padding: 8px 14px; }
+            .user-dropdown { font-size: 0.9rem; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -247,41 +212,97 @@
         }
         .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-2px); }
 
+        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
+        @media (max-width: 850px) {
+            header { padding: 8px 10px; gap: 4px; }
+            h1 { font-size: 0.9rem; }
+            .user-dropdown { font-size: 0.65rem; }
+            nav { gap: 2px; margin: 0 4px; }
+            nav button { font-size: 0.6rem; padding: 5px 6px; }
+
+            main { padding: 15px 12px !important; }
+            
+            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
+            .dash-card { padding: 18px !important; }
+            .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
+            #grid-container { grid-template-columns: 1fr !important; }
+            
+            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            #h-header { font-size: 1.8rem !important; }
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
+            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
+            .auth-card { padding: 35px 25px; }
+        }
+
         /* ── Live Timing Tab ──────────────────────────────────────────── */
-        #timing-table-wrap { display: block; overflow-x: auto; }
+
+        /* Desktop: full table visible, cards hidden */
+        #timing-table-wrap { display: block; }
         #timing-cards      { display: none; }
+        /* Mobile: cards visible, table hidden */
         @media (max-width: 640px) {
             #timing-table-wrap { display: none; }
             #timing-cards      { display: block; }
         }
+
+        /* Desktop table */
         #timing-table { width: 100%; border-collapse: collapse; font-family: 'Titillium Web', sans-serif; }
         #timing-table thead tr { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 2px solid var(--border); }
         #timing-table th { padding: 7px 5px; font-weight: 900; white-space: nowrap; }
         #timing-table td { padding: 9px 5px; font-size: 0.85rem; border-bottom: 1px solid var(--surface-inner); vertical-align: middle; white-space: nowrap; }
         #timing-table tbody tr:last-child td { border-bottom: none; }
-        .tr-block { display: flex; align-items: stretch; padding: 11px 0; border-bottom: 1px solid var(--surface-inner); }
+
+        /* Mobile card rows — ALL data, no columns hidden */
+        .tr-block {
+            display: flex;
+            align-items: stretch;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--surface-inner);
+        }
         .tr-block:last-child { border-bottom: none; }
-        .tr-pos-col { width: 28px; flex-shrink: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 2px; }
+        .tr-pos-col {
+            width: 28px; flex-shrink: 0;
+            display: flex; align-items: flex-start; justify-content: center; padding-top: 2px;
+        }
         .tr-pos { font-weight: 900; font-size: 1rem; color: var(--text-main); }
         .tr-bar { width: 4px; flex-shrink: 0; border-radius: 2px; margin-right: 9px; align-self: stretch; min-height: 52px; }
         .tr-content { flex: 1; min-width: 0; }
+
+        /* Line 1: name + badge → tyre + gap */
         .tr-line1 { display: flex; align-items: center; gap: 5px; }
         .tr-name  { font-weight: 900; font-size: 0.95rem; color: var(--text-main); letter-spacing: 0.5px; }
         .tr-badge { font-size: 0.6rem; font-weight: 900; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.5px; flex-shrink: 0; }
         .tr-badge.pit { background: rgba(238,187,0,0.15); color: #eebb00; border: 1px solid rgba(238,187,0,0.35); }
         .tr-badge.out { background: rgba(225,6,0,0.12);   color: #e10600; border: 1px solid rgba(225,6,0,0.3); }
         .tr-line1-right { margin-left: auto; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-        .tr-tyre-pill { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.72rem; font-weight: 900; }
+        .tr-tyre-pill {
+            width: 22px; height: 22px; display: inline-flex; align-items: center;
+            justify-content: center; border-radius: 50%; font-size: 0.72rem; font-weight: 900;
+        }
         .tr-tyre-age { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
         .tr-gap      { font-weight: 900; font-size: 0.88rem; color: var(--red); font-variant-numeric: tabular-nums; }
         .tr-gap.ldr  { color: var(--text-muted); font-size: 0.7rem; letter-spacing: 0.3px; }
-        .tr-line2 { margin-top: 5px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+        /* Line 2: team · best lap · last lap · laps · top spd */
+        .tr-line2 {
+            margin-top: 5px; font-size: 0.8rem;
+            display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+        }
+        /* Line 3: S1 · S2 · S3 */
         .tr-line3 { margin-top: 4px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
+
         .tr-sep   { color: var(--border); }
         .tr-val   { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-main); }
         .tr-muted { color: var(--text-muted); }
         .tr-sec   { font-weight: 700; font-variant-numeric: tabular-nums; }
-        #timing-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; gap: 8px; }
+
+        #timing-meta {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 12px; font-size: 0.72rem; color: var(--text-muted);
+            flex-wrap: wrap; gap: 8px;
+        }
         .timing-legend { display: flex; gap: 12px; }
     </style>
 </head>
@@ -316,9 +337,7 @@
     </nav>
 
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
-        <div class="user-chip">
-            <span id="logged-in-name"></span>
-        </div>
+        <span id="logged-in-name" style="color: var(--red);"></span>
         <div id="user-dropdown-content" class="user-dropdown-content">
             <button onclick="logout()">Logout</button>
         </div>
@@ -830,27 +849,30 @@
         const refresh = document.getElementById('timing-refresh-label');
 
         try {
-            const d = await fetch('https://f1-live-api.onrender.com/timing/latest').then(r => r.json());
+            const d = await fetch('/api/live-widget?t=' + Date.now()).then(r => r.json());
             if (d.error) throw new Error(d.error);
 
-            const drivers = d.drivers || [];
-            if (drivers.length === 0) throw new Error('No data received from API');
+            const drivers = d.timing?.drivers || [];
+            if (drivers.length === 0) throw new Error('No data');
 
-            const sesName   = "LIVE SESSION";
-            const sesType   = "";
-            const trackMsg  = "";
+            const session   = d.status?.session;
+            const sesName   = session?.Name || d.timing?.session || '';
+            const sesType   = session?.Type || '';
+            const connected = d.status?.connected;
+            const trackMsg  = d.status?.track_status?.Message || '';
 
-            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#00cc44;display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
+            const toSecs = (t) => {
+                if (!t) return null;
+                const p = t.split(':');
+                return p.length === 2 ? parseInt(p[0]) * 60 + parseFloat(p[1]) : parseFloat(p[0]);
+            };
+            const p1Secs = toSecs(drivers[0]?.best_lap_time);
+
+            const dot = connected ? '#00cc44' : '#e10600';
+            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-            // Helper to safely parse strings vs objects
-            const getFormattedTime = (obj) => {
-                if (!obj) return '-';
-                if (typeof obj === 'string' || typeof obj === 'number') return obj;
-                if (obj.formatted) return obj.formatted;
-                return '-';
-            };
-
+            // ── shared per-driver data ─────────────────────────────────────────
             const rows = drivers.map(r => {
                 const pos     = parseInt(r.position) || 99;
                 const name    = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
@@ -859,7 +881,7 @@
 
                 const tyre = (r.tyre_compound || '').toUpperCase();
                 let tyreColor = '#fff', tBg = '#444';
-                const tLetter = tyre && tyre !== '-' ? tyre[0] : '-';
+                const tLetter = tyre ? tyre[0] : '-';
                 if (tyre === 'SOFT')         { tBg = '#e10600'; }
                 if (tyre === 'MEDIUM')       { tyreColor = '#111'; tBg = '#eebb00'; }
                 if (tyre === 'HARD')         { tyreColor = '#111'; tBg = '#e8e8e8'; }
@@ -868,22 +890,24 @@
 
                 let gapText = '-';
                 if (pos === 1) gapText = 'LEADER';
-                else if (r.gap_to_leader !== null && r.gap_to_leader !== undefined) gapText = String(r.gap_to_leader).startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
-                else if (r.interval !== null && r.interval !== undefined)      gapText = String(r.interval).startsWith('+') ? r.interval : '+' + r.interval;
-                
+                else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
+                else if (r.interval)      gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
+                else if (p1Secs) { const ms = toSecs(r.best_lap_time); if (ms) gapText = '+' + (ms - p1Secs).toFixed(3); }
+
                 const sectors = [0,1,2].map(i => {
-                    const s = (r.last_lap_sectors || [])[i] || {};
+                    const s = (r.sectors || [])[i] || {};
                     return { val: s.value || '-', col: s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : null, ob: s.overall_best, pb: s.personal_best };
                 });
 
                 const lastCol = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : null;
-                const badge   = r.is_pit_out_lap ? 'out' : null;
-                const topSpd  = '-';
+                const badge   = r.retired ? 'out' : r.in_pit ? 'pit' : null;
+                const topSpd  = r.speed_traps?.fl || r.speed_traps?.st || '-';
 
-                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, getFormattedTime };
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r };
             });
 
-            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, getFormattedTime }) => {
+            // ── Desktop: table rows ───────────────────────────────────────────
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
                 const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob||s.pb)?'900':'600'};">${s.val}</td>`;
                 const badgeHtml = badge === 'out'
                     ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
@@ -895,16 +919,17 @@
                     <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);">${name}</b>${badgeHtml}</td>
                     <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
                     <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
-                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_age ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_age}L</span>` : ''}</td>
-                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${getFormattedTime(r.best_lap_time)}</td>
-                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${getFormattedTime(r.last_lap_time)}</td>
+                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
+                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
                     <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
                     ${sectors.map(sCell).join('')}
                     <td style="text-align:right;color:var(--text-muted);font-size:0.8rem;">${topSpd}</td>
                 </tr>`;
             }).join('');
 
-            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, getFormattedTime }) => {
+            // ── Mobile: 3-line card rows (ALL data) ───────────────────────────
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
                 const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
                 const isLeader  = pos === 1;
 
@@ -923,16 +948,16 @@
                             ${badgeHtml}
                             <div class="tr-line1-right">
                                 <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
-                                ${r.tyre_age ? `<span class="tr-tyre-age">${r.tyre_age}L</span>` : ''}
+                                ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
                                 <span class="tr-gap ${isLeader ? 'ldr' : ''}">${gapText}</span>
                             </div>
                         </div>
                         <div class="tr-line2">
                             <span class="tr-muted">${team}</span>
                             <span class="tr-sep">·</span>
-                            <span class="tr-val">${getFormattedTime(r.best_lap_time)}</span>
+                            <span class="tr-val">${r.best_lap_time || '-'}</span>
                             <span class="tr-sep">·</span>
-                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${getFormattedTime(r.last_lap_time)}</span>
+                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</span>
                             <span class="tr-sep">·</span>
                             <span class="tr-muted">${r.laps_completed || 0}L</span>
                             <span class="tr-sep">·</span>
@@ -946,78 +971,32 @@
             }).join('');
 
         } catch(e) {
-            console.error("Timing Error:", e);
-            body.innerHTML  = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--red);">⚠️ Data Error: ${e.message}<br><span style="font-size:0.8rem;color:var(--text-muted)">(If it says "Failed to fetch", your API is blocking it due to CORS)</span></td></tr>`;
-            cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--red);">⚠️ Data Error: ${e.message}<br><span style="font-size:0.8rem;color:var(--text-muted)">(If it says "Failed to fetch", your API is blocking it due to CORS)</span></div>`;
+            body.innerHTML  = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
             if (status) status.innerHTML = '';
         }
     }
 
     async function fetchLatestSession() {
         try {
-            const res = await fetch('https://f1-live-api.onrender.com/timing/latest').then(r=>r.json());
+            const res = await fetch('/api/live-sessions').then(r=>r.json());
+            if(res.error) throw new Error(res.error);
+
+            const data = res.data; 
+            if(!data || data.length === 0) throw new Error("No data");
+
+            let html = `<div style="font-weight: 700; color: var(--red); margin-bottom: 10px; font-size: 0.85rem; text-transform: uppercase;">Latest: ${res.sessionName} (Top 5)</div>`;
             
-            const drivers = res.drivers;
-            if(!drivers || drivers.length === 0) throw new Error("No data received from API");
-
-            let html = `<div style="font-weight: 900; color: var(--red); margin-bottom: 10px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">⏱️ LATEST SESSION</div>`;
-            
-            html += `<div style="display: grid; grid-template-columns: 25px 1fr 35px 35px 70px 65px; gap: 8px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 900; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
-                <div>P</div><div>Driver</div><div style="text-align:center;">Laps</div><div style="text-align:center;">Tyre</div><div>Time</div><div style="text-align:right;">Gap</div>
-            </div>`;
-
-            html += `<div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">`;
-
-            // Helper to safely parse strings vs objects
-            const getFormattedTime = (obj) => {
-                if (!obj) return 'NO TIME';
-                if (typeof obj === 'string' || typeof obj === 'number') return obj;
-                if (obj.formatted) return obj.formatted;
-                return 'NO TIME';
-            };
-
-            html += drivers.map(r => {
-                let tyreColor = '#fff';
-                let tBg = '#333';
-                let tName = '-';
-                
-                if (r.tyre_compound && r.tyre_compound !== '-') {
-                    tName = String(r.tyre_compound).substring(0,1).toUpperCase();
-                    if(r.tyre_compound === 'SOFT') { tyreColor = '#fff'; tBg = '#e10600'; }
-                    if(r.tyre_compound === 'MEDIUM') { tyreColor = '#111'; tBg = '#eebb00'; }
-                    if(r.tyre_compound === 'HARD') { tyreColor = '#111'; tBg = '#ffffff'; }
-                    if(r.tyre_compound === 'INTERMEDIATE') { tyreColor = '#fff'; tBg = '#00cc66'; }
-                    if(r.tyre_compound === 'WET') { tyreColor = '#fff'; tBg = '#0066ff'; }
-                }
-
-                let gapText = '-';
-                if (r.position === 1) gapText = 'LEADER';
-                else if (r.interval !== null && r.interval !== undefined) gapText = String(r.interval).startsWith('+') ? r.interval : '+' + r.interval;
-                
-                let lapTime = r.last_lap_time ? getFormattedTime(r.last_lap_time) : getFormattedTime(r.best_lap_time);
-                
-                let teamBorder = r.team_colour ? `#${r.team_colour}` : 'var(--border)';
-                let driverName = r.acronym || (r.name ? r.name.split(' ').pop() : 'DRV');
-
-                return `
-                <div style="display: grid; grid-template-columns: 25px 1fr 35px 35px 70px 65px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-inner); font-size: 0.9rem;">
-                    <div style="font-weight: 900; color: var(--text-main);">${r.position || '-'}</div>
-                    <div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid ${teamBorder}; padding-left: 6px;">${driverName}</div>
-                    <div style="color: var(--text-muted); font-weight: 700; text-align: center;">${r.laps_completed || 0}</div>
-                    <div style="text-align: center;">
-                        <span style="background: ${tBg}; color: ${tyreColor}; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: 900; border: 1px solid rgba(0,0,0,0.1);">${tName}</span>
-                    </div>
-                    <div style="font-family: monospace; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">${lapTime}</div>
-                    <div style="font-family: monospace; font-weight: 900; color: var(--red); text-align: right; font-size: 0.8rem;">${gapText}</div>
+            html += data.slice(0, 5).map(r => `
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-hover); font-size: 1.05rem;">
+                    <span><strong style="color: var(--text-main); width: 30px; display: inline-block;">P${r.position}</strong> ${r.driver.name}</span>
+                    <span style="font-weight: 900; color: var(--red);">${r.time || r.status || ''}</span>
                 </div>
-            `}).join('');
-            
-            html += `</div>`;
+            `).join('');
             
             document.getElementById('latest-session-results').innerHTML = html;
         } catch(e) {
-            console.error("Widget Error:", e);
-            document.getElementById('latest-session-results').innerHTML = `<span style="color:var(--red); font-size: 0.9rem;">⚠️ API Error: ${e.message}</span><br><span style="font-size:0.8rem;color:var(--text-muted)">(If it says "Failed to fetch", your API is blocking it due to CORS)</span>`;
+            document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
         }
     }
 
