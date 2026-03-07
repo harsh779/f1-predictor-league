@@ -219,11 +219,11 @@
 
         /* --- 8. MOBILE RESPONSIVENESS FIX --- */
         @media (max-width: 850px) {
-            header { padding: 0 10px; gap: 8px; }
-            h1 { font-size: 0.9rem; }
-            .user-dropdown { font-size: 0.7rem; }
-            nav { gap: 4px; }
-            nav button { font-size: 0.65rem; padding: 5px 7px; }
+            header { flex-wrap: wrap; padding: 10px 15px 0; gap: 0; }
+            h1 { order: 1; flex: 1; font-size: 1.3rem; }
+            .user-dropdown { order: 2; font-size: 0.85rem; }
+            nav { order: 3; width: 100%; flex: none; padding: 6px 0 10px; gap: 6px; }
+            nav button { font-size: 0.78rem; padding: 7px 11px; }
             main { padding: 15px 12px !important; }
             
             .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
