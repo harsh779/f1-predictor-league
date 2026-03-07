@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.5 - Single Line Header Fix (Logic Untouched)
+        // Version 6.5 - Single Line Header Fix (JS Untouched)
         (function() {
             const currentVersion = "6.5"; 
             const storedVersion = localStorage.getItem('app_version');
@@ -59,23 +59,27 @@
         /* --- 2. HEADER & NAVIGATION --- */
         header { 
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
-            padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; 
-            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
-            flex-wrap: nowrap; overflow: hidden; gap: 10px; /* Enforces single line */
+            padding: 10px 15px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+            display: flex; flex-direction: row; justify-content: space-between; align-items: center; 
+            flex-wrap: nowrap; gap: 10px; width: 100%; box-sizing: border-box;
         }
-        h1 { margin: 0; font-size: 1.2rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0;}
+        h1 { margin: 0; font-size: 1.3rem; font-weight: 900; font-style: italic; letter-spacing: 0.5px; color: var(--text-main); white-space: nowrap; flex-shrink: 0;}
         h1 span { color: var(--red); }
         
-        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap;}
+        .user-dropdown { position: relative; display: inline-block; cursor: pointer; font-family: 'Titillium Web'; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.85rem; color: var(--text-main); flex-shrink: 0; white-space: nowrap;}
         .user-dropdown-content { display: none; position: absolute; right: 0; top: 130%; background-color: var(--surface); min-width: 150px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; border: 1px solid var(--border); overflow: hidden; }
         .user-dropdown.show .user-dropdown-content { display: block; animation: slideUp 0.2s ease; }
         .user-dropdown-content button { width: 100%; text-align: left; padding: 15px 20px; background: none; border: none; font-family: 'Titillium Web'; font-size: 1rem; font-weight: 700; color: var(--red); cursor: pointer; transition: background 0.2s; border-radius: 0; }
         .user-dropdown-content button:hover { background-color: var(--surface-hover); }
 
-        nav { display: flex; gap: 4px; align-items: center; flex: 1; overflow: hidden; flex-wrap: nowrap; justify-content: center; margin: 0 5px; }
+        nav { 
+            display: flex; flex-direction: row; gap: 4px; align-items: center; justify-content: center;
+            flex: 1; flex-wrap: nowrap; overflow: hidden; margin: 0 5px; 
+        }
         nav button { 
             background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent; 
-            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 6px 8px; 
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 6px 10px; 
             border-radius: 20px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0; transition: all 0.2s ease; 
             white-space: nowrap; flex-shrink: 1; text-overflow: ellipsis; overflow: hidden;
         }
@@ -85,12 +89,35 @@
         .btn-support { background: rgba(197, 155, 39, 0.1) !important; color: var(--gold) !important; border: 1px solid var(--gold) !important; }
         .btn-support:hover { background: var(--gold) !important; color: #fff !important; box-shadow: 0 0 15px rgba(197,155,39,0.4); }
 
-        @media (min-width: 900px) {
-            header { padding: 15px 20px; gap: 15px; }
-            h1 { font-size: 1.6rem; }
+        @media (min-width: 1000px) {
+            header { padding: 12px 20px; gap: 15px; }
+            h1 { font-size: 1.5rem; }
             nav { gap: 6px; margin: 0 15px;}
-            nav button { font-size: 0.85rem; padding: 8px 14px; }
+            nav button { font-size: 0.8rem; padding: 8px 12px; }
             .user-dropdown { font-size: 0.9rem; }
+        }
+
+        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
+        @media (max-width: 850px) {
+            header { flex-wrap: wrap; padding: 10px 15px 0; gap: 0; }
+            h1 { font-size: 1.3rem; flex: 1; order: 1; }
+            .user-dropdown { order: 2; font-size: 0.8rem; }
+            nav { order: 3; width: 100%; flex: none; padding: 10px 0; gap: 6px; overflow-x: auto; margin: 0; justify-content: flex-start; border-top: 1px solid var(--surface-hover); margin-top: 10px; }
+            nav::-webkit-scrollbar { display: none; }
+            nav button { background: var(--nav-bg); border-radius: 30px; font-size: 0.75rem; padding: 6px 12px; flex-shrink: 0; overflow: visible;}
+            
+            main { padding: 15px 12px !important; }
+            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
+            .dash-card { padding: 18px !important; }
+            .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
+            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
+            #grid-container { grid-template-columns: 1fr !important; }
+            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            #h-header { font-size: 1.8rem !important; }
+            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
+            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
+            .auth-card { padding: 35px 25px; }
         }
 
         /* --- 3. LAYOUT & UTILS --- */
@@ -212,30 +239,6 @@
         }
         .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-2px); }
 
-        /* --- 8. MOBILE RESPONSIVENESS FIX --- */
-        @media (max-width: 850px) {
-            header { padding: 8px 10px; gap: 4px; }
-            h1 { font-size: 0.9rem; }
-            .user-dropdown { font-size: 0.65rem; }
-            nav { gap: 2px; margin: 0 4px; }
-            nav button { font-size: 0.6rem; padding: 5px 6px; }
-
-            main { padding: 15px 12px !important; }
-            
-            .dash-grid { grid-template-columns: 1fr !important; gap: 15px !important; }
-            .dash-card { padding: 18px !important; }
-            .live-grid-container { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            .form-grid { display: flex !important; flex-direction: column !important; gap: 15px !important; }
-            .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
-            #grid-container { grid-template-columns: 1fr !important; }
-            
-            input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
-            #h-header { font-size: 1.8rem !important; }
-            .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
-            th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
-            .auth-card { padding: 35px 25px; }
-        }
-
         /* ── Live Timing Tab ──────────────────────────────────────────── */
 
         /* Desktop: full table visible, cards hidden */
@@ -333,7 +336,7 @@
         <button onclick="tab('grid', this)">Grid</button>
         <button onclick="tab('rules', this)">Rules</button>
         <button onclick="tab('archive', this)">Archive</button>
-        <button id="install-btn" class="hidden" onclick="installApp()" style="color: #00e160; border: 1px solid #00e160; background: rgba(0, 225, 96, 0.1);">App</button>
+        <button id="install-btn" class="hidden" onclick="installApp()">App</button>
     </nav>
 
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
@@ -1094,6 +1097,7 @@
         if(t==='live') loadLive();
         if(t==='standings') loadBoard();
         if(t==='calendar') loadCalendar();
+        
         if(t==='timing') {
             loadTimingTab();
             clearInterval(timingInterval);
