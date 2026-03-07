@@ -20,7 +20,7 @@
     <script>
         // Version 6.8 - Single Line Header Fix
         (function() {
-            const currentVersion = "6.8"; 
+            const currentVersion = "6.9";
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -832,17 +832,15 @@
         const refresh = document.getElementById('timing-refresh-label');
 
         try {
-            const d = await fetch('https://f1-live-api.onrender.com/timing/latest').then(r => r.json());
+            const d = await fetch('http://localhost:3000/timing').then(r => r.json());
             if (d.error) throw new Error(d.error);
 
             const drivers = d.drivers || [];
             if (drivers.length === 0) throw new Error('No data');
 
-            const sesName   = "LIVE SESSION";
-            const sesType   = "";
-            const trackMsg  = "";
+            const sesName = d.session || 'LIVE SESSION';
 
-            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#00cc44;display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
+            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#00cc44;display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b>`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             // ── shared per-driver data ─────────────────────────────────────────
@@ -865,23 +863,21 @@
                 if (pos === 1) gapText = 'LEADER';
                 else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
                 else if (r.interval)      gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
-                
-                const formatTime = (timeObj) => timeObj ? timeObj.formatted : '-';
 
                 const sectors = [0,1,2].map(i => {
-                    const s = (r.last_lap_sectors || [])[i] || {};
+                    const s = (r.sectors || [])[i] || {};
                     return { val: s.value || '-', col: s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : null, ob: s.overall_best, pb: s.personal_best };
                 });
 
                 const lastCol = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : null;
-                const badge   = r.is_pit_out_lap ? 'out' : null;
-                const topSpd  = '-';
+                const badge   = r.pit_out ? 'out' : r.in_pit ? 'pit' : null;
+                const topSpd  = r.speed_traps?.st || r.speed_traps?.fl || '-';
 
-                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, formatTime };
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r };
             });
 
             // ── Desktop: table rows ───────────────────────────────────────────
-            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, formatTime }) => {
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
                 const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob||s.pb)?'900':'600'};">${s.val}</td>`;
                 const badgeHtml = badge === 'out'
                     ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
@@ -893,9 +889,9 @@
                     <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);">${name}</b>${badgeHtml}</td>
                     <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
                     <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
-                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_age ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_age}L</span>` : ''}</td>
-                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${formatTime(r.best_lap_time)}</td>
-                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${formatTime(r.last_lap_time)}</td>
+                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
+                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
                     <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
                     ${sectors.map(sCell).join('')}
                     <td style="text-align:right;color:var(--text-muted);font-size:0.8rem;">${topSpd}</td>
@@ -903,7 +899,7 @@
             }).join('');
 
             // ── Mobile: 3-line card rows (ALL data) ───────────────────────────
-            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r, formatTime }) => {
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
                 const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
                 const isLeader  = pos === 1;
 
@@ -922,16 +918,16 @@
                             ${badgeHtml}
                             <div class="tr-line1-right">
                                 <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
-                                ${r.tyre_age ? `<span class="tr-tyre-age">${r.tyre_age}L</span>` : ''}
+                                ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
                                 <span class="tr-gap ${isLeader ? 'ldr' : ''}">${gapText}</span>
                             </div>
                         </div>
                         <div class="tr-line2">
                             <span class="tr-muted">${team}</span>
                             <span class="tr-sep">·</span>
-                            <span class="tr-val">${formatTime(r.best_lap_time)}</span>
+                            <span class="tr-val">${r.best_lap_time || '-'}</span>
                             <span class="tr-sep">·</span>
-                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${formatTime(r.last_lap_time)}</span>
+                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</span>
                             <span class="tr-sep">·</span>
                             <span class="tr-muted">${r.laps_completed || 0}L</span>
                             <span class="tr-sep">·</span>
@@ -952,9 +948,11 @@
     }
 
     async function fetchLatestSession() {
+        const el = document.getElementById('latest-session-results');
+        if (!el) return;
         try {
             const res = await fetch('https://f1-live-api.onrender.com/timing/latest').then(r=>r.json());
-            
+
             const drivers = res.drivers;
             if(!drivers || drivers.length === 0) throw new Error("No data");
 
@@ -1003,9 +1001,9 @@
             
             html += `</div>`;
             
-            document.getElementById('latest-session-results').innerHTML = html;
+            el.innerHTML = html;
         } catch(e) {
-            document.getElementById('latest-session-results').innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
+            el.innerHTML = '<span style="color:var(--text-muted); font-size: 0.9rem;">Awaiting official timing data...</span>';
         }
     }
 
