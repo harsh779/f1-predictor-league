@@ -20,7 +20,7 @@
     <script>
         // Version 6.6 - Remove dead session card, cleanup
         (function() {
-            const currentVersion = "6.6";
+            const currentVersion = "7.0";
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -307,6 +307,80 @@
             flex-wrap: wrap; gap: 8px;
         }
         .timing-legend { display: flex; gap: 12px; }
+
+        /* ── Standings Sub-tabs ───────────────────────────────────── */
+        .standings-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+        .standings-tab {
+            background: var(--nav-bg); color: var(--text-muted); border: 2px solid transparent;
+            font-family: 'Titillium Web', sans-serif; font-weight: 700; cursor: pointer; padding: 8px 16px;
+            border-radius: 20px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        .standings-tab:hover { color: var(--text-main); background: #e0e2e6; }
+        .standings-tab.active-stab { background: var(--surface); color: var(--red); border: 2px solid var(--red); box-shadow: 0 4px 10px var(--red-glow); }
+        .standings-panel { display: none; animation: slideUp 0.3s ease; }
+        .standings-panel.active-sp { display: block; }
+
+        /* ── Track Status Banner ─────────────────────────────────── */
+        #track-banner { display:none; width:100%; padding:8px 16px; box-sizing:border-box; border-radius:8px; font-weight:900; text-transform:uppercase; letter-spacing:1px; font-size:0.85rem; text-align:center; margin-bottom:12px; }
+        #track-banner.banner-green  { display:block; background:rgba(0,204,68,0.12); color:#00cc44; border:1px solid rgba(0,204,68,0.3); }
+        #track-banner.banner-yellow { display:block; background:rgba(238,187,0,0.15); color:#b89900; border:1px solid rgba(238,187,0,0.35); animation:pulse-banner 1.5s infinite; }
+        #track-banner.banner-sc     { display:block; background:rgba(255,165,0,0.15); color:#cc8400; border:1px solid rgba(255,165,0,0.35); animation:pulse-banner 2s infinite; }
+        #track-banner.banner-red    { display:block; background:rgba(225,6,0,0.12); color:#e10600; border:1px solid rgba(225,6,0,0.3); animation:pulse-banner 1s infinite; }
+        @keyframes pulse-banner { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
+
+        /* ── Live Weather Strip ──────────────────────────────────── */
+        .weather-strip { display:flex; gap:16px; flex-wrap:wrap; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 16px; margin-bottom:14px; font-size:0.88rem; }
+        .weather-strip .ws-item { display:flex; align-items:center; gap:5px; }
+        .weather-strip .ws-label { color:var(--text-muted); font-weight:700; font-size:0.75rem; text-transform:uppercase; }
+        .weather-strip .ws-val { font-weight:900; color:var(--text-main); }
+        .weather-strip .ws-rain { color:#0066ff; }
+
+        /* ── Live Tab Sidebar Layout (desktop) ───────────────────── */
+        .live-layout { display:flex; gap:20px; }
+        .live-main { flex:2; min-width:0; }
+        .live-sidebar { flex:1; min-width:260px; max-width:380px; display:flex; flex-direction:column; gap:14px; }
+        .live-panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+        .live-panel-hdr { padding:10px 14px; font-weight:900; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); border-bottom:1px solid var(--border); background:var(--surface-inner); }
+        .live-panel-body { padding:10px 14px; max-height:300px; overflow-y:auto; }
+        .live-panel-body::-webkit-scrollbar { width:4px; }
+        .live-panel-body::-webkit-scrollbar-thumb { background:#ccc; border-radius:2px; }
+
+        @media (max-width:850px) {
+            .live-layout { flex-direction:column; }
+            .live-sidebar { max-width:100%; }
+            .live-collapse-toggle { display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+            .live-collapse-toggle::after { content:''; width:8px; height:8px; border-right:2px solid var(--text-muted); border-bottom:2px solid var(--text-muted); transform:rotate(45deg); transition:transform 0.2s; }
+            .live-collapse-toggle.open::after { transform:rotate(-135deg); }
+            .live-panel-body.collapsed { display:none; }
+        }
+        @media (min-width:851px) {
+            .live-collapse-toggle::after { display:none; }
+        }
+
+        /* ── Telemetry ───────────────────────────────────────────── */
+        .telem-mini { display:inline-flex; align-items:center; gap:3px; vertical-align:middle; }
+        .telem-speed-bar { display:inline-block; width:32px; height:5px; background:var(--surface-inner); border-radius:3px; overflow:hidden; }
+        .telem-speed-fill { height:100%; border-radius:3px; }
+        .telem-drs { font-size:0.55rem; font-weight:900; padding:0 3px; border-radius:2px; line-height:1.4; }
+        .telem-drs-on { background:rgba(0,204,68,0.15); color:#00cc44; border:1px solid rgba(0,204,68,0.3); }
+        .telem-drs-elig { background:rgba(238,187,0,0.15); color:#b89900; border:1px solid rgba(238,187,0,0.35); }
+
+        .telem-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(5px); display:flex; justify-content:center; align-items:center; z-index:9999; }
+        .telem-card { background:var(--surface); border-radius:16px; padding:28px; max-width:480px; width:92%; box-shadow:0 20px 50px rgba(0,0,0,0.4); animation:slideUp 0.3s ease; }
+        .telem-card-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; border-bottom:2px solid var(--border); padding-bottom:12px; }
+        .telem-card-hdr h3 { margin:0; font-size:1.3rem; font-weight:900; text-transform:uppercase; }
+        .telem-gauges { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:18px; }
+        .telem-g { text-align:center; }
+        .telem-g-label { font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.5px; margin-bottom:4px; }
+        .telem-g-val { font-size:1.8rem; font-weight:900; color:var(--text-main); line-height:1.1; }
+        .telem-g-unit { font-size:0.7rem; color:var(--text-muted); font-weight:700; }
+        .telem-bars { display:flex; flex-direction:column; gap:10px; }
+        .telem-bar-row { display:flex; align-items:center; gap:10px; }
+        .telem-bar-label { width:60px; font-size:0.8rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); }
+        .telem-bar-track { flex:1; height:14px; background:var(--surface-inner); border-radius:7px; overflow:hidden; }
+        .telem-bar-fill { height:100%; border-radius:7px; transition:width 0.3s ease; }
+        .telem-bar-val { width:40px; text-align:right; font-weight:900; font-size:0.85rem; }
     </style>
 </head>
 <body>
@@ -320,6 +394,36 @@
             <button class="close-btn" onclick="closeSelectorModal()">&times;</button>
         </div>
         <div id="selector-grid" class="modal-grid"></div>
+    </div>
+</div>
+
+<div id="telem-modal" class="telem-overlay hidden" onclick="if(event.target===this)closeTelemModal()">
+    <div class="telem-card">
+        <div class="telem-card-hdr">
+            <h3 id="telem-driver-name">Driver</h3>
+            <button class="close-btn" onclick="closeTelemModal()">&times;</button>
+        </div>
+        <div class="telem-gauges">
+            <div class="telem-g"><div class="telem-g-label">Speed</div><div class="telem-g-val" id="tg-speed">-</div><div class="telem-g-unit">km/h</div></div>
+            <div class="telem-g"><div class="telem-g-label">Gear</div><div class="telem-g-val" id="tg-gear">-</div><div class="telem-g-unit">&nbsp;</div></div>
+            <div class="telem-g"><div class="telem-g-label">RPM</div><div class="telem-g-val" id="tg-rpm">-</div><div class="telem-g-unit">&nbsp;</div></div>
+        </div>
+        <div class="telem-bars">
+            <div class="telem-bar-row">
+                <span class="telem-bar-label">Throttle</span>
+                <div class="telem-bar-track"><div class="telem-bar-fill" id="tg-throttle" style="background:#00cc44;width:0%;"></div></div>
+                <span class="telem-bar-val" id="tg-throttle-val">0%</span>
+            </div>
+            <div class="telem-bar-row">
+                <span class="telem-bar-label">Brake</span>
+                <div class="telem-bar-track"><div class="telem-bar-fill" id="tg-brake" style="background:#e10600;width:0%;"></div></div>
+                <span class="telem-bar-val" id="tg-brake-val">0%</span>
+            </div>
+            <div class="telem-bar-row">
+                <span class="telem-bar-label">DRS</span>
+                <div style="flex:1;font-weight:900;font-size:0.95rem;" id="tg-drs">OFF</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -493,55 +597,105 @@
 
     <div id="timing" class="tab">
         <h2 class="section-title">Live</h2>
+        <div id="track-banner"></div>
+        <div id="live-weather-strip" class="weather-strip" style="display:none;"></div>
         <div id="timing-status" style="display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:0.88rem; font-weight:700; color:var(--text-muted); flex-wrap:wrap;"></div>
 
-        <div id="timing-table-wrap">
-            <table id="timing-table">
-                <thead>
-                    <tr>
-                        <th style="text-align:center;">P</th>
-                        <th style="text-align:left;">Driver</th>
-                        <th style="text-align:left;">Team</th>
-                        <th style="text-align:center;">Laps</th>
-                        <th style="text-align:center;">Tyre</th>
-                        <th style="text-align:right;">Best</th>
-                        <th style="text-align:right;">Last</th>
-                        <th style="text-align:right;">Gap</th>
-                        <th style="text-align:right;">S1</th>
-                        <th style="text-align:right;">S2</th>
-                        <th style="text-align:right;">S3</th>
-                        <th style="text-align:right;">Spd</th>
-                    </tr>
-                </thead>
-                <tbody id="timing-body">
-                    <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <div class="live-layout">
+            <div class="live-main">
+                <div id="timing-table-wrap">
+                    <table id="timing-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:center;">P</th>
+                                <th style="text-align:left;">Driver</th>
+                                <th style="text-align:left;">Team</th>
+                                <th style="text-align:center;">Laps</th>
+                                <th style="text-align:center;">Tyre</th>
+                                <th style="text-align:right;">Best</th>
+                                <th style="text-align:right;">Last</th>
+                                <th style="text-align:right;">Gap</th>
+                                <th style="text-align:right;">S1</th>
+                                <th style="text-align:right;">S2</th>
+                                <th style="text-align:right;">S3</th>
+                                <th style="text-align:right;">Spd</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timing-body">
+                            <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
 
-        <div id="timing-cards">
-            <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</div>
-        </div>
+                <div id="timing-cards">
+                    <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</div>
+                </div>
 
-        <div id="timing-meta">
-            <div class="timing-legend">
-                <span><span style="color:#9b59b6; font-weight:900;">■</span> Overall fastest</span>
-                <span><span style="color:#00cc44; font-weight:900;">■</span> Personal best</span>
+                <div id="timing-meta">
+                    <div class="timing-legend">
+                        <span><span style="color:#9b59b6; font-weight:900;">■</span> Overall fastest</span>
+                        <span><span style="color:#00cc44; font-weight:900;">■</span> Personal best</span>
+                    </div>
+                    <span id="timing-refresh-label"></span>
+                </div>
             </div>
-            <span id="timing-refresh-label"></span>
+
+            <div class="live-sidebar">
+                <div class="live-panel" id="panel-race-control">
+                    <div class="live-panel-hdr live-collapse-toggle" onclick="toggleLivePanel(this)">Race Control</div>
+                    <div class="live-panel-body" id="rc-feed"><div style="color:var(--text-muted);font-size:0.85rem;">Waiting for messages...</div></div>
+                </div>
+                <div class="live-panel" id="panel-pits">
+                    <div class="live-panel-hdr live-collapse-toggle" onclick="toggleLivePanel(this)">Pit Strategy</div>
+                    <div class="live-panel-body collapsed" id="pit-feed"><div style="color:var(--text-muted);font-size:0.85rem;">Waiting for pit data...</div></div>
+                </div>
+                <div class="live-panel" id="panel-radio">
+                    <div class="live-panel-hdr live-collapse-toggle" onclick="toggleLivePanel(this)">Team Radio</div>
+                    <div class="live-panel-body collapsed" id="radio-feed"><div style="color:var(--text-muted);font-size:0.85rem;">Waiting for radio...</div></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="standings" class="tab">
-        <h2 class="section-title">League Standings</h2>
-        
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr><th style="width: 15%; text-align: center;">Pos</th><th>Strategist</th><th style="width: 25%; text-align: right;">Points</th></tr>
-                </thead>
-                <tbody id="leaderboard"></tbody>
-            </table>
+        <h2 class="section-title">Standings</h2>
+        <div class="standings-tabs">
+            <button class="standings-tab active-stab" onclick="switchStandings('league', this)">League</button>
+            <button class="standings-tab" onclick="switchStandings('wdc', this)">Drivers</button>
+            <button class="standings-tab" onclick="switchStandings('wcc', this)">Constructors</button>
+        </div>
+
+        <div id="standings-league" class="standings-panel active-sp">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th style="width: 15%; text-align: center;">Pos</th><th>Strategist</th><th style="width: 25%; text-align: right;">Points</th></tr>
+                    </thead>
+                    <tbody id="leaderboard"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="standings-wdc" class="standings-panel">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th style="width:8%;text-align:center;">Pos</th><th>Driver</th><th>Team</th><th style="width:12%;text-align:right;">Pts</th><th style="width:10%;text-align:center;">Wins</th><th style="width:12%;text-align:center;">Podiums</th></tr>
+                    </thead>
+                    <tbody id="wdc-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="standings-wcc" class="standings-panel">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th style="width:8%;text-align:center;">Pos</th><th>Team</th><th style="width:15%;text-align:right;">Pts</th><th style="width:12%;text-align:center;">Wins</th></tr>
+                    </thead>
+                    <tbody id="wcc-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -807,28 +961,14 @@
         }
     }
 
-    async function fetchWeather(locationQuery) {
+    async function fetchWeather() {
         try {
-            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1`);
-            const geoData = await geoRes.json();
-            if(!geoData.results || geoData.results.length === 0) throw new Error("Location not found");
-            const { latitude, longitude } = geoData.results[0];
-
-            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,weather_code,wind_speed_10m`);
-            const wData = await weatherRes.json();
-            const curr = wData.current;
-
-            const code = curr.weather_code;
-            let condition = 'Cloudy';
-            if(code === 0) condition = 'Clear';
-            else if(code > 0 && code < 4) condition = 'Partly Cloudy';
-            else if(code >= 51 && code <= 67) condition = 'Rain';
-            else if(code >= 71 && code <= 77) condition = 'Snow';
-            else if(code >= 95) condition = 'Thunderstorm';
-
+            const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
+            if (!w || !w.AirTemp) throw new Error('No weather data');
+            const rain = parseFloat(w.Rainfall) > 0;
             document.getElementById('weather-widget').innerHTML = `
-                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${curr.temperature_2m}°C <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">${condition}</span></div>
-                <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Wind: ${curr.wind_speed_10m} km/h | Precip: ${curr.precipitation}mm</div>
+                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${w.AirTemp}°C <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">${rain ? 'Rain' : 'Dry'}</span></div>
+                <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Track: ${w.TrackTemp}°C | Wind: ${w.WindSpeed} km/h | Humidity: ${w.Humidity}%</div>
             `;
         } catch(e) {
             document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Radar offline.</span>";
@@ -837,6 +977,41 @@
 
     // --- TIMING TAB ---
     let timingInterval = null;
+    let liveSSE = null;
+    let sseRetries = 0;
+    let lastSSERender = 0;
+    let sseConnected = false;
+
+    function startLiveSSE() {
+        if (liveSSE) return;
+        sseRetries = 0;
+        connectSSE();
+    }
+
+    function connectSSE() {
+        try {
+            liveSSE = new EventSource('/api/live/stream');
+            liveSSE.onopen = () => { sseRetries = 0; sseConnected = true; };
+            liveSSE.onmessage = (ev) => {
+                sseConnected = true;
+                const now = Date.now();
+                if (now - lastSSERender < 5000) return;
+                lastSSERender = now;
+                loadTimingTab();
+            };
+            liveSSE.onerror = () => {
+                sseConnected = false;
+                if (liveSSE) { liveSSE.close(); liveSSE = null; }
+                sseRetries++;
+                if (sseRetries < 3) { setTimeout(connectSSE, 3000); }
+            };
+        } catch(e) { sseConnected = false; }
+    }
+
+    function stopLiveSSE() {
+        if (liveSSE) { liveSSE.close(); liveSSE = null; }
+        sseConnected = false;
+    }
 
     async function loadTimingTab() {
         const body    = document.getElementById('timing-body');
@@ -864,8 +1039,9 @@
             };
             const p1Secs = toSecs(drivers[0]?.best_lap_time);
 
-            const dot = connected ? '#00cc44' : '#e10600';
-            status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
+            const dotColor = sseConnected ? '#00cc44' : connected ? '#eebb00' : '#e10600';
+            const dotLabel = sseConnected ? 'SSE' : connected ? 'Polling' : 'Offline';
+            status.innerHTML = `<span title="${dotLabel}" style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;box-shadow:0 0 6px ${dotColor};"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             // ── shared per-driver data ─────────────────────────────────────────
@@ -899,11 +1075,13 @@
                 const badge   = r.retired ? 'out' : r.in_pit ? 'pit' : null;
                 const topSpd  = r.speed_traps?.fl || r.speed_traps?.st || '-';
 
-                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r };
+                const telem = r.telemetry || {};
+                const driverNum = r.driver_number || '';
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, telem, driverNum, r };
             });
 
             // ── Desktop: table rows ───────────────────────────────────────────
-            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
                 const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob||s.pb)?'900':'600'};">${s.val}</td>`;
                 const badgeHtml = badge === 'out'
                     ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
@@ -912,7 +1090,7 @@
                     : '';
                 return `<tr>
                     <td style="text-align:center;font-weight:900;color:var(--text-main);">${pos === 99 ? '-' : pos}</td>
-                    <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);">${name}</b>${badgeHtml}</td>
+                    <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);cursor:pointer;" onclick="openTelemModal('${driverNum}','${name}','${teamCol}')">${name}</b>${badgeHtml}</td>
                     <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
                     <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
                     <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
@@ -920,12 +1098,12 @@
                     <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
                     <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
                     ${sectors.map(sCell).join('')}
-                    <td style="text-align:right;color:var(--text-muted);font-size:0.8rem;">${topSpd}</td>
+                    <td style="text-align:right;font-size:0.8rem;">${telem.speed ? `<span class="telem-mini"><span class="telem-speed-bar"><span class="telem-speed-fill" style="width:${Math.min(100,(telem.speed/350)*100)}%;background:${telem.speed>300?'#e10600':telem.speed>200?'#eebb00':'#00cc44'};"></span></span>${telem.drs===10||telem.drs===12?'<span class="telem-drs telem-drs-on">DRS</span>':telem.drs===8?'<span class="telem-drs telem-drs-elig">DRS</span>':''}</span> ` : ''}<span style="color:var(--text-muted);">${topSpd}</span></td>
                 </tr>`;
             }).join('');
 
             // ── Mobile: 3-line card rows (ALL data) ───────────────────────────
-            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, r }) => {
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
                 const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
                 const isLeader  = pos === 1;
 
@@ -940,8 +1118,8 @@
                     <div class="tr-bar" style="background:${teamCol};"></div>
                     <div class="tr-content">
                         <div class="tr-line1">
-                            <span class="tr-name">${name}</span>
-                            ${badgeHtml}
+                            <span class="tr-name" style="cursor:pointer;" onclick="openTelemModal('${driverNum}','${name}','${teamCol}')">${name}</span>
+                            ${badgeHtml}${telem.drs===10||telem.drs===12?'<span class="telem-drs telem-drs-on">DRS</span>':telem.drs===8?'<span class="telem-drs telem-drs-elig">DRS</span>':''}
                             <div class="tr-line1-right">
                                 <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
                                 ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
@@ -966,13 +1144,180 @@
                 </div>`;
             }).join('');
 
+            // Update live panels
+            updateTrackBanner(d.status?.track_status);
+            updateLiveWeatherStrip();
+            loadRaceControl();
+            loadPitData();
+            loadTeamRadio();
+
         } catch(e) {
             body.innerHTML  = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
             cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
             if (status) status.innerHTML = '';
+            document.getElementById('track-banner').className = '';
+            document.getElementById('track-banner').style.display = 'none';
+            document.getElementById('live-weather-strip').style.display = 'none';
         }
     }
 
+    function updateTrackBanner(ts) {
+        const banner = document.getElementById('track-banner');
+        if (!ts || !ts.Message) { banner.className = ''; banner.style.display = 'none'; return; }
+        const msg = ts.Message;
+        banner.className = '';
+        if (msg === 'AllClear' || msg === 'Green') { banner.className = 'banner-green'; banner.textContent = 'Track Clear'; }
+        else if (msg.includes('Yellow')) { banner.className = 'banner-yellow'; banner.textContent = 'Yellow Flag'; }
+        else if (msg.includes('SC') && !msg.includes('VSC')) { banner.className = 'banner-sc'; banner.textContent = 'Safety Car'; }
+        else if (msg.includes('VSC')) { banner.className = 'banner-sc'; banner.textContent = 'Virtual Safety Car'; }
+        else if (msg.includes('Red')) { banner.className = 'banner-red'; banner.textContent = 'Red Flag'; }
+        else { banner.className = 'banner-green'; banner.textContent = msg; }
+        banner.id = 'track-banner';
+    }
+
+    async function updateLiveWeatherStrip() {
+        const strip = document.getElementById('live-weather-strip');
+        try {
+            const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
+            if (!w || !w.AirTemp) { strip.style.display = 'none'; return; }
+            const rain = parseFloat(w.Rainfall) > 0;
+            strip.style.display = 'flex';
+            strip.innerHTML = `
+                <div class="ws-item"><span class="ws-label">Air</span><span class="ws-val">${w.AirTemp}°C</span></div>
+                <div class="ws-item"><span class="ws-label">Track</span><span class="ws-val">${w.TrackTemp}°C</span></div>
+                <div class="ws-item"><span class="ws-label">Humidity</span><span class="ws-val">${w.Humidity}%</span></div>
+                <div class="ws-item"><span class="ws-label">Wind</span><span class="ws-val">${w.WindSpeed} km/h</span></div>
+                ${rain ? '<div class="ws-item"><span class="ws-val ws-rain">RAIN</span></div>' : ''}
+            `;
+        } catch(e) { strip.style.display = 'none'; }
+    }
+
+    async function loadRaceControl() {
+        const feed = document.getElementById('rc-feed');
+        try {
+            const msgs = await fetch('/api/live/race-control?t=' + Date.now()).then(r => r.json());
+            if (!Array.isArray(msgs) || !msgs.length) return;
+            feed.innerHTML = msgs.slice(0, 30).map(m => {
+                let color = 'var(--text-muted)';
+                if (m.Category === 'Flag') {
+                    if (m.Message?.includes('RED')) color = '#e10600';
+                    else if (m.Message?.includes('YELLOW') || m.Message?.includes('Yellow')) color = '#b89900';
+                    else if (m.Message?.includes('GREEN') || m.Message?.includes('CLEAR')) color = '#00cc44';
+                    else if (m.Message?.includes('BLUE')) color = '#0066ff';
+                } else if (m.Category === 'SafetyCar') color = '#cc8400';
+                const lap = m.Lap ? `L${m.Lap}` : '';
+                return `<div style="padding:5px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;line-height:1.4;">
+                    <span style="color:${color};font-weight:900;">${lap}</span> <span style="color:var(--text-main);">${m.Message || ''}</span>
+                </div>`;
+            }).join('');
+        } catch(e) {}
+    }
+
+    async function loadPitData() {
+        const feed = document.getElementById('pit-feed');
+        try {
+            const d = await fetch('/api/live/pits?t=' + Date.now()).then(r => r.json());
+            const drivers = d.drivers || [];
+            if (!drivers.length) return;
+            const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+            feed.innerHTML = drivers.filter(dr => dr.total_stops > 0 || dr.current_stint).sort((a,b) => (b.total_stops||0) - (a.total_stops||0)).slice(0, 22).map(dr => {
+                const tc = tyreColors[(dr.current_stint?.compound || '').toUpperCase()] || '#888';
+                return `<div style="padding:4px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;display:flex;align-items:center;gap:6px;">
+                    <b style="width:40px;flex-shrink:0;">${dr.acronym || dr.name?.split(' ').pop() || ''}</b>
+                    <span style="width:14px;height:14px;border-radius:50%;background:${tc};flex-shrink:0;display:inline-block;"></span>
+                    <span style="color:var(--text-muted);">${dr.current_stint?.laps || 0}L</span>
+                    <span style="margin-left:auto;font-weight:700;">${dr.total_stops || 0} stop${(dr.total_stops||0) !== 1 ? 's' : ''}</span>
+                </div>`;
+            }).join('');
+        } catch(e) {}
+    }
+
+    async function loadTeamRadio() {
+        const feed = document.getElementById('radio-feed');
+        try {
+            const d = await fetch('/api/live/team-radio?t=' + Date.now()).then(r => r.json());
+            const msgs = d.messages || [];
+            if (!msgs.length) return;
+            feed.innerHTML = msgs.slice(0, 20).map(m => {
+                const tc = teamColorMap[(m.team || '').toLowerCase()] || 'var(--border)';
+                const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+                return `<div style="padding:6px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;display:flex;align-items:center;gap:8px;">
+                    <span style="width:4px;height:28px;background:${tc};border-radius:2px;flex-shrink:0;"></span>
+                    <div style="flex:1;min-width:0;">
+                        <b>${m.acronym || m.name?.split(' ').pop() || ''}</b>
+                        <span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px;">${time}</span>
+                    </div>
+                    ${m.audio_url ? `<button onclick="playRadio(this,'${m.audio_url}')" style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.7rem;">&#9654;</button>` : ''}
+                </div>`;
+            }).join('');
+        } catch(e) {}
+    }
+
+    function playRadio(btn, url) {
+        const existing = document.querySelector('audio.radio-player');
+        if (existing) { existing.pause(); existing.remove(); }
+        const audio = document.createElement('audio');
+        audio.className = 'radio-player';
+        audio.src = url;
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+        audio.play().catch(() => {});
+        btn.innerHTML = '&#9632;';
+        audio.onended = () => { btn.innerHTML = '&#9654;'; audio.remove(); };
+        btn.onclick = () => { audio.pause(); audio.remove(); btn.innerHTML = '&#9654;'; btn.onclick = () => playRadio(btn, url); };
+    }
+
+    function toggleLivePanel(hdr) {
+        if (window.innerWidth <= 850) {
+            hdr.classList.toggle('open');
+            hdr.nextElementSibling.classList.toggle('collapsed');
+        }
+    }
+
+    let telemSSE = null;
+    function openTelemModal(num, name, color) {
+        document.getElementById('telem-driver-name').innerHTML = `<span style="display:inline-block;width:4px;height:20px;background:${color};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${name}`;
+        document.getElementById('telem-modal').classList.remove('hidden');
+        if (telemSSE) { telemSSE.close(); telemSSE = null; }
+        telemSSE = new EventSource(`/api/live/telemetry/stream/${num}`);
+        telemSSE.onmessage = (ev) => {
+            try {
+                const d = JSON.parse(ev.data);
+                const t = d.telemetry || d;
+                updateTelemUI(t);
+            } catch(e) {}
+        };
+        telemSSE.onerror = () => {
+            if (telemSSE) { telemSSE.close(); telemSSE = null; }
+            fetch(`/api/live/telemetry/${num}?t=${Date.now()}`).then(r => r.json()).then(d => {
+                const drivers = d.drivers || [];
+                const dr = drivers.find(x => String(x.driver_number) === String(num));
+                if (dr?.telemetry) updateTelemUI(dr.telemetry);
+            }).catch(() => {});
+        };
+    }
+
+    function closeTelemModal() {
+        document.getElementById('telem-modal').classList.add('hidden');
+        if (telemSSE) { telemSSE.close(); telemSSE = null; }
+    }
+
+    function updateTelemUI(t) {
+        document.getElementById('tg-speed').textContent = t.speed || 0;
+        document.getElementById('tg-gear').textContent = t.gear || 'N';
+        document.getElementById('tg-rpm').textContent = t.rpm ? Math.round(t.rpm / 100) * 100 : 0;
+        const throttle = t.throttle || 0;
+        const brake = t.brake || 0;
+        document.getElementById('tg-throttle').style.width = throttle + '%';
+        document.getElementById('tg-throttle-val').textContent = throttle + '%';
+        document.getElementById('tg-brake').style.width = brake + '%';
+        document.getElementById('tg-brake-val').textContent = brake + '%';
+        const drs = t.drs;
+        const drsEl = document.getElementById('tg-drs');
+        if (drs === 10 || drs === 12) { drsEl.textContent = 'ACTIVE'; drsEl.style.color = '#00cc44'; }
+        else if (drs === 8) { drsEl.textContent = 'ELIGIBLE'; drsEl.style.color = '#eebb00'; }
+        else { drsEl.textContent = 'OFF'; drsEl.style.color = 'var(--text-muted)'; }
+    }
 
     async function loadHomeData() {
         try {
@@ -1000,7 +1345,7 @@
             
             checkPredictionLock();
 
-            fetchWeather(r.country);
+            fetchWeather();
 
             const d = await fetch('/api/season-leaderboard?t=' + new Date().getTime()).then(res=>res.json());
             const podiumUI = document.getElementById('h-top-3');
@@ -1071,9 +1416,11 @@
             loadTimingTab();
             clearInterval(timingInterval);
             timingInterval = setInterval(loadTimingTab, 30000);
+            startLiveSSE();
         } else {
             clearInterval(timingInterval);
             timingInterval = null;
+            stopLiveSSE();
         }
     }
 
@@ -1184,6 +1531,61 @@
                 return `<tr><td style="text-align: center; font-weight: 900; color: ${posColor}; vertical-align: middle;">${i+1}</td><td>${nameHtml}${seasonPicks}</td><td style="text-align: right; vertical-align: middle;"><b style="font-size:1.2rem; font-weight: 900; color: var(--text-main);">${x.total_score}</b></td></tr>`;
             }).join('');
         }
+    }
+
+    function switchStandings(panel, btn) {
+        document.querySelectorAll('.standings-panel').forEach(p => p.classList.remove('active-sp'));
+        document.querySelectorAll('.standings-tab').forEach(b => b.classList.remove('active-stab'));
+        document.getElementById(`standings-${panel}`).classList.add('active-sp');
+        btn.classList.add('active-stab');
+        if (panel === 'league') loadBoard();
+        if (panel === 'wdc') loadWDC();
+        if (panel === 'wcc') loadWCC();
+    }
+
+    const teamColorMap = {};
+    teamsData.forEach(t => { teamColorMap[t.name.toLowerCase()] = t.color; });
+
+    async function loadWDC() {
+        const body = document.getElementById('wdc-body');
+        body.innerHTML = '<tr><td colspan="6"><div class="skeleton" style="width:100%;height:40px;"></div></td></tr>'.repeat(5);
+        try {
+            const d = await fetch('/api/standings/drivers?t=' + Date.now()).then(r => r.json());
+            const standings = d.standings || [];
+            if (!standings.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">No championship data available yet.</td></tr>'; return; }
+            body.innerHTML = standings.map((s, i) => {
+                const posColor = i === 0 ? '#c59b27' : i === 1 ? '#999999' : i === 2 ? '#b87333' : 'var(--text-muted)';
+                const tc = teamColorMap[(s.team || '').toLowerCase()] || (s.team_colour ? '#' + s.team_colour.replace('#','') : 'var(--border)');
+                return `<tr>
+                    <td style="text-align:center;font-weight:900;color:${posColor};">${s.position}</td>
+                    <td style="font-weight:700;"><span style="display:inline-block;width:4px;height:16px;background:${tc};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${s.name}</td>
+                    <td style="color:var(--text-muted);font-size:0.9rem;">${s.team || ''}</td>
+                    <td style="text-align:right;font-weight:900;font-size:1.1rem;">${s.points}</td>
+                    <td style="text-align:center;font-weight:700;">${s.wins || 0}</td>
+                    <td style="text-align:center;font-weight:700;">${s.podiums || 0}</td>
+                </tr>`;
+            }).join('');
+        } catch(e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">Championship data unavailable.</td></tr>'; }
+    }
+
+    async function loadWCC() {
+        const body = document.getElementById('wcc-body');
+        body.innerHTML = '<tr><td colspan="4"><div class="skeleton" style="width:100%;height:40px;"></div></td></tr>'.repeat(5);
+        try {
+            const d = await fetch('/api/standings/constructors?t=' + Date.now()).then(r => r.json());
+            const standings = d.standings || [];
+            if (!standings.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted);">No championship data available yet.</td></tr>'; return; }
+            body.innerHTML = standings.map((s, i) => {
+                const posColor = i === 0 ? '#c59b27' : i === 1 ? '#999999' : i === 2 ? '#b87333' : 'var(--text-muted)';
+                const tc = teamColorMap[(s.team || '').toLowerCase()] || 'var(--border)';
+                return `<tr>
+                    <td style="text-align:center;font-weight:900;color:${posColor};">${s.position}</td>
+                    <td style="font-weight:700;"><span style="display:inline-block;width:4px;height:18px;background:${tc};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${s.team}</td>
+                    <td style="text-align:right;font-weight:900;font-size:1.1rem;">${s.points}</td>
+                    <td style="text-align:center;font-weight:700;">${s.wins || 0}</td>
+                </tr>`;
+            }).join('');
+        } catch(e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted);">Championship data unavailable.</td></tr>'; }
     }
 
     async function loadCalendar() {

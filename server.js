@@ -147,22 +147,80 @@ async function sendDiscordNotification(msg) {
 
 async function performFinalization() {
   try {
-    // 1. Fetch Race Data (try current/last first, fall back to specific round)
-    let races;
-    try {
-        const raceRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/results.json', { timeout: 15000 }).then(r => r.data);
-        races = raceRes.MRData.RaceTable.Races;
-    } catch(e) { console.log("Ergast current/last failed, trying fallback..."); }
-    if (!races || races.length === 0) {
-        try {
-            const fallback = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/results.json', { timeout: 15000 }).then(r => r.data);
-            races = fallback.MRData.RaceTable.Races;
-        } catch(e) { console.log("Ergast fallback also failed:", e.message); }
+    // 1. Fetch Race Data — own API first, Ergast fallback
+    let raceData = null;
+    let results = null;
+    let sprintResults = [];
+    const gridMap = {};
+
+    const _now = new Date();
+    const latestCalRace = [...f1Calendar2026].reverse().find(r => new Date(r.sessions.race) < _now);
+    if (latestCalRace) {
+      try {
+        const roundData = await axios.get(`${F1_TIMING_API}/results/round/${latestCalRace.round}`, { timeout: 15000 }).then(r => r.data);
+        const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
+        if (raceSes?.results?.length) {
+          const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+          const dMap = {};
+          driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+          const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
+          if (qualSes?.results) qualSes.results.forEach(r => {
+            const d = dMap[String(r.driver_number)];
+            if (d) gridMap[normalizeStr(d.name)] = r.position;
+          });
+
+          results = raceSes.results.map(r => {
+            const d = dMap[String(r.driver_number)] || {};
+            const parts = (d.name || '').split(' ');
+            return {
+              position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)),
+              grid: String(gridMap[normalizeStr(d.name || '')] || 0),
+              status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'),
+              Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
+              Constructor: { name: d.team || '' }
+            };
+          });
+          raceData = { round: String(latestCalRace.round), raceName: raceSes.meta?.meeting || latestCalRace.name, Results: results };
+
+          const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+          if (sprintSes?.results) {
+            sprintResults = sprintSes.results.map(r => {
+              const d = dMap[String(r.driver_number)] || {};
+              const parts = (d.name || '').split(' ');
+              return {
+                position: String(r.position), positionText: r.retired ? 'R' : String(r.position),
+                grid: String(gridMap[normalizeStr(d.name || '')] || 0),
+                status: r.retired ? 'Retired' : 'Finished',
+                Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
+                Constructor: { name: d.team || '' }
+              };
+            });
+          }
+          console.log(`[FINALIZE] Own API: ${raceData.raceName} (R${latestCalRace.round}) — ${results.length} drivers`);
+        }
+      } catch (e) { console.log('[FINALIZE] Own API failed:', e.message); }
     }
-    if (!races || races.length === 0) return { success: false, message: "No race data found." };
-    const raceData = races[0];
-    const results = raceData.Results;
-    console.log(`[FINALIZE] Race data loaded: ${raceData.raceName} (Round ${raceData.round}) — ${results.length} drivers`);
+
+    if (!raceData) {
+      let races;
+      try { races = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {}
+      if (!races?.length) { try { races = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {} }
+      if (!races?.length) return { success: false, message: "No race data found." };
+      raceData = races[0]; results = raceData.Results;
+      try {
+        const sprintRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/sprint.json', { timeout: 15000 }).then(r => r.data);
+        if (sprintRes.MRData.RaceTable.Races.length > 0) sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
+      } catch(e) {}
+      try {
+        let qr = null;
+        try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {}
+        if (!qr?.length) { try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {} }
+        if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
+      } catch(e) {}
+      console.log(`[FINALIZE] Ergast: ${raceData.raceName} (R${raceData.round}) — ${results.length} drivers`);
+    }
+
+    console.log(`[FINALIZE] Grid map: ${Object.keys(gridMap).length} drivers`);
 
     // 1b. Check if this round was already scored
     const roundCheck = `R${raceData.round}`;
@@ -172,37 +230,6 @@ async function performFinalization() {
         console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
         return { success: false, message: "Already scored." };
     }
-
-    // 2. Fetch Sprint Data
-    let sprintResults = [];
-    try {
-        const sprintRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/sprint.json', { timeout: 15000 }).then(r => r.data);
-        if (sprintRes.MRData.RaceTable.Races.length > 0) {
-            sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
-        }
-    } catch(e) { console.log("No sprint data available"); }
-
-    // 3. Fetch Qualifying Data (fallback for grid positions when results.grid is null)
-    const gridMap = {};
-    try {
-        let qualRaces;
-        try {
-            qualRaces = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races);
-        } catch(e) { console.log("Qualifying current/last failed, trying fallback..."); }
-        if (!qualRaces || qualRaces.length === 0) {
-            try {
-                qualRaces = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races);
-            } catch(e) { console.log("Qualifying fallback also failed"); }
-        }
-        if (qualRaces && qualRaces.length > 0) {
-            qualRaces[0].QualifyingResults.forEach(q => {
-                const name = normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`);
-                gridMap[name] = parseInt(q.position);
-            });
-        }
-    } catch(e) { console.log("No qualifying data available for grid fallback"); }
-
-    console.log(`[FINALIZE] Grid map built: ${Object.keys(gridMap).length} drivers with qualifying positions`);
 
     const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
@@ -556,10 +583,61 @@ app.get('/api/admin/round-history', authenticateToken, async (req, res) => {
   } catch (e) { res.json([]); }
 });
 
+// --- 8b. LIVE API PROXY ROUTES ---
+const liveProxy = async (apiPath, res) => {
+    try {
+        const r = await axios.get(`${F1_TIMING_API}${apiPath}`, { timeout: 10000 });
+        res.json(r.data);
+    } catch (e) {
+        res.status(502).json({ error: 'API unavailable', detail: e.message });
+    }
+};
+
+app.get('/api/live/timing', (_, res) => liveProxy('/timing', res));
+app.get('/api/live/weather', (_, res) => liveProxy('/weather', res));
+app.get('/api/live/track', (_, res) => liveProxy('/track', res));
+app.get('/api/live/race-control', (_, res) => liveProxy('/race-control', res));
+app.get('/api/live/pits', (_, res) => liveProxy('/pits', res));
+app.get('/api/live/team-radio', (_, res) => liveProxy('/team-radio', res));
+app.get('/api/live/telemetry', (_, res) => liveProxy('/telemetry', res));
+app.get('/api/live/telemetry/:number', (req, res) => liveProxy(`/telemetry/${req.params.number}`, res));
+app.get('/api/standings/drivers', (_, res) => liveProxy('/standings/drivers', res));
+app.get('/api/standings/constructors', (_, res) => liveProxy('/standings/constructors', res));
+app.get('/api/live/status', (_, res) => liveProxy('/status', res));
+
+// SSE proxy: pipes live timing stream from own API to client
+app.get('/api/live/stream', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    });
+    const topic = req.query.topic || '';
+    const url = topic ? `${F1_TIMING_API}/stream?topic=${encodeURIComponent(topic)}` : `${F1_TIMING_API}/stream/timing`;
+    axios.get(url, { responseType: 'stream', timeout: 0, headers: { 'Accept': 'text/event-stream' } })
+        .then(upstream => { upstream.data.pipe(res); req.on('close', () => upstream.data.destroy()); })
+        .catch(e => { res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); });
+});
+
+// SSE proxy: telemetry stream for individual driver
+app.get('/api/live/telemetry/stream/:number', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    });
+    axios.get(`${F1_TIMING_API}/telemetry/stream/${req.params.number}`, { responseType: 'stream', timeout: 0, headers: { 'Accept': 'text/event-stream' } })
+        .then(upstream => { upstream.data.pipe(res); req.on('close', () => upstream.data.destroy()); })
+        .catch(e => { res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); });
+});
+
 // --- 9. AUTOMATED RACE DETECTION & FINALIZATION ---
 // Polls the F1 live timing API every 6 minutes (2 min on retry after failure).
 // When a Race session transitions to "Finalised", scoring is triggered automatically.
 let finalizationPending = false;
+let lastKnownFinalizedSession = null; // in-memory cache to avoid repeated DB hits + log spam
 
 async function checkAndFinalize() {
     // Keep both Render servers awake
@@ -569,17 +647,24 @@ async function checkAndFinalize() {
     if (finalizationPending) return;
 
     try {
-        console.log('[AUTO] Checking race status...');
         const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 8000 }).then(r => r.data);
         const session = status?.session;
 
-        if (!session || session.Type !== 'Race') { console.log('[AUTO] No active race session'); return; }
+        if (!session || session.Type !== 'Race') return;
         if (session.SessionStatus !== 'Finalised') { console.log(`[AUTO] Race status: ${session.SessionStatus} — waiting`); return; }
 
         const sessionKey = String(session.Key);
 
+        // Skip silently if we already handled this session (in-memory fast path)
+        if (lastKnownFinalizedSession === sessionKey) return;
+
+        // Check DB in case server restarted and memory was lost
         const meta = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'last_finalized_session'", args: [] });
-        if (meta.rows[0]?.value === sessionKey) { console.log(`[AUTO] Session ${sessionKey} already finalized`); return; }
+        if (meta.rows[0]?.value === sessionKey) {
+            lastKnownFinalizedSession = sessionKey; // cache it so we never hit DB again for this session
+            console.log(`[AUTO] Session ${sessionKey} already finalized — skipping future checks`);
+            return;
+        }
 
         console.log(`[AUTO] Race session ${sessionKey} finalised — triggering scoring`);
         finalizationPending = true;
@@ -588,6 +673,7 @@ async function checkAndFinalize() {
 
         if (result.success || result.message === "Already scored." || result.message === "No predictions found.") {
             await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('last_finalized_session', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [sessionKey] });
+            lastKnownFinalizedSession = sessionKey; // cache after successful DB write
             if (result.success) console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
             else console.log(`[AUTO] Session ${sessionKey} marked done (${result.message})`);
         } else {
