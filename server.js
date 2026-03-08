@@ -613,6 +613,7 @@ app.get('/api/live/weather', async (_, res) => {
         }) || f1Calendar2026[f1Calendar2026.length - 1];
         const meteo = await axios.get(`https://api.open-meteo.com/v1/forecast`, {
             params: { latitude: next.lat, longitude: next.lon, current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation' },
+            headers: { 'User-Agent': 'F1PredictionApp/1.0 (https://f1-prediction-app.onrender.com)' },
             timeout: 8000
         }).then(r => r.data);
         const c = meteo.current;
@@ -625,7 +626,8 @@ app.get('/api/live/weather', async (_, res) => {
             _source: 'open-meteo'
         });
     } catch (e) {
-        res.status(503).json({ error: 'Weather unavailable' });
+        console.error('[Weather Fallback]', e.message);
+        res.status(503).json({ error: 'Weather unavailable', detail: e.message });
     }
 });
 app.get('/api/live/track', (_, res) => liveProxy('/track', res));
