@@ -164,6 +164,15 @@ async function performFinalization() {
     const results = raceData.Results;
     console.log(`[FINALIZE] Race data loaded: ${raceData.raceName} (Round ${raceData.round}) — ${results.length} drivers`);
 
+    // 1b. Check if this round was already scored
+    const roundCheck = `R${raceData.round}`;
+    await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+    const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
+    if (alreadyScored.rows[0].count > 0) {
+        console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
+        return { success: false, message: "Already scored." };
+    }
+
     // 2. Fetch Sprint Data
     let sprintResults = [];
     try {
@@ -577,9 +586,10 @@ async function checkAndFinalize() {
 
         const result = await performFinalization();
 
-        if (result.success) {
+        if (result.success || result.message === "Already scored." || result.message === "No predictions found.") {
             await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('last_finalized_session', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [sessionKey] });
-            console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
+            if (result.success) console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
+            else console.log(`[AUTO] Session ${sessionKey} marked done (${result.message})`);
         } else {
             console.warn(`[AUTO] Scoring failed: ${result.message} — retrying in 2 min`);
             setTimeout(checkAndFinalize, 2 * 60 * 1000);
