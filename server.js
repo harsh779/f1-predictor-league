@@ -147,9 +147,18 @@ async function sendDiscordNotification(msg) {
 
 async function performFinalization() {
   try {
-    // 1. Fetch Race Data
-    const raceRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/results.json').then(r => r.json());
-    const races = raceRes.MRData.RaceTable.Races;
+    // 1. Fetch Race Data (try current/last first, fall back to specific round)
+    let races;
+    try {
+        const raceRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/results.json', { timeout: 15000 }).then(r => r.data);
+        races = raceRes.MRData.RaceTable.Races;
+    } catch(e) { console.log("Ergast current/last failed, trying fallback..."); }
+    if (!races || races.length === 0) {
+        try {
+            const fallback = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/results.json', { timeout: 15000 }).then(r => r.data);
+            races = fallback.MRData.RaceTable.Races;
+        } catch(e) { console.log("Ergast fallback also failed:", e.message); }
+    }
     if (!races || races.length === 0) return { success: false, message: "No race data found." };
     const raceData = races[0];
     const results = raceData.Results;
@@ -157,7 +166,7 @@ async function performFinalization() {
     // 2. Fetch Sprint Data
     let sprintResults = [];
     try {
-        const sprintRes = await fetch('https://api.jolpi.ca/ergast/f1/current/last/sprint.json').then(r => r.json());
+        const sprintRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/sprint.json', { timeout: 15000 }).then(r => r.data);
         if (sprintRes.MRData.RaceTable.Races.length > 0) {
             sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
         }
