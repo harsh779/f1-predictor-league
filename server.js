@@ -598,7 +598,7 @@ app.get('/api/live/weather', async (_, res) => {
     // Try F1 live timing weather first
     try {
         const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 5000 }).then(r => r.data);
-        if (status && status.connected) {
+        if (status && status.session && status.session.SessionStatus !== 'Finalised') {
             const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
             if (live && live.AirTemp) return res.json(live);
         }
