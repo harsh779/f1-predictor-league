@@ -7,7 +7,7 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026'; 
+const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026';
 
 app.use(express.json());
 
@@ -19,94 +19,94 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false })); 
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false }));
 
 const db = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
 
 // --- 1. DATABASE SETUP ---
 async function setupDatabase() {
-  try {
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, auth_id TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
-    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN auth_id TEXT`); } catch(e) {}
-    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch(e) {}
-    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch(e) {}
-    
-    // 🌍 NEW: Columns for Season-Long Predictions
-    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_driver TEXT`); } catch(e) {}
-    try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_constructor TEXT`); } catch(e) {}
-    
-    // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
+    try {
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, auth_id TEXT, total_score INTEGER DEFAULT 0, has_participated INTEGER DEFAULT 0, is_vip INTEGER DEFAULT 0)`);
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN auth_id TEXT`); } catch (e) { }
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch (e) { }
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch (e) { }
+
+        // 🌍 NEW: Columns for Season-Long Predictions
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_driver TEXT`); } catch (e) { }
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_constructor TEXT`); } catch (e) { }
+
+        // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT UNIQUE, 
         p1 TEXT, p2 TEXT, p3 TEXT, p10 TEXT, p11 TEXT, p21 TEXT, p22 TEXT, 
         c1 TEXT, c2 TEXT, c5 TEXT, c6 TEXT, c11 TEXT, 
         w_race_loser TEXT, w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
-    
-    await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
-    await db.execute(`CREATE TABLE IF NOT EXISTS f1_meta (key TEXT PRIMARY KEY, value TEXT)`);
-    console.log("Database synced.");
-  } catch (e) { console.error("DB Error:", e); }
+
+        await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_meta (key TEXT PRIMARY KEY, value TEXT)`);
+        console.log("Database synced.");
+    } catch (e) { console.error("DB Error:", e); }
 }
 setupDatabase();
 
 // --- 2. FULL 2026 CALENDAR (FULLY UPDATED WITH ALL SESSIONS) ---
 const f1Calendar2026 = [
-  { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-08T09:30:00+05:30", circuit: "Albert Park Circuit", country: "Australia", lat: -37.8497, lon: 144.9680, trackDetails: { length: "5.278 km", laps: 58, corners: 14, firstGP: 1996, record: "1:19.813" }, sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
-  { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-15T12:30:00+05:30", circuit: "Shanghai International Circuit", country: "China", lat: 31.3389, lon: 121.2197, trackDetails: { length: "5.451 km", laps: 56, corners: 16, firstGP: 2004, record: "1:32.238" }, sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
-  { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-29T10:30:00+05:30", circuit: "Suzuka International Racing Course", country: "Japan", lat: 34.8431, lon: 136.5407, trackDetails: { length: "5.807 km", laps: 53, corners: 18, firstGP: 1987, record: "1:30.983" }, sessions: { fp1: "2026-03-27T08:00:00+05:30", fp2: "2026-03-27T11:30:00+05:30", fp3: "2026-03-28T08:00:00+05:30", quali: "2026-03-28T11:30:00+05:30", race: "2026-03-29T10:30:00+05:30" } },
-  { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-12T20:30:00+05:30", circuit: "Bahrain International Circuit", country: "Bahrain", lat: 26.0325, lon: 50.5106, trackDetails: { length: "5.412 km", laps: 57, corners: 15, firstGP: 2004, record: "1:31.447" }, sessions: { fp1: "2026-04-10T17:00:00+05:30", fp2: "2026-04-10T20:30:00+05:30", fp3: "2026-04-11T17:30:00+05:30", quali: "2026-04-11T21:30:00+05:30", race: "2026-04-12T20:30:00+05:30" } },
-  { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-19T22:30:00+05:30", circuit: "Jeddah Corniche Circuit", country: "Saudi Arabia", lat: 21.6319, lon: 39.1044, trackDetails: { length: "6.174 km", laps: 50, corners: 27, firstGP: 2021, record: "1:30.734" }, sessions: { fp1: "2026-04-17T19:00:00+05:30", fp2: "2026-04-17T22:30:00+05:30", fp3: "2026-04-18T19:00:00+05:30", quali: "2026-04-18T22:30:00+05:30", race: "2026-04-19T22:30:00+05:30" } },
-  { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-04T01:30:00+05:30", circuit: "Miami International Autodrome", country: "United States", lat: 25.9581, lon: -80.2389, trackDetails: { length: "5.412 km", laps: 57, corners: 19, firstGP: 2022, record: "1:29.708" }, sessions: { fp1: "2026-05-01T22:00:00+05:30", sprintQuali: "2026-05-02T02:00:00+05:30", sprint: "2026-05-02T21:30:00+05:30", quali: "2026-05-03T01:30:00+05:30", race: "2026-05-04T01:30:00+05:30" } },
-  { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-24T23:30:00+05:30", circuit: "Circuit Gilles-Villeneuve", country: "Canada", lat: 45.5017, lon: -73.5228, trackDetails: { length: "4.361 km", laps: 70, corners: 14, firstGP: 1978, record: "1:13.078" }, sessions: { fp1: "2026-05-22T23:00:00+05:30", sprintQuali: "2026-05-23T03:00:00+05:30", sprint: "2026-05-23T21:30:00+05:30", quali: "2026-05-24T01:30:00+05:30", race: "2026-05-24T23:30:00+05:30" } },
-  { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-07T18:30:00+05:30", circuit: "Circuit de Monaco", country: "Monaco", lat: 43.7347, lon: 7.4206, trackDetails: { length: "3.337 km", laps: 78, corners: 19, firstGP: 1950, record: "1:12.909" }, sessions: { fp1: "2026-06-05T17:00:00+05:30", fp2: "2026-06-05T20:30:00+05:30", fp3: "2026-06-06T16:00:00+05:30", quali: "2026-06-06T19:30:00+05:30", race: "2026-06-07T18:30:00+05:30" } },
-  { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-14T18:30:00+05:30", circuit: "Circuit de Barcelona-Catalunya", country: "Spain", lat: 41.5700, lon: 2.2611, trackDetails: { length: "4.657 km", laps: 66, corners: 14, firstGP: 1991, record: "1:18.149" }, sessions: { fp1: "2026-06-12T17:00:00+05:30", fp2: "2026-06-12T20:30:00+05:30", fp3: "2026-06-13T16:00:00+05:30", quali: "2026-06-13T19:30:00+05:30", race: "2026-06-14T18:30:00+05:30" } },
-  { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-28T18:30:00+05:30", circuit: "Red Bull Ring", country: "Austria", lat: 47.2197, lon: 14.7647, trackDetails: { length: "4.318 km", laps: 71, corners: 10, firstGP: 1970, record: "1:05.619" }, sessions: { fp1: "2026-06-26T17:00:00+05:30", fp2: "2026-06-26T20:30:00+05:30", fp3: "2026-06-27T16:00:00+05:30", quali: "2026-06-27T19:00:00+05:30", race: "2026-06-28T18:30:00+05:30" } },
-  { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-05T19:30:00+05:30", circuit: "Silverstone Circuit", country: "Great Britain", lat: 52.0786, lon: -1.0169, trackDetails: { length: "5.891 km", laps: 52, corners: 18, firstGP: 1950, record: "1:27.097" }, sessions: { fp1: "2026-07-03T18:00:00+05:30", sprintQuali: "2026-07-03T22:00:00+05:30", sprint: "2026-07-04T16:30:00+05:30", quali: "2026-07-04T20:00:00+05:30", race: "2026-07-05T19:30:00+05:30" } },
-  { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-19T18:30:00+05:30", circuit: "Circuit de Spa-Francorchamps", country: "Belgium", lat: 50.4372, lon: 5.9714, trackDetails: { length: "7.004 km", laps: 44, corners: 19, firstGP: 1950, record: "1:46.286" }, sessions: { fp1: "2026-07-17T17:00:00+05:30", fp2: "2026-07-17T20:30:00+05:30", fp3: "2026-07-18T16:00:00+05:30", quali: "2026-07-18T19:00:00+05:30", race: "2026-07-19T18:30:00+05:30" } },
-  { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-26T18:30:00+05:30", circuit: "Hungaroring", country: "Hungary", lat: 47.5789, lon: 19.2486, trackDetails: { length: "4.381 km", laps: 70, corners: 14, firstGP: 1986, record: "1:16.627" }, sessions: { fp1: "2026-07-24T17:00:00+05:30", fp2: "2026-07-24T20:30:00+05:30", fp3: "2026-07-25T16:00:00+05:30", quali: "2026-07-25T19:30:00+05:30", race: "2026-07-26T18:30:00+05:30" } },
-  { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-23T18:30:00+05:30", circuit: "Circuit Zandvoort", country: "Netherlands", lat: 52.3888, lon: 4.5409, trackDetails: { length: "4.259 km", laps: 72, corners: 14, firstGP: 1952, record: "1:11.097" }, sessions: { fp1: "2026-08-21T16:00:00+05:30", sprintQuali: "2026-08-21T19:30:00+05:30", sprint: "2026-08-22T15:30:00+05:30", quali: "2026-08-22T18:30:00+05:30", race: "2026-08-23T18:30:00+05:30" } },
-  { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-06T18:30:00+05:30", circuit: "Monza Circuit", country: "Italy", lat: 45.6156, lon: 9.2811, trackDetails: { length: "5.793 km", laps: 53, corners: 11, firstGP: 1950, record: "1:21.046" }, sessions: { fp1: "2026-09-04T17:00:00+05:30", fp2: "2026-09-04T20:30:00+05:30", fp3: "2026-09-05T16:00:00+05:30", quali: "2026-09-05T19:30:00+05:30", race: "2026-09-06T18:30:00+05:30" } },
-  { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-13T18:30:00+05:30", circuit: "IFEMA Madrid", country: "Spain", lat: 40.4653, lon: -3.6156, trackDetails: { length: "5.474 km", laps: 55, corners: 20, firstGP: 2026, record: "TBC" }, sessions: { fp1: "2026-09-11T17:00:00+05:30", fp2: "2026-09-11T20:30:00+05:30", fp3: "2026-09-12T16:00:00+05:30", quali: "2026-09-12T19:30:00+05:30", race: "2026-09-13T18:30:00+05:30" } },
-  { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-26T16:30:00+05:30", circuit: "Baku City Circuit", country: "Azerbaijan", lat: 40.3725, lon: 49.8533, trackDetails: { length: "6.003 km", laps: 51, corners: 20, firstGP: 2016, record: "1:43.009" }, sessions: { fp1: "2026-09-24T15:00:00+05:30", fp2: "2026-09-24T18:30:00+05:30", fp3: "2026-09-25T14:30:00+05:30", quali: "2026-09-25T17:30:00+05:30", race: "2026-09-26T16:30:00+05:30" } },
-  { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-11T17:30:00+05:30", circuit: "Marina Bay Street Circuit", country: "Singapore", lat: 1.2914, lon: 103.8640, trackDetails: { length: "4.940 km", laps: 62, corners: 19, firstGP: 2008, record: "1:35.867" }, sessions: { fp1: "2026-10-09T15:00:00+05:30", sprintQuali: "2026-10-09T18:30:00+05:30", sprint: "2026-10-10T14:30:00+05:30", quali: "2026-10-10T18:30:00+05:30", race: "2026-10-11T17:30:00+05:30" } },
-  { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-26T00:30:00+05:30", circuit: "Circuit of the Americas", country: "USA", lat: 30.1328, lon: -97.6411, trackDetails: { length: "5.513 km", laps: 56, corners: 20, firstGP: 2012, record: "1:36.169" }, sessions: { fp1: "2026-10-23T23:00:00+05:30", fp2: "2026-10-24T02:30:00+05:30", fp3: "2026-10-24T23:30:00+05:30", quali: "2026-10-25T03:30:00+05:30", race: "2026-10-26T00:30:00+05:30" } },
-  { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-11-02T02:30:00+05:30", circuit: "Autódromo Hermanos Rodríguez", country: "Mexico", lat: 19.4042, lon: -99.0907, trackDetails: { length: "4.304 km", laps: 71, corners: 17, firstGP: 1962, record: "1:17.774" }, sessions: { fp1: "2026-10-31T00:00:00+05:30", fp2: "2026-10-31T03:30:00+05:30", fp3: "2026-10-31T23:00:00+05:30", quali: "2026-11-01T03:30:00+05:30", race: "2026-11-02T02:30:00+05:30" } },
-  { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-08T22:30:00+05:30", circuit: "Interlagos Circuit", country: "Brazil", lat: -23.7014, lon: -46.6969, trackDetails: { length: "4.309 km", laps: 71, corners: 15, firstGP: 1973, record: "1:10.540" }, sessions: { fp1: "2026-11-06T20:00:00+05:30", fp2: "2026-11-06T23:30:00+05:30", fp3: "2026-11-07T20:00:00+05:30", quali: "2026-11-07T23:30:00+05:30", race: "2026-11-08T22:30:00+05:30" } },
-  { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-22T11:30:00+05:30", circuit: "Las Vegas Strip Circuit", country: "USA", lat: 36.1147, lon: -115.1728, trackDetails: { length: "6.201 km", laps: 50, corners: 17, firstGP: 2023, record: "1:35.490" }, sessions: { fp1: "2026-11-20T08:00:00+05:30", fp2: "2026-11-20T11:30:00+05:30", fp3: "2026-11-21T08:00:00+05:30", quali: "2026-11-21T11:30:00+05:30", race: "2026-11-22T11:30:00+05:30" } },
-  { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-29T22:30:00+05:30", circuit: "Lusail International Circuit", country: "Qatar", lat: 25.4900, lon: 51.4542, trackDetails: { length: "5.419 km", laps: 57, corners: 16, firstGP: 2021, record: "1:24.319" }, sessions: { fp1: "2026-11-27T19:00:00+05:30", fp2: "2026-11-27T22:30:00+05:30", fp3: "2026-11-28T19:00:00+05:30", quali: "2026-11-28T22:30:00+05:30", race: "2026-11-29T22:30:00+05:30" } },
-  { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-06T18:30:00+05:30", circuit: "Yas Marina Circuit", country: "Abu Dhabi", lat: 24.4672, lon: 54.6031, trackDetails: { length: "5.281 km", laps: 58, corners: 16, firstGP: 2009, record: "1:26.103" }, sessions: { fp1: "2026-12-04T15:00:00+05:30", fp2: "2026-12-04T18:30:00+05:30", fp3: "2026-12-05T16:00:00+05:30", quali: "2026-12-05T19:30:00+05:30", race: "2026-12-06T18:30:00+05:30" } }
+    { round: 1, name: "Australian Grand Prix", hasSprint: false, date: "2026-03-08T09:30:00+05:30", circuit: "Albert Park Circuit", country: "Australia", lat: -37.8497, lon: 144.9680, trackDetails: { length: "5.278 km", laps: 58, corners: 14, firstGP: 1996, record: "1:19.813" }, sessions: { fp1: "2026-03-06T07:00:00+05:30", fp2: "2026-03-06T10:30:00+05:30", fp3: "2026-03-07T07:00:00+05:30", quali: "2026-03-07T10:30:00+05:30", race: "2026-03-08T09:30:00+05:30" } },
+    { round: 2, name: "Chinese Grand Prix", hasSprint: true, date: "2026-03-15T12:30:00+05:30", circuit: "Shanghai International Circuit", country: "China", lat: 31.3389, lon: 121.2197, trackDetails: { length: "5.451 km", laps: 56, corners: 16, firstGP: 2004, record: "1:32.238" }, sessions: { fp1: "2026-03-13T09:00:00+05:30", sprintQuali: "2026-03-13T13:00:00+05:30", sprint: "2026-03-14T09:00:00+05:30", quali: "2026-03-14T13:00:00+05:30", race: "2026-03-15T12:30:00+05:30" } },
+    { round: 3, name: "Japanese Grand Prix", hasSprint: false, date: "2026-03-29T10:30:00+05:30", circuit: "Suzuka International Racing Course", country: "Japan", lat: 34.8431, lon: 136.5407, trackDetails: { length: "5.807 km", laps: 53, corners: 18, firstGP: 1987, record: "1:30.983" }, sessions: { fp1: "2026-03-27T08:00:00+05:30", fp2: "2026-03-27T11:30:00+05:30", fp3: "2026-03-28T08:00:00+05:30", quali: "2026-03-28T11:30:00+05:30", race: "2026-03-29T10:30:00+05:30" } },
+    { round: 4, name: "Bahrain Grand Prix", hasSprint: false, date: "2026-04-12T20:30:00+05:30", circuit: "Bahrain International Circuit", country: "Bahrain", lat: 26.0325, lon: 50.5106, trackDetails: { length: "5.412 km", laps: 57, corners: 15, firstGP: 2004, record: "1:31.447" }, sessions: { fp1: "2026-04-10T17:00:00+05:30", fp2: "2026-04-10T20:30:00+05:30", fp3: "2026-04-11T17:30:00+05:30", quali: "2026-04-11T21:30:00+05:30", race: "2026-04-12T20:30:00+05:30" } },
+    { round: 5, name: "Saudi Arabian Grand Prix", hasSprint: false, date: "2026-04-19T22:30:00+05:30", circuit: "Jeddah Corniche Circuit", country: "Saudi Arabia", lat: 21.6319, lon: 39.1044, trackDetails: { length: "6.174 km", laps: 50, corners: 27, firstGP: 2021, record: "1:30.734" }, sessions: { fp1: "2026-04-17T19:00:00+05:30", fp2: "2026-04-17T22:30:00+05:30", fp3: "2026-04-18T19:00:00+05:30", quali: "2026-04-18T22:30:00+05:30", race: "2026-04-19T22:30:00+05:30" } },
+    { round: 6, name: "Miami Grand Prix", hasSprint: true, date: "2026-05-04T01:30:00+05:30", circuit: "Miami International Autodrome", country: "United States", lat: 25.9581, lon: -80.2389, trackDetails: { length: "5.412 km", laps: 57, corners: 19, firstGP: 2022, record: "1:29.708" }, sessions: { fp1: "2026-05-01T22:00:00+05:30", sprintQuali: "2026-05-02T02:00:00+05:30", sprint: "2026-05-02T21:30:00+05:30", quali: "2026-05-03T01:30:00+05:30", race: "2026-05-04T01:30:00+05:30" } },
+    { round: 7, name: "Canadian Grand Prix", hasSprint: true, date: "2026-05-24T23:30:00+05:30", circuit: "Circuit Gilles-Villeneuve", country: "Canada", lat: 45.5017, lon: -73.5228, trackDetails: { length: "4.361 km", laps: 70, corners: 14, firstGP: 1978, record: "1:13.078" }, sessions: { fp1: "2026-05-22T23:00:00+05:30", sprintQuali: "2026-05-23T03:00:00+05:30", sprint: "2026-05-23T21:30:00+05:30", quali: "2026-05-24T01:30:00+05:30", race: "2026-05-24T23:30:00+05:30" } },
+    { round: 8, name: "Monaco Grand Prix", hasSprint: false, date: "2026-06-07T18:30:00+05:30", circuit: "Circuit de Monaco", country: "Monaco", lat: 43.7347, lon: 7.4206, trackDetails: { length: "3.337 km", laps: 78, corners: 19, firstGP: 1950, record: "1:12.909" }, sessions: { fp1: "2026-06-05T17:00:00+05:30", fp2: "2026-06-05T20:30:00+05:30", fp3: "2026-06-06T16:00:00+05:30", quali: "2026-06-06T19:30:00+05:30", race: "2026-06-07T18:30:00+05:30" } },
+    { round: 9, name: "Spanish Grand Prix", hasSprint: false, date: "2026-06-14T18:30:00+05:30", circuit: "Circuit de Barcelona-Catalunya", country: "Spain", lat: 41.5700, lon: 2.2611, trackDetails: { length: "4.657 km", laps: 66, corners: 14, firstGP: 1991, record: "1:18.149" }, sessions: { fp1: "2026-06-12T17:00:00+05:30", fp2: "2026-06-12T20:30:00+05:30", fp3: "2026-06-13T16:00:00+05:30", quali: "2026-06-13T19:30:00+05:30", race: "2026-06-14T18:30:00+05:30" } },
+    { round: 10, name: "Austrian Grand Prix", hasSprint: false, date: "2026-06-28T18:30:00+05:30", circuit: "Red Bull Ring", country: "Austria", lat: 47.2197, lon: 14.7647, trackDetails: { length: "4.318 km", laps: 71, corners: 10, firstGP: 1970, record: "1:05.619" }, sessions: { fp1: "2026-06-26T17:00:00+05:30", fp2: "2026-06-26T20:30:00+05:30", fp3: "2026-06-27T16:00:00+05:30", quali: "2026-06-27T19:00:00+05:30", race: "2026-06-28T18:30:00+05:30" } },
+    { round: 11, name: "British Grand Prix", hasSprint: true, date: "2026-07-05T19:30:00+05:30", circuit: "Silverstone Circuit", country: "Great Britain", lat: 52.0786, lon: -1.0169, trackDetails: { length: "5.891 km", laps: 52, corners: 18, firstGP: 1950, record: "1:27.097" }, sessions: { fp1: "2026-07-03T18:00:00+05:30", sprintQuali: "2026-07-03T22:00:00+05:30", sprint: "2026-07-04T16:30:00+05:30", quali: "2026-07-04T20:00:00+05:30", race: "2026-07-05T19:30:00+05:30" } },
+    { round: 12, name: "Belgian Grand Prix", hasSprint: false, date: "2026-07-19T18:30:00+05:30", circuit: "Circuit de Spa-Francorchamps", country: "Belgium", lat: 50.4372, lon: 5.9714, trackDetails: { length: "7.004 km", laps: 44, corners: 19, firstGP: 1950, record: "1:46.286" }, sessions: { fp1: "2026-07-17T17:00:00+05:30", fp2: "2026-07-17T20:30:00+05:30", fp3: "2026-07-18T16:00:00+05:30", quali: "2026-07-18T19:00:00+05:30", race: "2026-07-19T18:30:00+05:30" } },
+    { round: 13, name: "Hungarian Grand Prix", hasSprint: false, date: "2026-07-26T18:30:00+05:30", circuit: "Hungaroring", country: "Hungary", lat: 47.5789, lon: 19.2486, trackDetails: { length: "4.381 km", laps: 70, corners: 14, firstGP: 1986, record: "1:16.627" }, sessions: { fp1: "2026-07-24T17:00:00+05:30", fp2: "2026-07-24T20:30:00+05:30", fp3: "2026-07-25T16:00:00+05:30", quali: "2026-07-25T19:30:00+05:30", race: "2026-07-26T18:30:00+05:30" } },
+    { round: 14, name: "Dutch Grand Prix", hasSprint: true, date: "2026-08-23T18:30:00+05:30", circuit: "Circuit Zandvoort", country: "Netherlands", lat: 52.3888, lon: 4.5409, trackDetails: { length: "4.259 km", laps: 72, corners: 14, firstGP: 1952, record: "1:11.097" }, sessions: { fp1: "2026-08-21T16:00:00+05:30", sprintQuali: "2026-08-21T19:30:00+05:30", sprint: "2026-08-22T15:30:00+05:30", quali: "2026-08-22T18:30:00+05:30", race: "2026-08-23T18:30:00+05:30" } },
+    { round: 15, name: "Italian Grand Prix", hasSprint: false, date: "2026-09-06T18:30:00+05:30", circuit: "Monza Circuit", country: "Italy", lat: 45.6156, lon: 9.2811, trackDetails: { length: "5.793 km", laps: 53, corners: 11, firstGP: 1950, record: "1:21.046" }, sessions: { fp1: "2026-09-04T17:00:00+05:30", fp2: "2026-09-04T20:30:00+05:30", fp3: "2026-09-05T16:00:00+05:30", quali: "2026-09-05T19:30:00+05:30", race: "2026-09-06T18:30:00+05:30" } },
+    { round: 16, name: "Madrid Grand Prix", hasSprint: false, date: "2026-09-13T18:30:00+05:30", circuit: "IFEMA Madrid", country: "Spain", lat: 40.4653, lon: -3.6156, trackDetails: { length: "5.474 km", laps: 55, corners: 20, firstGP: 2026, record: "TBC" }, sessions: { fp1: "2026-09-11T17:00:00+05:30", fp2: "2026-09-11T20:30:00+05:30", fp3: "2026-09-12T16:00:00+05:30", quali: "2026-09-12T19:30:00+05:30", race: "2026-09-13T18:30:00+05:30" } },
+    { round: 17, name: "Azerbaijan Grand Prix", hasSprint: false, date: "2026-09-26T16:30:00+05:30", circuit: "Baku City Circuit", country: "Azerbaijan", lat: 40.3725, lon: 49.8533, trackDetails: { length: "6.003 km", laps: 51, corners: 20, firstGP: 2016, record: "1:43.009" }, sessions: { fp1: "2026-09-24T15:00:00+05:30", fp2: "2026-09-24T18:30:00+05:30", fp3: "2026-09-25T14:30:00+05:30", quali: "2026-09-25T17:30:00+05:30", race: "2026-09-26T16:30:00+05:30" } },
+    { round: 18, name: "Singapore Grand Prix", hasSprint: true, date: "2026-10-11T17:30:00+05:30", circuit: "Marina Bay Street Circuit", country: "Singapore", lat: 1.2914, lon: 103.8640, trackDetails: { length: "4.940 km", laps: 62, corners: 19, firstGP: 2008, record: "1:35.867" }, sessions: { fp1: "2026-10-09T15:00:00+05:30", sprintQuali: "2026-10-09T18:30:00+05:30", sprint: "2026-10-10T14:30:00+05:30", quali: "2026-10-10T18:30:00+05:30", race: "2026-10-11T17:30:00+05:30" } },
+    { round: 19, name: "United States Grand Prix", hasSprint: false, date: "2026-10-26T00:30:00+05:30", circuit: "Circuit of the Americas", country: "USA", lat: 30.1328, lon: -97.6411, trackDetails: { length: "5.513 km", laps: 56, corners: 20, firstGP: 2012, record: "1:36.169" }, sessions: { fp1: "2026-10-23T23:00:00+05:30", fp2: "2026-10-24T02:30:00+05:30", fp3: "2026-10-24T23:30:00+05:30", quali: "2026-10-25T03:30:00+05:30", race: "2026-10-26T00:30:00+05:30" } },
+    { round: 20, name: "Mexico City Grand Prix", hasSprint: false, date: "2026-11-02T02:30:00+05:30", circuit: "Autódromo Hermanos Rodríguez", country: "Mexico", lat: 19.4042, lon: -99.0907, trackDetails: { length: "4.304 km", laps: 71, corners: 17, firstGP: 1962, record: "1:17.774" }, sessions: { fp1: "2026-10-31T00:00:00+05:30", fp2: "2026-10-31T03:30:00+05:30", fp3: "2026-10-31T23:00:00+05:30", quali: "2026-11-01T03:30:00+05:30", race: "2026-11-02T02:30:00+05:30" } },
+    { round: 21, name: "São Paulo Grand Prix", hasSprint: false, date: "2026-11-08T22:30:00+05:30", circuit: "Interlagos Circuit", country: "Brazil", lat: -23.7014, lon: -46.6969, trackDetails: { length: "4.309 km", laps: 71, corners: 15, firstGP: 1973, record: "1:10.540" }, sessions: { fp1: "2026-11-06T20:00:00+05:30", fp2: "2026-11-06T23:30:00+05:30", fp3: "2026-11-07T20:00:00+05:30", quali: "2026-11-07T23:30:00+05:30", race: "2026-11-08T22:30:00+05:30" } },
+    { round: 22, name: "Las Vegas Grand Prix", hasSprint: false, date: "2026-11-22T11:30:00+05:30", circuit: "Las Vegas Strip Circuit", country: "USA", lat: 36.1147, lon: -115.1728, trackDetails: { length: "6.201 km", laps: 50, corners: 17, firstGP: 2023, record: "1:35.490" }, sessions: { fp1: "2026-11-20T08:00:00+05:30", fp2: "2026-11-20T11:30:00+05:30", fp3: "2026-11-21T08:00:00+05:30", quali: "2026-11-21T11:30:00+05:30", race: "2026-11-22T11:30:00+05:30" } },
+    { round: 23, name: "Qatar Grand Prix", hasSprint: false, date: "2026-11-29T22:30:00+05:30", circuit: "Lusail International Circuit", country: "Qatar", lat: 25.4900, lon: 51.4542, trackDetails: { length: "5.419 km", laps: 57, corners: 16, firstGP: 2021, record: "1:24.319" }, sessions: { fp1: "2026-11-27T19:00:00+05:30", fp2: "2026-11-27T22:30:00+05:30", fp3: "2026-11-28T19:00:00+05:30", quali: "2026-11-28T22:30:00+05:30", race: "2026-11-29T22:30:00+05:30" } },
+    { round: 24, name: "Abu Dhabi Grand Prix", hasSprint: false, date: "2026-12-06T18:30:00+05:30", circuit: "Yas Marina Circuit", country: "Abu Dhabi", lat: 24.4672, lon: 54.6031, trackDetails: { length: "5.281 km", laps: 58, corners: 16, firstGP: 2009, record: "1:26.103" }, sessions: { fp1: "2026-12-04T15:00:00+05:30", fp2: "2026-12-04T18:30:00+05:30", fp3: "2026-12-05T16:00:00+05:30", quali: "2026-12-05T19:30:00+05:30", race: "2026-12-06T18:30:00+05:30" } }
 ];
 
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
-  const l = normalizeStr(c);
-  if (l.includes("mclaren")) return "mclaren";
-  if (l.includes("red bull") || l.includes("redbull")) return "red bull";
-  if (l.includes("ferrari")) return "ferrari";
-  if (l.includes("mercedes")) return "mercedes";
-  if (l.includes("aston")) return "aston martin";
-  if (l.includes("alpine")) return "alpine";
-  if (l.includes("haas")) return "haas";
-  if (l.includes("rb") || l.includes("racing bulls")) return "racing bulls";
-  if (l.includes("williams")) return "williams";
-  if (l.includes("sauber") || l.includes("audi")) return "audi";
-  if (l.includes("cadillac")) return "cadillac"; 
-  return l;
+    const l = normalizeStr(c);
+    if (l.includes("mclaren")) return "mclaren";
+    if (l.includes("red bull") || l.includes("redbull")) return "red bull";
+    if (l.includes("ferrari")) return "ferrari";
+    if (l.includes("mercedes")) return "mercedes";
+    if (l.includes("aston")) return "aston martin";
+    if (l.includes("alpine")) return "alpine";
+    if (l.includes("haas")) return "haas";
+    if (l.includes("rb") || l.includes("racing bulls")) return "racing bulls";
+    if (l.includes("williams")) return "williams";
+    if (l.includes("sauber") || l.includes("audi")) return "audi";
+    if (l.includes("cadillac")) return "cadillac";
+    return l;
 }
 
 // --- 4. JWT AUTHENTICATION MIDDLEWARE ---
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
-  
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Access Denied: Invalid Token" });
-    req.user = user;
-    next();
-  });
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: "Access Denied: Invalid Token" });
+        req.user = user;
+        next();
+    });
 }
 
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
@@ -123,301 +123,301 @@ app.get('/auth/google/callback', async (req, res) => {
             client_secret: process.env.GOOGLE_CLIENT_SECRET,
             code, grant_type: 'authorization_code', redirect_uri: `${APP_URL}/auth/google/callback`
         });
-        
+
         const userResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
         });
-        
+
         const googleUser = userResponse.data;
-        
+
         await db.execute({ sql: `INSERT INTO f1_drivers (name, auth_id) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET auth_id=excluded.auth_id`, args: [googleUser.name, `google_${googleUser.id}`] });
-        
+
         const token = jwt.sign({ name: googleUser.name, id: `google_${googleUser.id}` }, JWT_SECRET, { expiresIn: '30d' });
-        
+
         res.redirect(`/?token=${token}&name=${encodeURIComponent(googleUser.name)}`);
     } catch (error) { res.redirect('/?error=oauth_failed'); }
 });
 
 // --- 6. SCORING ENGINE (V4 NEW RULES) ---
 async function sendDiscordNotification(msg) {
-  const url = process.env.DISCORD_WEBHOOK;
-  if (!url) return;
-  try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) }); } catch (e) {}
+    const url = process.env.DISCORD_WEBHOOK;
+    if (!url) return;
+    try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) }); } catch (e) { }
 }
 
 async function performFinalization() {
-  try {
-    // 1. Fetch Race Data — own API first, Ergast fallback
-    let raceData = null;
-    let results = null;
-    let sprintResults = [];
-    const gridMap = {};
+    try {
+        // 1. Fetch Race Data — own API first, Ergast fallback
+        let raceData = null;
+        let results = null;
+        let sprintResults = [];
+        const gridMap = {};
 
-    const _now = new Date();
-    const latestCalRace = [...f1Calendar2026].reverse().find(r => new Date(r.sessions.race) < _now);
-    if (latestCalRace) {
-      try {
-        const roundData = await axios.get(`${F1_TIMING_API}/results/round/${latestCalRace.round}`, { timeout: 15000 }).then(r => r.data);
-        const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
-        if (raceSes?.results?.length) {
-          const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
-          const dMap = {};
-          driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
-          const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
-          if (qualSes?.results) qualSes.results.forEach(r => {
-            const d = dMap[String(r.driver_number)];
-            if (d) gridMap[normalizeStr(d.name)] = r.position;
-          });
+        const _now = new Date();
+        const latestCalRace = [...f1Calendar2026].reverse().find(r => new Date(r.sessions.race) < _now);
+        if (latestCalRace) {
+            try {
+                const roundData = await axios.get(`${F1_TIMING_API}/results/round/${latestCalRace.round}`, { timeout: 15000 }).then(r => r.data);
+                const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
+                if (raceSes?.results?.length) {
+                    const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+                    const dMap = {};
+                    driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+                    const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
+                    if (qualSes?.results) qualSes.results.forEach(r => {
+                        const d = dMap[String(r.driver_number)];
+                        if (d) gridMap[normalizeStr(d.name)] = r.position;
+                    });
 
-          results = raceSes.results.map(r => {
-            const d = dMap[String(r.driver_number)] || {};
-            const parts = (d.name || '').split(' ');
-            return {
-              position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)),
-              grid: String(gridMap[normalizeStr(d.name || '')] || 0),
-              status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'),
-              Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
-              Constructor: { name: d.team || '' }
-            };
-          });
-          raceData = { round: String(latestCalRace.round), raceName: raceSes.meta?.meeting || latestCalRace.name, Results: results };
+                    results = raceSes.results.map(r => {
+                        const d = dMap[String(r.driver_number)] || {};
+                        const parts = (d.name || '').split(' ');
+                        return {
+                            position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)),
+                            grid: String(gridMap[normalizeStr(d.name || '')] || 0),
+                            status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'),
+                            Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
+                            Constructor: { name: d.team || '' }
+                        };
+                    });
+                    raceData = { round: String(latestCalRace.round), raceName: raceSes.meta?.meeting || latestCalRace.name, Results: results };
 
-          const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
-          if (sprintSes?.results) {
-            sprintResults = sprintSes.results.map(r => {
-              const d = dMap[String(r.driver_number)] || {};
-              const parts = (d.name || '').split(' ');
-              return {
-                position: String(r.position), positionText: r.retired ? 'R' : String(r.position),
-                grid: String(gridMap[normalizeStr(d.name || '')] || 0),
-                status: r.retired ? 'Retired' : 'Finished',
-                Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
-                Constructor: { name: d.team || '' }
-              };
+                    const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+                    if (sprintSes?.results) {
+                        sprintResults = sprintSes.results.map(r => {
+                            const d = dMap[String(r.driver_number)] || {};
+                            const parts = (d.name || '').split(' ');
+                            return {
+                                position: String(r.position), positionText: r.retired ? 'R' : String(r.position),
+                                grid: String(gridMap[normalizeStr(d.name || '')] || 0),
+                                status: r.retired ? 'Retired' : 'Finished',
+                                Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
+                                Constructor: { name: d.team || '' }
+                            };
+                        });
+                    }
+                    console.log(`[FINALIZE] Own API: ${raceData.raceName} (R${latestCalRace.round}) — ${results.length} drivers`);
+                }
+            } catch (e) { console.log('[FINALIZE] Own API failed:', e.message); }
+        }
+
+        if (!raceData) {
+            let races;
+            try { races = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { }
+            if (!races?.length) { try { races = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { } }
+            if (!races?.length) return { success: false, message: "No race data found." };
+            raceData = races[0]; results = raceData.Results;
+            try {
+                const sprintRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/sprint.json', { timeout: 15000 }).then(r => r.data);
+                if (sprintRes.MRData.RaceTable.Races.length > 0) sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
+            } catch (e) { }
+            try {
+                let qr = null;
+                try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { }
+                if (!qr?.length) { try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { } }
+                if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
+            } catch (e) { }
+            console.log(`[FINALIZE] Ergast: ${raceData.raceName} (R${raceData.round}) — ${results.length} drivers`);
+        }
+
+        console.log(`[FINALIZE] Grid map: ${Object.keys(gridMap).length} drivers`);
+
+        // 1b. Check if this round was already scored
+        const roundCheck = `R${raceData.round}`;
+        await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+        const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
+        if (alreadyScored.rows[0].count > 0) {
+            console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
+            return { success: false, message: "Already scored." };
+        }
+
+        const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
+        if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
+        console.log(`[FINALIZE] ${check.rows[0].count} predictions to score`);
+
+        // --- DRIVER MATH (DNFs = 22) ---
+        const actualDriverPositions = {};
+        results.forEach(r => {
+            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+            let pos = parseInt(r.position);
+            if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W' || r.status.startsWith('Retired') || r.status.startsWith('Collision')) {
+                pos = 22;
+            }
+            actualDriverPositions[name] = pos;
+        });
+
+        // --- CONSTRUCTOR MATH (Tie Range Logic) ---
+        const constructorSums = {};
+        results.forEach(r => {
+            const c = normalizeConstructor(r.Constructor.name);
+            let pos = parseInt(r.position);
+            if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W') pos = 22;
+            constructorSums[c] = (constructorSums[c] || 0) + pos;
+        });
+
+        const sumGroups = {};
+        for (const [c, sum] of Object.entries(constructorSums)) {
+            if (!sumGroups[sum]) sumGroups[sum] = [];
+            sumGroups[sum].push(c);
+        }
+
+        const sortedSums = Object.keys(sumGroups).map(Number).sort((a, b) => a - b);
+        const actualCRanges = {};
+        let currentRank = 1;
+
+        sortedSums.forEach(sum => {
+            const teams = sumGroups[sum];
+            const numTeams = teams.length;
+            teams.forEach(team => {
+                actualCRanges[team] = { min: currentRank, max: currentRank + numTeams - 1 };
             });
-          }
-          console.log(`[FINALIZE] Own API: ${raceData.raceName} (R${latestCalRace.round}) — ${results.length} drivers`);
-        }
-      } catch (e) { console.log('[FINALIZE] Own API failed:', e.message); }
-    }
-
-    if (!raceData) {
-      let races;
-      try { races = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {}
-      if (!races?.length) { try { races = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {} }
-      if (!races?.length) return { success: false, message: "No race data found." };
-      raceData = races[0]; results = raceData.Results;
-      try {
-        const sprintRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/sprint.json', { timeout: 15000 }).then(r => r.data);
-        if (sprintRes.MRData.RaceTable.Races.length > 0) sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
-      } catch(e) {}
-      try {
-        let qr = null;
-        try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {}
-        if (!qr?.length) { try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch(e) {} }
-        if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
-      } catch(e) {}
-      console.log(`[FINALIZE] Ergast: ${raceData.raceName} (R${raceData.round}) — ${results.length} drivers`);
-    }
-
-    console.log(`[FINALIZE] Grid map: ${Object.keys(gridMap).length} drivers`);
-
-    // 1b. Check if this round was already scored
-    const roundCheck = `R${raceData.round}`;
-    await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
-    const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
-    if (alreadyScored.rows[0].count > 0) {
-        console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
-        return { success: false, message: "Already scored." };
-    }
-
-    const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
-    if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
-    console.log(`[FINALIZE] ${check.rows[0].count} predictions to score`);
-
-    // --- DRIVER MATH (DNFs = 22) ---
-    const actualDriverPositions = {};
-    results.forEach(r => {
-        const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-        let pos = parseInt(r.position);
-        if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W' || r.status.startsWith('Retired') || r.status.startsWith('Collision')) { 
-            pos = 22; 
-        }
-        actualDriverPositions[name] = pos;
-    });
-
-    // --- CONSTRUCTOR MATH (Tie Range Logic) ---
-    const constructorSums = {};
-    results.forEach(r => {
-      const c = normalizeConstructor(r.Constructor.name);
-      let pos = parseInt(r.position);
-      if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W') pos = 22; 
-      constructorSums[c] = (constructorSums[c] || 0) + pos;
-    });
-
-    const sumGroups = {};
-    for (const [c, sum] of Object.entries(constructorSums)) {
-        if (!sumGroups[sum]) sumGroups[sum] = [];
-        sumGroups[sum].push(c);
-    }
-    
-    const sortedSums = Object.keys(sumGroups).map(Number).sort((a, b) => a - b);
-    const actualCRanges = {};
-    let currentRank = 1;
-    
-    sortedSums.forEach(sum => {
-        const teams = sumGroups[sum];
-        const numTeams = teams.length;
-        teams.forEach(team => {
-            actualCRanges[team] = { min: currentRank, max: currentRank + numTeams - 1 };
-        });
-        currentRank += numTeams;
-    });
-
-    // --- WILDCARDS ---
-    let raceLosers = []; let maxRaceDrop = -999;
-    results.forEach(r => {
-       const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-       const grid = parseInt(r.grid) || gridMap[name] || 0;
-       if (grid > 0) {
-           let finish = parseInt(r.position);
-           if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
-           const drop = finish - grid;
-           if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; }
-           else if (drop === maxRaceDrop) raceLosers.push(name);
-       }
-    });
-
-    let sprintGainers = []; let maxSprintGain = -999;
-    let sprintLosers = []; let maxSprintDrop = -999;
-    sprintResults.forEach(r => {
-       const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-       const grid = parseInt(r.grid) || gridMap[name] || 0;
-       if (grid > 0) {
-           let finish = parseInt(r.position);
-           if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
-           const gain = grid - finish;
-           const drop = finish - grid;
-
-           if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; }
-           else if (gain === maxSprintGain) sprintGainers.push(name);
-           if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; }
-           else if (drop === maxSprintDrop) sprintLosers.push(name);
-       }
-    });
-
-    console.log(`[FINALIZE] Race Loser(s): ${raceLosers.join(', ') || 'none'} (drop: ${maxRaceDrop})`);
-    if (sprintResults.length > 0) {
-        console.log(`[FINALIZE] Sprint Gainer(s): ${sprintGainers.join(', ') || 'none'} | Sprint Loser(s): ${sprintLosers.join(', ') || 'none'}`);
-    }
-
-    // --- SCORE CALCULATION ---
-    const predictions = await db.execute("SELECT * FROM f1_predictions_v4").then(r => r.rows);
-    let scores = {}; let lowest = Infinity;
-
-    predictions.forEach(p => {
-        let score = 0;
-
-        const driversToScore = [
-            { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
-            { pred: p.p10, rank: 10 }, { pred: p.p11, rank: 11 },
-            { pred: p.p21, rank: 21 }, { pred: p.p22, rank: 22 }
-        ];
-        
-        driversToScore.forEach(item => {
-            if (!item.pred) return;
-            let act = actualDriverPositions[normalizeStr(item.pred)];
-            if (!act) act = 22; // Replacement defaults
-            
-            const diff = Math.abs(item.rank - act);
-            if (diff === 0) score += 2;
-            else score -= diff;
+            currentRank += numTeams;
         });
 
-        const teamsToScore = [
-            { pred: p.c1, rank: 1 }, { pred: p.c2, rank: 2 },
-            { pred: p.c5, rank: 5 }, { pred: p.c6, rank: 6 }, { pred: p.c11, rank: 11 }
-        ];
-        
-        teamsToScore.forEach(item => {
-            if (!item.pred) return;
-            const range = actualCRanges[normalizeConstructor(item.pred)];
-            if (!range) return;
-            
-            let diff = 0;
-            if (item.rank >= range.min && item.rank <= range.max) diff = 0;
-            else if (item.rank < range.min) diff = range.min - item.rank;
-            else diff = item.rank - range.max;
-            
-            if (diff === 0) score += 2;
-            else score -= diff;
+        // --- WILDCARDS ---
+        let raceLosers = []; let maxRaceDrop = -999;
+        results.forEach(r => {
+            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+            const grid = parseInt(r.grid) || gridMap[name] || 0;
+            if (grid > 0) {
+                let finish = parseInt(r.position);
+                if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
+                const drop = finish - grid;
+                if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; }
+                else if (drop === maxRaceDrop) raceLosers.push(name);
+            }
         });
 
-        if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) score += 5;
-        if (p.w_sprint_gainer && sprintGainers.includes(normalizeStr(p.w_sprint_gainer))) score += 5;
-        if (p.w_sprint_loser && sprintLosers.includes(normalizeStr(p.w_sprint_loser))) score += 5;
+        let sprintGainers = []; let maxSprintGain = -999;
+        let sprintLosers = []; let maxSprintDrop = -999;
+        sprintResults.forEach(r => {
+            const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+            const grid = parseInt(r.grid) || gridMap[name] || 0;
+            if (grid > 0) {
+                let finish = parseInt(r.position);
+                if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
+                const gain = grid - finish;
+                const drop = finish - grid;
 
-        scores[p.user_name] = score;
-        if (score < lowest) lowest = score;
-    });
+                if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; }
+                else if (gain === maxSprintGain) sprintGainers.push(name);
+                if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; }
+                else if (drop === maxSprintDrop) sprintLosers.push(name);
+            }
+        });
 
-    // Apply "Lowest - 5" Penalty
-    const penalty = (lowest === Infinity ? 0 : lowest) - 5;
-    const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
-
-    const finalScores = {};
-    for (const d of activeDrivers) {
-        let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
-        finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined };
-        if (d.name !== 'admin') {
-            await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
+        console.log(`[FINALIZE] Race Loser(s): ${raceLosers.join(', ') || 'none'} (drop: ${maxRaceDrop})`);
+        if (sprintResults.length > 0) {
+            console.log(`[FINALIZE] Sprint Gainer(s): ${sprintGainers.join(', ') || 'none'} | Sprint Loser(s): ${sprintLosers.join(', ') || 'none'}`);
         }
-    }
 
-    // --- SAVE ROUND HISTORY ---
-    await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
-    const roundLabel = `R${raceData.round}`;
-    for (const p of predictions) {
-        const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
-        await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, new Date().toISOString()] });
-    }
-    // Save penalty entries for non-submitters
-    for (const [name, data] of Object.entries(finalScores)) {
-        if (!data.hadPrediction && name !== 'admin') {
-            await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, new Date().toISOString()] });
+        // --- SCORE CALCULATION ---
+        const predictions = await db.execute("SELECT * FROM f1_predictions_v4").then(r => r.rows);
+        let scores = {}; let lowest = Infinity;
+
+        predictions.forEach(p => {
+            let score = 0;
+
+            const driversToScore = [
+                { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
+                { pred: p.p10, rank: 10 }, { pred: p.p11, rank: 11 },
+                { pred: p.p21, rank: 21 }, { pred: p.p22, rank: 22 }
+            ];
+
+            driversToScore.forEach(item => {
+                if (!item.pred) return;
+                let act = actualDriverPositions[normalizeStr(item.pred)];
+                if (!act) act = 22; // Replacement defaults
+
+                const diff = Math.abs(item.rank - act);
+                if (diff === 0) score += 2;
+                else score -= diff;
+            });
+
+            const teamsToScore = [
+                { pred: p.c1, rank: 1 }, { pred: p.c2, rank: 2 },
+                { pred: p.c5, rank: 5 }, { pred: p.c6, rank: 6 }, { pred: p.c11, rank: 11 }
+            ];
+
+            teamsToScore.forEach(item => {
+                if (!item.pred) return;
+                const range = actualCRanges[normalizeConstructor(item.pred)];
+                if (!range) return;
+
+                let diff = 0;
+                if (item.rank >= range.min && item.rank <= range.max) diff = 0;
+                else if (item.rank < range.min) diff = range.min - item.rank;
+                else diff = item.rank - range.max;
+
+                if (diff === 0) score += 2;
+                else score -= diff;
+            });
+
+            if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) score += 5;
+            if (p.w_sprint_gainer && sprintGainers.includes(normalizeStr(p.w_sprint_gainer))) score += 5;
+            if (p.w_sprint_loser && sprintLosers.includes(normalizeStr(p.w_sprint_loser))) score += 5;
+
+            scores[p.user_name] = score;
+            if (score < lowest) lowest = score;
+        });
+
+        // Apply "Lowest - 5" Penalty
+        const penalty = (lowest === Infinity ? 0 : lowest) - 5;
+        const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
+
+        const finalScores = {};
+        for (const d of activeDrivers) {
+            let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
+            finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined };
+            if (d.name !== 'admin') {
+                await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
+            }
         }
-    }
-    console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
 
-    await db.execute("DELETE FROM f1_predictions_v4");
+        // --- SAVE ROUND HISTORY ---
+        await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+        const roundLabel = `R${raceData.round}`;
+        for (const p of predictions) {
+            const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
+            await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, new Date().toISOString()] });
+        }
+        // Save penalty entries for non-submitters
+        for (const [name, data] of Object.entries(finalScores)) {
+            if (!data.hadPrediction && name !== 'admin') {
+                await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, new Date().toISOString()] });
+            }
+        }
+        console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
 
-    // --- DISCORD SCORE BREAKDOWN ---
-    const sorted = Object.entries(finalScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
-    let breakdown = `**${raceData.raceName} (${roundLabel}) — Score Breakdown**\n`;
-    breakdown += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
-    if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
-    breakdown += `No-submission penalty: ${penalty}\n\n`;
-    sorted.forEach(([name, data], i) => {
-        const tag = data.hadPrediction ? '' : ' (no sub)';
-        breakdown += `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**${tag}\n`;
-    });
-    await sendDiscordNotification(breakdown);
+        await db.execute("DELETE FROM f1_predictions_v4");
 
-    return { success: true, message: "Round Finalized." };
-  } catch (e) { return { success: false, message: e.message }; }
+        // --- DISCORD SCORE BREAKDOWN ---
+        const sorted = Object.entries(finalScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
+        let breakdown = `**${raceData.raceName} (${roundLabel}) — Score Breakdown**\n`;
+        breakdown += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
+        if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
+        breakdown += `No-submission penalty: ${penalty}\n\n`;
+        sorted.forEach(([name, data], i) => {
+            const tag = data.hadPrediction ? '' : ' (no sub)';
+            breakdown += `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**${tag}\n`;
+        });
+        await sendDiscordNotification(breakdown);
+
+        return { success: true, message: "Round Finalized." };
+    } catch (e) { return { success: false, message: e.message }; }
 }
 
 // --- 7. SECURE CORE ROUTES ---
 app.get('/api/next-race', (req, res) => {
-  const now = new Date();
-  const next = f1Calendar2026.find(r => {
-      const raceEndBuffer = new Date(r.sessions.race);
-      raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
-      return raceEndBuffer > now;
-  }) || f1Calendar2026[f1Calendar2026.length-1];
-  
-  const payload = { ...next, lockTime: next.sessions.quali };
-  res.json(payload);
+    const now = new Date();
+    const next = f1Calendar2026.find(r => {
+        const raceEndBuffer = new Date(r.sessions.race);
+        raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
+        return raceEndBuffer > now;
+    }) || f1Calendar2026[f1Calendar2026.length - 1];
+
+    const payload = { ...next, lockTime: next.sessions.quali };
+    res.json(payload);
 });
 
 app.get('/api/calendar', (req, res) => { res.json(f1Calendar2026); });
@@ -435,22 +435,22 @@ app.get('/api/live-widget', async (_req, res) => {
         widgetCache = { timing, status };
         widgetCacheTime = Date.now();
         res.json(widgetCache);
-    } catch(e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- API-Sports Live Proxy (For Widget ONLY with 2025 Fallback) ---
 app.get('/api/live-sessions', async (req, res) => {
     try {
         const apiKey = process.env.API_SPORTS_KEY;
-        
+
         let sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
             params: { season: '2026' },
             headers: { 'x-apisports-key': apiKey }
         });
-        
+
         let completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
         let displaySessionName = "";
-        
+
         if (completed.length === 0) {
             sessionsRes = await axios.get('https://v1.formula-1.api-sports.io/races', {
                 params: { season: '2025' },
@@ -459,16 +459,16 @@ app.get('/api/live-sessions', async (req, res) => {
             completed = sessionsRes.data.response.filter(s => s.status === 'Completed');
             displaySessionName = "2025 Abu Dhabi (Standby)";
         } else {
-            displaySessionName = completed[completed.length - 1].type; 
+            displaySessionName = completed[completed.length - 1].type;
         }
-        
+
         const lastSessionId = completed[completed.length - 1].id;
-        
+
         const rankRes = await axios.get('https://v1.formula-1.api-sports.io/rankings/races', {
             params: { race: lastSessionId },
             headers: { 'x-apisports-key': apiKey }
         });
-        
+
         res.json({ sessionName: displaySessionName, data: rankRes.data.response });
     } catch (e) {
         res.status(500).json({ error: "Live fetch failed" });
@@ -488,7 +488,7 @@ app.post('/api/season-picks', authenticateToken, async (req, res) => {
     if (new Date() > ausQuali) {
         return res.status(403).json({ success: false, message: "Season predictions are permanently locked." });
     }
-    
+
     try {
         await db.execute({
             sql: "UPDATE f1_drivers SET season_driver = ?, season_constructor = ? WHERE name = ?",
@@ -500,87 +500,87 @@ app.post('/api/season-picks', authenticateToken, async (req, res) => {
 
 // --- RACE PREDICTION SUBMIT ---
 app.post('/predict', authenticateToken, async (req, res) => {
-  const d = req.body;
-  const userName = req.user.name;
+    const d = req.body;
+    const userName = req.user.name;
 
-  const now = new Date();
-  const currentRace = f1Calendar2026.find(r => {
-      const raceEndBuffer = new Date(r.sessions.race);
-      raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
-      return raceEndBuffer > now;
-  }); 
-  if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
+    const now = new Date();
+    const currentRace = f1Calendar2026.find(r => {
+        const raceEndBuffer = new Date(r.sessions.race);
+        raceEndBuffer.setHours(raceEndBuffer.getHours() + 4);
+        return raceEndBuffer > now;
+    });
+    if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
-  const lockTime = new Date(currentRace.sessions.quali);
-  if (now > lockTime) {
-      return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
-  }
-  
-  if (!d.p1 || !d.p10 || !d.c11 || !d.w_race_loser) {
-      return res.status(400).json({ success: false, message: "Invalid: Incomplete predictions." });
-  }
+    const lockTime = new Date(currentRace.sessions.quali);
+    if (now > lockTime) {
+        return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
+    }
 
-  try {
-      await db.execute({
-          sql: `INSERT INTO f1_predictions_v4 (user_name, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
+    if (!d.p1 || !d.p10 || !d.c11 || !d.w_race_loser) {
+        return res.status(400).json({ success: false, message: "Invalid: Incomplete predictions." });
+    }
+
+    try {
+        await db.execute({
+            sql: `INSERT INTO f1_predictions_v4 (user_name, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
                 ON CONFLICT(user_name) DO UPDATE SET 
                 p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p10=excluded.p10, p11=excluded.p11, p21=excluded.p21, p22=excluded.p22, 
                 c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c11=excluded.c11, 
                 w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
-          args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
-      });
-      
-      await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
-      res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+            args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
+        });
+
+        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/finalize', authenticateToken, async (req, res) => {
-  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).json({ success: false });
-  const result = await performFinalization();
-  res.status(result.success ? 200 : 400).json(result);
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).json({ success: false });
+    const result = await performFinalization();
+    res.status(result.success ? 200 : 400).json(result);
 });
 
 app.get('/api/predictions', async (req, res) => {
-  const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name");
-  res.json(r.rows);
+    const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name");
+    res.json(r.rows);
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-  const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
-  res.json(r.rows);
+    const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+    res.json(r.rows);
 });
 
 // --- 8. ADMIN ROUTES ---
 app.get('/api/admin/users', authenticateToken, async (req, res) => {
-  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
-  try {
-      const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
-      res.json(r.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+    try {
+        const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
+        res.json(r.rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/toggle-vip', authenticateToken, async (req, res) => {
-  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
-  try {
-      await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [req.body.vipStatus ? 1 : 0, req.body.targetUser] });
-      res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+    try {
+        await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [req.body.vipStatus ? 1 : 0, req.body.targetUser] });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
-  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
-  try {
-      await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [req.body.targetUser] });
-      res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+    try {
+        await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [req.body.targetUser] });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/admin/round-history', authenticateToken, async (req, res) => {
-  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
-  try {
-      const rows = await db.execute("SELECT * FROM f1_round_history ORDER BY id DESC").then(r => r.rows);
-      res.json(rows);
-  } catch (e) { res.json([]); }
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+    try {
+        const rows = await db.execute("SELECT * FROM f1_round_history ORDER BY id DESC").then(r => r.rows);
+        res.json(rows);
+    } catch (e) { res.json([]); }
 });
 
 // --- 8b. LIVE API PROXY ROUTES ---
@@ -597,9 +597,12 @@ app.get('/api/live/timing', (_, res) => liveProxy('/timing', res));
 app.get('/api/live/weather', async (_, res) => {
     // Try F1 live timing weather first
     try {
-        const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
-        if (live && live.AirTemp) return res.json(live);
-    } catch(e) {}
+        const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 5000 }).then(r => r.data);
+        if (status && status.connected) {
+            const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
+            if (live && live.AirTemp) return res.json(live);
+        }
+    } catch (e) { }
     // Fallback: Open-Meteo for the next race's circuit location (free, no API key)
     try {
         const now = new Date();
@@ -621,7 +624,7 @@ app.get('/api/live/weather', async (_, res) => {
             Rainfall: String(c.precipitation > 0 ? 1 : 0),
             _source: 'open-meteo'
         });
-    } catch(e) {
+    } catch (e) {
         res.status(503).json({ error: 'Weather unavailable' });
     }
 });
@@ -671,8 +674,8 @@ let lastKnownFinalizedSession = null; // in-memory cache to avoid repeated DB hi
 
 async function checkAndFinalize() {
     // Keep both Render servers awake
-    fetch(`${APP_URL}/api/next-race`).catch(() => {});
-    fetch(`${F1_TIMING_API}/status`).catch(() => {});
+    fetch(`${APP_URL}/api/next-race`).catch(() => { });
+    fetch(`${F1_TIMING_API}/status`).catch(() => { });
 
     if (finalizationPending) return;
 
