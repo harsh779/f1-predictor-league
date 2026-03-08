@@ -172,6 +172,18 @@ async function performFinalization() {
         }
     } catch(e) { console.log("No sprint data available"); }
 
+    // 3. Fetch Qualifying Data (fallback for grid positions when results.grid is null)
+    const gridMap = {};
+    try {
+        const qualRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data);
+        if (qualRes.MRData.RaceTable.Races.length > 0) {
+            qualRes.MRData.RaceTable.Races[0].QualifyingResults.forEach(q => {
+                const name = normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`);
+                gridMap[name] = parseInt(q.position);
+            });
+        }
+    } catch(e) { console.log("No qualifying data available for grid fallback"); }
+
     const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
 
@@ -217,11 +229,12 @@ async function performFinalization() {
     // --- WILDCARDS ---
     let raceLosers = []; let maxRaceDrop = -999;
     results.forEach(r => {
-       if (parseInt(r.grid) > 0) {
+       const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+       const grid = parseInt(r.grid) || gridMap[name] || 0;
+       if (grid > 0) {
            let finish = parseInt(r.position);
            if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
-           const drop = finish - parseInt(r.grid);
-           const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+           const drop = finish - grid;
            if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; }
            else if (drop === maxRaceDrop) raceLosers.push(name);
        }
