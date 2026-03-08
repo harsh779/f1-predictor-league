@@ -162,6 +162,7 @@ async function performFinalization() {
     if (!races || races.length === 0) return { success: false, message: "No race data found." };
     const raceData = races[0];
     const results = raceData.Results;
+    console.log(`[FINALIZE] Race data loaded: ${raceData.raceName} (Round ${raceData.round}) — ${results.length} drivers`);
 
     // 2. Fetch Sprint Data
     let sprintResults = [];
@@ -175,17 +176,28 @@ async function performFinalization() {
     // 3. Fetch Qualifying Data (fallback for grid positions when results.grid is null)
     const gridMap = {};
     try {
-        const qualRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data);
-        if (qualRes.MRData.RaceTable.Races.length > 0) {
-            qualRes.MRData.RaceTable.Races[0].QualifyingResults.forEach(q => {
+        let qualRaces;
+        try {
+            qualRaces = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races);
+        } catch(e) { console.log("Qualifying current/last failed, trying fallback..."); }
+        if (!qualRaces || qualRaces.length === 0) {
+            try {
+                qualRaces = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races);
+            } catch(e) { console.log("Qualifying fallback also failed"); }
+        }
+        if (qualRaces && qualRaces.length > 0) {
+            qualRaces[0].QualifyingResults.forEach(q => {
                 const name = normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`);
                 gridMap[name] = parseInt(q.position);
             });
         }
     } catch(e) { console.log("No qualifying data available for grid fallback"); }
 
+    console.log(`[FINALIZE] Grid map built: ${Object.keys(gridMap).length} drivers with qualifying positions`);
+
     const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
     if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
+    console.log(`[FINALIZE] ${check.rows[0].count} predictions to score`);
 
     // --- DRIVER MATH (DNFs = 22) ---
     const actualDriverPositions = {};
@@ -243,19 +255,25 @@ async function performFinalization() {
     let sprintGainers = []; let maxSprintGain = -999;
     let sprintLosers = []; let maxSprintDrop = -999;
     sprintResults.forEach(r => {
-       if (parseInt(r.grid) > 0) {
+       const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
+       const grid = parseInt(r.grid) || gridMap[name] || 0;
+       if (grid > 0) {
            let finish = parseInt(r.position);
            if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
-           const gain = parseInt(r.grid) - finish;
-           const drop = finish - parseInt(r.grid);
-           const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-           
+           const gain = grid - finish;
+           const drop = finish - grid;
+
            if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; }
            else if (gain === maxSprintGain) sprintGainers.push(name);
            if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; }
            else if (drop === maxSprintDrop) sprintLosers.push(name);
        }
     });
+
+    console.log(`[FINALIZE] Race Loser(s): ${raceLosers.join(', ') || 'none'} (drop: ${maxRaceDrop})`);
+    if (sprintResults.length > 0) {
+        console.log(`[FINALIZE] Sprint Gainer(s): ${sprintGainers.join(', ') || 'none'} | Sprint Loser(s): ${sprintLosers.join(', ') || 'none'}`);
+    }
 
     // --- SCORE CALCULATION ---
     const predictions = await db.execute("SELECT * FROM f1_predictions_v4").then(r => r.rows);
@@ -310,16 +328,45 @@ async function performFinalization() {
     // Apply "Lowest - 5" Penalty
     const penalty = (lowest === Infinity ? 0 : lowest) - 5;
     const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
-    
+
+    const finalScores = {};
     for (const d of activeDrivers) {
         let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
+        finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined };
         if (d.name !== 'admin') {
             await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
         }
     }
 
+    // --- SAVE ROUND HISTORY ---
+    await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+    const roundLabel = `R${raceData.round}`;
+    for (const p of predictions) {
+        const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
+        await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, new Date().toISOString()] });
+    }
+    // Save penalty entries for non-submitters
+    for (const [name, data] of Object.entries(finalScores)) {
+        if (!data.hadPrediction && name !== 'admin') {
+            await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, new Date().toISOString()] });
+        }
+    }
+    console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
+
     await db.execute("DELETE FROM f1_predictions_v4");
-    await sendDiscordNotification(`🏁 **${raceData.raceName} Finalized!** Points distributed!`);
+
+    // --- DISCORD SCORE BREAKDOWN ---
+    const sorted = Object.entries(finalScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
+    let breakdown = `**${raceData.raceName} (${roundLabel}) — Score Breakdown**\n`;
+    breakdown += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
+    if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
+    breakdown += `No-submission penalty: ${penalty}\n\n`;
+    sorted.forEach(([name, data], i) => {
+        const tag = data.hadPrediction ? '' : ' (no sub)';
+        breakdown += `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**${tag}\n`;
+    });
+    await sendDiscordNotification(breakdown);
+
     return { success: true, message: "Round Finalized." };
   } catch (e) { return { success: false, message: e.message }; }
 }
@@ -492,12 +539,20 @@ app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/admin/round-history', authenticateToken, async (req, res) => {
+  if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+  try {
+      const rows = await db.execute("SELECT * FROM f1_round_history ORDER BY id DESC").then(r => r.rows);
+      res.json(rows);
+  } catch (e) { res.json([]); }
+});
+
 // --- 9. AUTOMATED RACE DETECTION & FINALIZATION ---
-// Polls the F1 live timing API every 6 minutes.
+// Polls the F1 live timing API every 6 minutes (2 min on retry after failure).
 // When a Race session transitions to "Finalised", scoring is triggered automatically.
 let finalizationPending = false;
 
-setInterval(async () => {
+async function checkAndFinalize() {
     // Keep both Render servers awake
     fetch(`${APP_URL}/api/next-race`).catch(() => {});
     fetch(`${F1_TIMING_API}/status`).catch(() => {});
@@ -505,18 +560,17 @@ setInterval(async () => {
     if (finalizationPending) return;
 
     try {
+        console.log('[AUTO] Checking race status...');
         const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 8000 }).then(r => r.data);
         const session = status?.session;
 
-        // Only act on Race sessions that are fully Finalised
-        if (!session || session.Type !== 'Race') return;
-        if (session.SessionStatus !== 'Finalised') return;
+        if (!session || session.Type !== 'Race') { console.log('[AUTO] No active race session'); return; }
+        if (session.SessionStatus !== 'Finalised') { console.log(`[AUTO] Race status: ${session.SessionStatus} — waiting`); return; }
 
         const sessionKey = String(session.Key);
 
-        // Check DB to see if we already finalized this session (survives restarts)
         const meta = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'last_finalized_session'", args: [] });
-        if (meta.rows[0]?.value === sessionKey) return;
+        if (meta.rows[0]?.value === sessionKey) { console.log(`[AUTO] Session ${sessionKey} already finalized`); return; }
 
         console.log(`[AUTO] Race session ${sessionKey} finalised — triggering scoring`);
         finalizationPending = true;
@@ -527,14 +581,22 @@ setInterval(async () => {
             await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('last_finalized_session', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [sessionKey] });
             console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
         } else {
-            console.warn(`[AUTO] Scoring failed: ${result.message} — retrying in 6 min`);
+            console.warn(`[AUTO] Scoring failed: ${result.message} — retrying in 2 min`);
+            setTimeout(checkAndFinalize, 2 * 60 * 1000);
         }
     } catch (e) {
-        console.error('[AUTO] Race detection error:', e.message);
+        console.error('[AUTO] Race detection error:', e.message, '— retrying in 2 min');
+        setTimeout(checkAndFinalize, 2 * 60 * 1000);
     } finally {
         finalizationPending = false;
     }
-}, 6 * 60 * 1000);
+}
+
+// Regular 6-min polling
+setInterval(checkAndFinalize, 6 * 60 * 1000);
+
+// Run once on startup (catches races finalized while server was cold)
+setTimeout(checkAndFinalize, 10 * 1000);
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
