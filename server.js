@@ -141,8 +141,19 @@ app.get('/auth/google/callback', async (req, res) => {
 // --- 6. SCORING ENGINE (V4 NEW RULES) ---
 async function sendDiscordNotification(msg) {
     const url = process.env.DISCORD_WEBHOOK;
-    if (!url) return;
-    try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🏎️ **F1 Steward:** ${msg}` }) }); } catch (e) { }
+    if (!url) { console.warn('[DISCORD] No DISCORD_WEBHOOK env var set — skipping notification'); return; }
+    try {
+        const fullMsg = `🏎️ **F1 Steward:** ${msg}`;
+        // Discord has a 2000 char limit — split if needed
+        const chunks = [];
+        if (fullMsg.length <= 2000) { chunks.push(fullMsg); }
+        else { for (let i = 0; i < fullMsg.length; i += 2000) chunks.push(fullMsg.slice(i, i + 2000)); }
+        for (const chunk of chunks) {
+            const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: chunk }) });
+            if (!resp.ok) console.error(`[DISCORD] Webhook failed: ${resp.status} ${resp.statusText}`);
+            else console.log('[DISCORD] Score breakdown sent successfully');
+        }
+    } catch (e) { console.error('[DISCORD] Webhook error:', e.message); }
 }
 
 async function performFinalization() {
@@ -531,6 +542,28 @@ app.post('/predict', authenticateToken, async (req, res) => {
             args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
         });
 
+        // Check if this is the player's first prediction — apply retroactive penalties for missed rounds
+        const player = await db.execute({ sql: "SELECT has_participated FROM f1_drivers WHERE name = ?", args: [userName] }).then(r => r.rows[0]);
+        if (player && player.has_participated !== 1) {
+            // Get all distinct past rounds and their penalties (from any no-submission entry)
+            const pastRounds = await db.execute(
+                "SELECT DISTINCT round, race_name, score FROM f1_round_history WHERE prediction = '{\"penalty\":\"no submission\"}' GROUP BY round"
+            ).then(r => r.rows);
+
+            let retroPenalty = 0;
+            for (const pr of pastRounds) {
+                retroPenalty += pr.score;
+                await db.execute({
+                    sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    args: [pr.round, pr.race_name, userName, '{"penalty":"no submission (retroactive)"}', pr.score, new Date().toISOString()]
+                });
+            }
+            if (retroPenalty !== 0) {
+                await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [retroPenalty, userName] });
+                console.log(`[PREDICT] Retroactive penalty of ${retroPenalty} applied to new player ${userName} for ${pastRounds.length} missed round(s)`);
+            }
+        }
+
         await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -550,6 +583,13 @@ app.get('/api/predictions', async (req, res) => {
 app.get('/api/season-leaderboard', async (req, res) => {
     const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
     res.json(r.rows);
+});
+
+app.get('/api/round-scores', async (req, res) => {
+    try {
+        const rows = await db.execute("SELECT round, race_name, user_name, score FROM f1_round_history ORDER BY id ASC").then(r => r.rows);
+        res.json(rows);
+    } catch (e) { res.json([]); }
 });
 
 // --- 8. ADMIN ROUTES ---
@@ -572,6 +612,33 @@ app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
     try {
         await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [req.body.targetUser] });
         res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/apply-retro-penalty', authenticateToken, async (req, res) => {
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+    const targetUser = req.body.targetUser;
+    if (!targetUser) return res.status(400).json({ error: 'targetUser required' });
+    try {
+        // Find rounds where this user has NO entry
+        const allRounds = await db.execute("SELECT DISTINCT round, race_name FROM f1_round_history").then(r => r.rows);
+        const userRounds = await db.execute({ sql: "SELECT DISTINCT round FROM f1_round_history WHERE user_name = ?", args: [targetUser] }).then(r => r.rows.map(x => x.round));
+
+        let totalPenalty = 0;
+        const applied = [];
+        for (const ar of allRounds) {
+            if (userRounds.includes(ar.round)) continue;
+            // Get the penalty for this round (from any no-submission entry)
+            const penaltyRow = await db.execute({ sql: "SELECT score FROM f1_round_history WHERE round = ? AND prediction LIKE '%no submission%' LIMIT 1", args: [ar.round] }).then(r => r.rows[0]);
+            const penalty = penaltyRow ? penaltyRow.score : -5;
+            totalPenalty += penalty;
+            await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [ar.round, ar.race_name, targetUser, '{"penalty":"no submission (retroactive)"}', penalty, new Date().toISOString()] });
+            applied.push({ round: ar.round, penalty });
+        }
+        if (totalPenalty !== 0) {
+            await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [totalPenalty, targetUser] });
+        }
+        res.json({ success: true, totalPenalty, rounds: applied });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
