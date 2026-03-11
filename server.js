@@ -34,7 +34,6 @@ async function setupDatabase() {
         // 🌍 NEW: Columns for Season-Long Predictions
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_driver TEXT`); } catch (e) { }
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_constructor TEXT`); } catch (e) { }
-        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_new_joiner INTEGER DEFAULT 0`); } catch (e) { }
 
         // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
         await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
@@ -377,10 +376,14 @@ async function performFinalization() {
         const penalty = (lowest === Infinity ? 0 : lowest) - 5;
         const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
 
+        // Detect new joiners: players with no prior round history entries
+        const playersWithHistory = await db.execute("SELECT DISTINCT user_name FROM f1_round_history").then(r => new Set(r.rows.map(x => x.user_name)));
+
         const finalScores = {};
         for (const d of activeDrivers) {
+            const isNewJoiner = !playersWithHistory.has(d.name) && d.name !== 'admin';
             let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
-            finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined, isNewJoiner: d.is_new_joiner === 1 };
+            finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined, isNewJoiner };
             if (d.name !== 'admin') {
                 await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
             }
@@ -388,17 +391,21 @@ async function performFinalization() {
 
         // New joiner penalty: lowest total_score in standings - 5 (applied once)
         // Must run AFTER all round scores are applied so standings reflect this round
-        const newJoiners = activeDrivers.filter(d => d.is_new_joiner === 1 && d.name !== 'admin');
+        const newJoiners = Object.entries(finalScores).filter(([name, data]) => data.isNewJoiner);
         if (newJoiners.length > 0) {
-            // Get lowest total_score among NON-new-joiner participants (the established players)
-            const established = await db.execute("SELECT MIN(total_score) as min_score FROM f1_drivers WHERE has_participated = 1 AND is_new_joiner = 0 AND name != 'admin'").then(r => r.rows[0]);
-            const lowestStanding = established?.min_score ?? 0;
+            // Get lowest total_score among established (non-new-joiner) participants
+            const establishedNames = Object.entries(finalScores).filter(([n, d]) => !d.isNewJoiner && n !== 'admin').map(([n]) => n);
+            let lowestStanding = 0;
+            if (establishedNames.length > 0) {
+                const estRows = await db.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
+                lowestStanding = estRows?.min_score ?? 0;
+            }
             const newJoinerPenalty = lowestStanding - 5;
 
-            for (const nj of newJoiners) {
-                await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ?, is_new_joiner = 0 WHERE name = ?", args: [newJoinerPenalty, nj.name] });
-                finalScores[nj.name].newJoinerPenalty = newJoinerPenalty;
-                console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${nj.name} (lowest standing: ${lowestStanding})`);
+            for (const [name] of newJoiners) {
+                await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [newJoinerPenalty, name] });
+                finalScores[name].newJoinerPenalty = newJoinerPenalty;
+                console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${name} (lowest standing: ${lowestStanding})`);
             }
         }
 
@@ -564,10 +571,7 @@ app.post('/predict', authenticateToken, async (req, res) => {
             args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
         });
 
-        // Mark first-time predictor so finalization can apply new-joiner penalty
-        const player = await db.execute({ sql: "SELECT has_participated FROM f1_drivers WHERE name = ?", args: [userName] }).then(r => r.rows[0]);
-        const isNewJoiner = player && player.has_participated !== 1;
-        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1, is_new_joiner = ? WHERE name = ?`, args: [isNewJoiner ? 1 : 0, userName] });
+        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -628,15 +632,6 @@ app.post('/api/admin/set-score', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/admin/flag-new-joiner', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
-    const targetUser = req.body.targetUser;
-    if (!targetUser) return res.status(400).json({ error: 'targetUser required' });
-    try {
-        await db.execute({ sql: "UPDATE f1_drivers SET is_new_joiner = 1 WHERE name = ?", args: [targetUser] });
-        res.json({ success: true, message: `${targetUser} flagged as new joiner — penalty will be applied at next race finalization` });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
 
 app.get('/api/admin/round-history', authenticateToken, async (req, res) => {
     if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
