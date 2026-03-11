@@ -789,4 +789,25 @@ setTimeout(checkAndFinalize, 10 * 1000);
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// --- DEPLOY UPDATE NOTIFICATION ---
+const APP_VERSION = 'v7.2';
+const APP_CHANGELOG = [
+    'New joiner penalty: new players get (lowest standings score - 5) applied on first race',
+    'Missed round penalty clarified: (lowest round score - 5)',
+    'League standings now show per-race score breakdown (tap to expand)',
+    'Discord notifications improved with error logging'
+];
+async function notifyDeployUpdate() {
+    try {
+        const meta = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'app_version'", args: [] });
+        if (meta.rows[0]?.value === APP_VERSION) return;
+        let msg = `**App Update — ${APP_VERSION}**\n`;
+        APP_CHANGELOG.forEach(c => { msg += `• ${c}\n`; });
+        await sendDiscordNotification(msg);
+        await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('app_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [APP_VERSION] });
+        console.log(`[DEPLOY] Update notification sent for ${APP_VERSION}`);
+    } catch (e) { console.error('[DEPLOY] Failed to send update notification:', e.message); }
+}
+setTimeout(notifyDeployUpdate, 5 * 1000);
+
 app.listen(port, () => console.log(`🏁 Server 3000 (Google OAuth Secure)`));
