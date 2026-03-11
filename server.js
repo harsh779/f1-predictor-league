@@ -34,6 +34,7 @@ async function setupDatabase() {
         // 🌍 NEW: Columns for Season-Long Predictions
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_driver TEXT`); } catch (e) { }
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_constructor TEXT`); } catch (e) { }
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_new_joiner INTEGER DEFAULT 0`); } catch (e) { }
 
         // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
         await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
@@ -372,16 +373,32 @@ async function performFinalization() {
             if (score < lowest) lowest = score;
         });
 
-        // Apply "Lowest - 5" Penalty
+        // Apply "Lowest - 5" Penalty for players who missed this round
         const penalty = (lowest === Infinity ? 0 : lowest) - 5;
         const activeDrivers = await db.execute("SELECT * FROM f1_drivers WHERE has_participated = 1").then(r => r.rows);
 
         const finalScores = {};
         for (const d of activeDrivers) {
             let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
-            finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined };
+            finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined, isNewJoiner: d.is_new_joiner === 1 };
             if (d.name !== 'admin') {
                 await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
+            }
+        }
+
+        // New joiner penalty: lowest total_score in standings - 5 (applied once)
+        // Must run AFTER all round scores are applied so standings reflect this round
+        const newJoiners = activeDrivers.filter(d => d.is_new_joiner === 1 && d.name !== 'admin');
+        if (newJoiners.length > 0) {
+            // Get lowest total_score among NON-new-joiner participants (the established players)
+            const established = await db.execute("SELECT MIN(total_score) as min_score FROM f1_drivers WHERE has_participated = 1 AND is_new_joiner = 0 AND name != 'admin'").then(r => r.rows[0]);
+            const lowestStanding = established?.min_score ?? 0;
+            const newJoinerPenalty = lowestStanding - 5;
+
+            for (const nj of newJoiners) {
+                await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ?, is_new_joiner = 0 WHERE name = ?", args: [newJoinerPenalty, nj.name] });
+                finalScores[nj.name].newJoinerPenalty = newJoinerPenalty;
+                console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${nj.name} (lowest standing: ${lowestStanding})`);
             }
         }
 
@@ -397,6 +414,10 @@ async function performFinalization() {
             if (!data.hadPrediction && name !== 'admin') {
                 await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, new Date().toISOString()] });
             }
+            // Save new joiner penalty as separate history entry
+            if (data.newJoinerPenalty !== undefined && name !== 'admin') {
+                await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"new joiner"}', data.newJoinerPenalty, new Date().toISOString()] });
+            }
         }
         console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
 
@@ -409,7 +430,8 @@ async function performFinalization() {
         if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
         breakdown += `No-submission penalty: ${penalty}\n\n`;
         sorted.forEach(([name, data], i) => {
-            const tag = data.hadPrediction ? '' : ' (no sub)';
+            let tag = data.hadPrediction ? '' : ' (no sub)';
+            if (data.newJoinerPenalty !== undefined) tag += ` (new joiner: ${data.newJoinerPenalty})`;
             breakdown += `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**${tag}\n`;
         });
         await sendDiscordNotification(breakdown);
@@ -542,29 +564,10 @@ app.post('/predict', authenticateToken, async (req, res) => {
             args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
         });
 
-        // Check if this is the player's first prediction — apply retroactive penalties for missed rounds
+        // Mark first-time predictor so finalization can apply new-joiner penalty
         const player = await db.execute({ sql: "SELECT has_participated FROM f1_drivers WHERE name = ?", args: [userName] }).then(r => r.rows[0]);
-        if (player && player.has_participated !== 1) {
-            // Get all distinct past rounds and their penalties (from any no-submission entry)
-            const pastRounds = await db.execute(
-                "SELECT DISTINCT round, race_name, score FROM f1_round_history WHERE prediction = '{\"penalty\":\"no submission\"}' GROUP BY round"
-            ).then(r => r.rows);
-
-            let retroPenalty = 0;
-            for (const pr of pastRounds) {
-                retroPenalty += pr.score;
-                await db.execute({
-                    sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    args: [pr.round, pr.race_name, userName, '{"penalty":"no submission (retroactive)"}', pr.score, new Date().toISOString()]
-                });
-            }
-            if (retroPenalty !== 0) {
-                await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [retroPenalty, userName] });
-                console.log(`[PREDICT] Retroactive penalty of ${retroPenalty} applied to new player ${userName} for ${pastRounds.length} missed round(s)`);
-            }
-        }
-
-        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
+        const isNewJoiner = player && player.has_participated !== 1;
+        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1, is_new_joiner = ? WHERE name = ?`, args: [isNewJoiner ? 1 : 0, userName] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -615,30 +618,23 @@ app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/admin/apply-retro-penalty', authenticateToken, async (req, res) => {
+app.post('/api/admin/set-score', authenticateToken, async (req, res) => {
+    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+    const { targetUser, score } = req.body;
+    if (!targetUser || score === undefined) return res.status(400).json({ error: 'targetUser and score required' });
+    try {
+        await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [score, targetUser] });
+        res.json({ success: true, user: targetUser, newScore: score });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/flag-new-joiner', authenticateToken, async (req, res) => {
     if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
     const targetUser = req.body.targetUser;
     if (!targetUser) return res.status(400).json({ error: 'targetUser required' });
     try {
-        // Find rounds where this user has NO entry
-        const allRounds = await db.execute("SELECT DISTINCT round, race_name FROM f1_round_history").then(r => r.rows);
-        const userRounds = await db.execute({ sql: "SELECT DISTINCT round FROM f1_round_history WHERE user_name = ?", args: [targetUser] }).then(r => r.rows.map(x => x.round));
-
-        let totalPenalty = 0;
-        const applied = [];
-        for (const ar of allRounds) {
-            if (userRounds.includes(ar.round)) continue;
-            // Get the penalty for this round (from any no-submission entry)
-            const penaltyRow = await db.execute({ sql: "SELECT score FROM f1_round_history WHERE round = ? AND prediction LIKE '%no submission%' LIMIT 1", args: [ar.round] }).then(r => r.rows[0]);
-            const penalty = penaltyRow ? penaltyRow.score : -5;
-            totalPenalty += penalty;
-            await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [ar.round, ar.race_name, targetUser, '{"penalty":"no submission (retroactive)"}', penalty, new Date().toISOString()] });
-            applied.push({ round: ar.round, penalty });
-        }
-        if (totalPenalty !== 0) {
-            await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [totalPenalty, targetUser] });
-        }
-        res.json({ success: true, totalPenalty, rounds: applied });
+        await db.execute({ sql: "UPDATE f1_drivers SET is_new_joiner = 1 WHERE name = ?", args: [targetUser] });
+        res.json({ success: true, message: `${targetUser} flagged as new joiner — penalty will be applied at next race finalization` });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
