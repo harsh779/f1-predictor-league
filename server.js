@@ -791,7 +791,7 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.3.1';
+const APP_VERSION = 'v7.4';
 const APP_CHANGELOG = [
     'LIVE tab: Race Control messages, Pit Strategy tracker, and Team Radio feed',
     'New joiner penalty: new players get (lowest standings score - 5) applied on first race',
@@ -801,9 +801,12 @@ const APP_CHANGELOG = [
 async function notifyDeployUpdate() {
     try {
         const meta = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'app_version'", args: [] });
-        if (meta.rows[0]?.value === APP_VERSION) return;
+        const storedVersion = meta.rows[0]?.value || 'none';
+        console.log(`[DEPLOY] Current: ${APP_VERSION}, Stored: ${storedVersion}`);
+        if (storedVersion === APP_VERSION) { console.log('[DEPLOY] Version unchanged — skipping notification'); return; }
         let msg = `**App Update — ${APP_VERSION}**\n`;
         APP_CHANGELOG.forEach(c => { msg += `• ${c}\n`; });
+        console.log('[DEPLOY] Sending Discord notification...');
         await sendDiscordNotification(msg);
         await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('app_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [APP_VERSION] });
         console.log(`[DEPLOY] Update notification sent for ${APP_VERSION}`);
