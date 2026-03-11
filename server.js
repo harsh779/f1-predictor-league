@@ -811,4 +811,7 @@ async function notifyDeployUpdate() {
 }
 setTimeout(notifyDeployUpdate, 5 * 1000);
 
-app.listen(port, () => console.log(`🏁 Server 3000 (Google OAuth Secure)`));
+app.listen(port, () => {
+    console.log(`🏁 Server 3000 (Google OAuth Secure)`);
+    console.log(`[ENV] DISCORD_WEBHOOK: ${process.env.DISCORD_WEBHOOK ? 'SET (' + process.env.DISCORD_WEBHOOK.substring(0, 30) + '...)' : 'NOT SET'}`);
+});
