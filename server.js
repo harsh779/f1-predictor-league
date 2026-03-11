@@ -790,12 +790,12 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.2';
+const APP_VERSION = 'v7.3';
 const APP_CHANGELOG = [
+    'LIVE tab: Race Control messages, Pit Strategy tracker, and Team Radio feed',
     'New joiner penalty: new players get (lowest standings score - 5) applied on first race',
     'Missed round penalty clarified: (lowest round score - 5)',
     'League standings now show per-race score breakdown (tap to expand)',
-    'Discord notifications improved with error logging'
 ];
 async function notifyDeployUpdate() {
     try {
