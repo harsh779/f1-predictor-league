@@ -142,18 +142,19 @@ app.get('/auth/google/callback', async (req, res) => {
 async function sendDiscordNotification(msg) {
     const url = process.env.DISCORD_WEBHOOK;
     if (!url) { console.warn('[DISCORD] No DISCORD_WEBHOOK env var set — skipping notification'); return; }
-    try {
-        const fullMsg = `🏎️ **F1 Steward:** ${msg}`;
-        // Discord has a 2000 char limit — split if needed
-        const chunks = [];
-        if (fullMsg.length <= 2000) { chunks.push(fullMsg); }
-        else { for (let i = 0; i < fullMsg.length; i += 2000) chunks.push(fullMsg.slice(i, i + 2000)); }
-        for (const chunk of chunks) {
-            const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: chunk }) });
-            if (!resp.ok) console.error(`[DISCORD] Webhook failed: ${resp.status} ${resp.statusText}`);
-            else console.log('[DISCORD] Score breakdown sent successfully');
+    const fullMsg = `🏎️ **F1 Steward:** ${msg}`;
+    // Discord has a 2000 char limit — split if needed
+    const chunks = [];
+    if (fullMsg.length <= 2000) { chunks.push(fullMsg); }
+    else { for (let i = 0; i < fullMsg.length; i += 2000) chunks.push(fullMsg.slice(i, i + 2000)); }
+    for (const chunk of chunks) {
+        try {
+            await axios.post(url, { content: chunk }, { timeout: 10000 });
+            console.log('[DISCORD] Message sent successfully');
+        } catch (e) {
+            console.error(`[DISCORD] Webhook error: ${e.response?.status || 'NO_RESPONSE'} — ${e.response?.data ? JSON.stringify(e.response.data) : e.message}`);
         }
-    } catch (e) { console.error('[DISCORD] Webhook error:', e.message); }
+    }
 }
 
 async function performFinalization() {
@@ -790,7 +791,7 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.3';
+const APP_VERSION = 'v7.3.1';
 const APP_CHANGELOG = [
     'LIVE tab: Race Control messages, Pit Strategy tracker, and Team Radio feed',
     'New joiner penalty: new players get (lowest standings score - 5) applied on first race',
