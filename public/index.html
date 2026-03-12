@@ -20,7 +20,7 @@
     <script>
         // Version 6.6 - Remove dead session card, cleanup
         (function() {
-            const currentVersion = "7.1";
+            const currentVersion = "7.6";
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -399,6 +399,49 @@
         .telem-bar-track { flex:1; height:14px; background:var(--surface-inner); border-radius:7px; overflow:hidden; }
         .telem-bar-fill { height:100%; border-radius:7px; transition:width 0.3s ease; }
         .telem-bar-val { width:40px; text-align:right; font-weight:900; font-size:0.85rem; }
+
+        /* ── Driver Deep Dive Tabs ─────────────────────────────────── */
+        .dd-tabs { display:flex; gap:4px; margin-bottom:16px; }
+        .dd-tab { background:var(--nav-bg); color:var(--text-muted); border:1px solid transparent; font-family:'Titillium Web'; font-weight:700; cursor:pointer; padding:6px 12px; border-radius:16px; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; transition:all 0.2s; }
+        .dd-tab.active-dd { background:var(--surface); color:var(--red); border:1px solid var(--red); }
+        .dd-panel { display:none; }
+        .dd-panel.active-ddp { display:block; }
+
+        .dd-timing-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+        .dd-stat { background:var(--surface-inner); border-radius:8px; padding:10px; text-align:center; }
+        .dd-stat-label { font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.5px; }
+        .dd-stat-val { font-size:1.2rem; font-weight:900; color:var(--text-main); margin-top:2px; }
+
+        .dd-stint { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--surface-inner); font-size:0.85rem; }
+        .dd-stint:last-child { border-bottom:none; }
+        .dd-stint-compound { width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:900; flex-shrink:0; }
+        .dd-radio-msg { padding:8px 0; border-bottom:1px solid var(--surface-inner); font-size:0.82rem; }
+        .dd-radio-msg:last-child { border-bottom:none; }
+        .dd-section-hdr { font-size:0.75rem; font-weight:900; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); margin:12px 0 8px; }
+
+        /* ── Past Results ──────────────────────────────────────────── */
+        .results-list { display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+        .result-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; cursor:pointer; transition:all 0.2s; display:flex; justify-content:space-between; align-items:center; }
+        .result-card:hover { border-color:var(--red); box-shadow:0 4px 12px rgba(225,6,0,0.1); }
+        .result-card-info { display:flex; flex-direction:column; gap:2px; }
+        .result-card-round { font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; }
+        .result-card-name { font-weight:900; font-size:1rem; color:var(--text-main); }
+        .result-card-type { font-size:0.75rem; color:var(--text-muted); }
+        .result-card-arrow { color:var(--text-muted); font-size:0.8rem; }
+
+        .result-detail-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(5px); display:flex; justify-content:center; align-items:center; z-index:9999; }
+        .result-detail-card { background:var(--bg-light); border-radius:16px; padding:0; max-width:700px; width:95%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.4); animation:slideUp 0.3s ease; overflow:hidden; }
+        .result-detail-hdr { padding:20px 24px 14px; border-bottom:2px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--surface); }
+        .result-detail-hdr h3 { margin:0; font-size:1.2rem; font-weight:900; text-transform:uppercase; }
+        .result-detail-body { overflow-y:auto; padding:0; }
+        .result-detail-body table { width:100%; border-collapse:collapse; }
+        .result-detail-body th { position:sticky; top:0; background:var(--surface-inner); z-index:1; padding:10px 8px; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); border-bottom:2px solid var(--border); white-space:nowrap; }
+        .result-detail-body td { padding:10px 8px; border-bottom:1px solid var(--surface-inner); font-size:0.88rem; white-space:nowrap; }
+        @media (max-width:640px) {
+            .result-detail-card { border-radius:16px 16px 0 0; max-height:90vh; width:100%; max-width:100%; }
+            .result-detail-body th, .result-detail-body td { padding:8px 5px; font-size:0.78rem; }
+            .dd-timing-grid { grid-template-columns:1fr 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -416,31 +459,64 @@
 </div>
 
 <div id="telem-modal" class="telem-overlay hidden" onclick="if(event.target===this)closeTelemModal()">
-    <div class="telem-card">
+    <div class="telem-card" style="max-width:520px;">
         <div class="telem-card-hdr">
             <h3 id="telem-driver-name">Driver</h3>
             <button class="close-btn" onclick="closeTelemModal()">&times;</button>
         </div>
-        <div class="telem-gauges">
-            <div class="telem-g"><div class="telem-g-label">Speed</div><div class="telem-g-val" id="tg-speed">-</div><div class="telem-g-unit">km/h</div></div>
-            <div class="telem-g"><div class="telem-g-label">Gear</div><div class="telem-g-val" id="tg-gear">-</div><div class="telem-g-unit">&nbsp;</div></div>
-            <div class="telem-g"><div class="telem-g-label">RPM</div><div class="telem-g-val" id="tg-rpm">-</div><div class="telem-g-unit">&nbsp;</div></div>
+        <div class="dd-tabs">
+            <button class="dd-tab active-dd" onclick="switchDD('telem')">Telemetry</button>
+            <button class="dd-tab" onclick="switchDD('timing')">Timing</button>
+            <button class="dd-tab" onclick="switchDD('strat')">Strategy</button>
+            <button class="dd-tab" onclick="switchDD('radio')">Radio</button>
         </div>
-        <div class="telem-bars">
-            <div class="telem-bar-row">
-                <span class="telem-bar-label">Throttle</span>
-                <div class="telem-bar-track"><div class="telem-bar-fill" id="tg-throttle" style="background:#00cc44;width:0%;"></div></div>
-                <span class="telem-bar-val" id="tg-throttle-val">0%</span>
+
+        <div id="dd-telem" class="dd-panel active-ddp">
+            <div class="telem-gauges">
+                <div class="telem-g"><div class="telem-g-label">Speed</div><div class="telem-g-val" id="tg-speed">-</div><div class="telem-g-unit">km/h</div></div>
+                <div class="telem-g"><div class="telem-g-label">Gear</div><div class="telem-g-val" id="tg-gear">-</div><div class="telem-g-unit">&nbsp;</div></div>
+                <div class="telem-g"><div class="telem-g-label">RPM</div><div class="telem-g-val" id="tg-rpm">-</div><div class="telem-g-unit">&nbsp;</div></div>
             </div>
-            <div class="telem-bar-row">
-                <span class="telem-bar-label">Brake</span>
-                <div class="telem-bar-track"><div class="telem-bar-fill" id="tg-brake" style="background:#e10600;width:0%;"></div></div>
-                <span class="telem-bar-val" id="tg-brake-val">0%</span>
+            <div class="telem-bars">
+                <div class="telem-bar-row">
+                    <span class="telem-bar-label">Throttle</span>
+                    <div class="telem-bar-track"><div class="telem-bar-fill" id="tg-throttle" style="background:#00cc44;width:0%;"></div></div>
+                    <span class="telem-bar-val" id="tg-throttle-val">0%</span>
+                </div>
+                <div class="telem-bar-row">
+                    <span class="telem-bar-label">Brake</span>
+                    <div class="telem-bar-track"><div class="telem-bar-fill" id="tg-brake" style="background:#e10600;width:0%;"></div></div>
+                    <span class="telem-bar-val" id="tg-brake-val">0%</span>
+                </div>
+                <div class="telem-bar-row">
+                    <span class="telem-bar-label">DRS</span>
+                    <div style="flex:1;font-weight:900;font-size:0.95rem;" id="tg-drs">OFF</div>
+                </div>
             </div>
-            <div class="telem-bar-row">
-                <span class="telem-bar-label">DRS</span>
-                <div style="flex:1;font-weight:900;font-size:0.95rem;" id="tg-drs">OFF</div>
-            </div>
+        </div>
+
+        <div id="dd-timing" class="dd-panel">
+            <div id="dd-timing-content" style="color:var(--text-muted);font-size:0.85rem;">Loading timing data...</div>
+        </div>
+
+        <div id="dd-strat" class="dd-panel">
+            <div id="dd-strat-content" style="color:var(--text-muted);font-size:0.85rem;">Loading pit strategy...</div>
+        </div>
+
+        <div id="dd-radio" class="dd-panel">
+            <div id="dd-radio-content" style="color:var(--text-muted);font-size:0.85rem;">Loading team radio...</div>
+        </div>
+    </div>
+</div>
+
+<div id="result-detail-modal" class="result-detail-modal hidden" onclick="if(event.target===this)closeResultDetail()">
+    <div class="result-detail-card">
+        <div class="result-detail-hdr">
+            <h3 id="result-detail-title">Session Result</h3>
+            <button class="close-btn" onclick="closeResultDetail()">&times;</button>
+        </div>
+        <div class="result-detail-body" id="result-detail-body">
+            <div style="padding:30px;text-align:center;color:var(--text-muted);">Loading...</div>
         </div>
     </div>
 </div>
@@ -673,6 +749,14 @@
                 </div>
             </div>
         </div>
+
+        <div style="margin-top:24px;">
+            <h3 style="font-weight:900; text-transform:uppercase; letter-spacing:1px; font-size:1.1rem; color:var(--text-main); margin:0 0 4px;">Past Sessions</h3>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin:0 0 12px;">Tap to view detailed classification with pit stints and speed traps.</p>
+            <div id="past-results-list" class="results-list">
+                <div style="color:var(--text-muted);font-size:0.85rem;">Loading past sessions...</div>
+            </div>
+        </div>
     </div>
 
     <div id="standings" class="tab">
@@ -740,7 +824,7 @@
         <div class="predict-group" style="line-height: 1.8;">
             <h3>1. Parc Fermé (The Deadline)</h3>
             <ul>
-                <li>Strategies are <strong>strictly locked</strong> at the start of Qualifying. You can change your team any number of times before this.</li>
+                <li>Strategies are <strong>strictly locked 1 minute before Qualifying</strong>. You can change your team any number of times before this.</li>
                 <li>Incomplete submissions will be rejected. If you fail to submit a team, your score will be <strong>5 points lower than the lowest scoring player</strong> that week.</li>
             </ul>
             <h3 style="margin-top:20px;">2. Driver Scoring (P1, P2, P3, P10, P11, P21, P22)</h3>
@@ -1301,17 +1385,26 @@
     }
 
     let telemSSE = null;
+    let ddDriverNum = null;
+
+    function switchDD(panel) {
+        document.querySelectorAll('.dd-tab').forEach(b => b.classList.remove('active-dd'));
+        document.querySelectorAll('.dd-panel').forEach(p => p.classList.remove('active-ddp'));
+        document.getElementById('dd-' + panel).classList.add('active-ddp');
+        document.querySelector(`.dd-tab[onclick="switchDD('${panel}')"]`).classList.add('active-dd');
+    }
+
     function openTelemModal(num, name, color) {
+        ddDriverNum = num;
         document.getElementById('telem-driver-name').innerHTML = `<span style="display:inline-block;width:4px;height:20px;background:${color};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${name}`;
         document.getElementById('telem-modal').classList.remove('hidden');
+        // Reset to telemetry tab
+        switchDD('telem');
+        // Start telemetry SSE
         if (telemSSE) { telemSSE.close(); telemSSE = null; }
         telemSSE = new EventSource(`/api/live/telemetry/stream/${num}`);
         telemSSE.onmessage = (ev) => {
-            try {
-                const d = JSON.parse(ev.data);
-                const t = d.telemetry || d;
-                updateTelemUI(t);
-            } catch(e) {}
+            try { const d = JSON.parse(ev.data); updateTelemUI(d.telemetry || d); } catch(e) {}
         };
         telemSSE.onerror = () => {
             if (telemSSE) { telemSSE.close(); telemSSE = null; }
@@ -1321,11 +1414,16 @@
                 if (dr?.telemetry) updateTelemUI(dr.telemetry);
             }).catch(() => {});
         };
+        // Load other tabs
+        loadDDTiming(num);
+        loadDDStrategy(num);
+        loadDDRadio(num);
     }
 
     function closeTelemModal() {
         document.getElementById('telem-modal').classList.add('hidden');
         if (telemSSE) { telemSSE.close(); telemSSE = null; }
+        ddDriverNum = null;
     }
 
     function updateTelemUI(t) {
@@ -1343,6 +1441,182 @@
         if (drs === 10 || drs === 12) { drsEl.textContent = 'ACTIVE'; drsEl.style.color = '#00cc44'; }
         else if (drs === 8) { drsEl.textContent = 'ELIGIBLE'; drsEl.style.color = '#eebb00'; }
         else { drsEl.textContent = 'OFF'; drsEl.style.color = 'var(--text-muted)'; }
+    }
+
+    async function loadDDTiming(num) {
+        const el = document.getElementById('dd-timing-content');
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/timing/${num}?t=${Date.now()}`).then(r => r.json());
+            if (!d || !d.driver_number) throw new Error('No data');
+            const sectors = d.sectors || [];
+            const sHtml = sectors.map((s, i) => {
+                const col = s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : 'var(--text-main)';
+                return `<div class="dd-stat"><div class="dd-stat-label">S${i+1}</div><div class="dd-stat-val" style="color:${col};">${s.value || '-'}</div></div>`;
+            }).join('');
+            const spd = d.speed_traps || {};
+            el.innerHTML = `
+                <div class="dd-timing-grid">
+                    <div class="dd-stat"><div class="dd-stat-label">Position</div><div class="dd-stat-val">P${d.position || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">Gap</div><div class="dd-stat-val" style="color:var(--red);font-size:1rem;">${d.gap_to_leader || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">Laps</div><div class="dd-stat-val">${d.laps_completed || 0}</div></div>
+                </div>
+                <div class="dd-section-hdr">Lap Times</div>
+                <div class="dd-timing-grid">
+                    <div class="dd-stat"><div class="dd-stat-label">Best</div><div class="dd-stat-val" style="font-size:1rem;">${d.best_lap_time || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">Last</div><div class="dd-stat-val" style="font-size:1rem;color:${d.last_lap_personal_best ? '#00cc44' : 'var(--text-main)'};">${d.last_lap_time || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">Interval</div><div class="dd-stat-val" style="font-size:1rem;">${d.interval || '-'}</div></div>
+                </div>
+                <div class="dd-section-hdr">Sectors</div>
+                <div class="dd-timing-grid">${sHtml || '<div class="dd-stat"><div class="dd-stat-val">-</div></div>'}</div>
+                <div class="dd-section-hdr">Speed Traps</div>
+                <div class="dd-timing-grid">
+                    <div class="dd-stat"><div class="dd-stat-label">I1</div><div class="dd-stat-val" style="font-size:1rem;">${spd.i1 || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">I2</div><div class="dd-stat-val" style="font-size:1rem;">${spd.i2 || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">FL</div><div class="dd-stat-val" style="font-size:1rem;">${spd.fl || '-'}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">Trap</div><div class="dd-stat-val" style="font-size:1rem;">${spd.st || '-'}</div></div>
+                </div>
+            `;
+        } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Timing data unavailable</div>'; }
+    }
+
+    async function loadDDStrategy(num) {
+        const el = document.getElementById('dd-strat-content');
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/pits/${num}?t=${Date.now()}`).then(r => r.json());
+            if (!d || !d.driver_number) throw new Error('No data');
+            const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+            const tyreTextColors = { MEDIUM:'#111', HARD:'#111' };
+            const cs = d.current_stint || {};
+            const cTc = tyreColors[(cs.compound || '').toUpperCase()] || '#888';
+            const cTxt = tyreTextColors[(cs.compound || '').toUpperCase()] || '#fff';
+
+            let stintsHtml = '';
+            if (d.pit_stops && d.pit_stops.length > 0) {
+                stintsHtml = d.pit_stops.map((p, i) => {
+                    const tc = tyreColors[(p.compound || '').toUpperCase()] || '#888';
+                    const txt = tyreTextColors[(p.compound || '').toUpperCase()] || '#fff';
+                    return `<div class="dd-stint">
+                        <span style="width:24px;color:var(--text-muted);font-weight:900;font-size:0.85rem;">#${p.stop_number || i+1}</span>
+                        <span class="dd-stint-compound" style="background:${tc};color:${txt};">${(p.compound || '?')[0]}</span>
+                        <span style="flex:1;font-weight:700;">Lap ${p.lap || '?'}</span>
+                        <span style="color:var(--text-muted);font-size:0.82rem;">${p.new_tyre ? 'New' : 'Used'}</span>
+                    </div>`;
+                }).join('');
+            }
+
+            el.innerHTML = `
+                <div class="dd-timing-grid" style="grid-template-columns:1fr 1fr;">
+                    <div class="dd-stat"><div class="dd-stat-label">Total Stops</div><div class="dd-stat-val">${d.total_stops || 0}</div></div>
+                    <div class="dd-stat"><div class="dd-stat-label">Status</div><div class="dd-stat-val" style="font-size:1rem;color:${d.in_pit ? '#eebb00' : '#00cc44'};">${d.in_pit ? 'IN PIT' : d.pit_out ? 'PIT OUT' : 'ON TRACK'}</div></div>
+                </div>
+                <div class="dd-section-hdr">Current Stint</div>
+                <div class="dd-stint">
+                    <span class="dd-stint-compound" style="background:${cTc};color:${cTxt};">${(cs.compound || '?')[0]}</span>
+                    <span style="font-weight:900;flex:1;">${cs.compound || 'Unknown'}</span>
+                    <span style="font-weight:700;">${cs.laps || 0} laps</span>
+                    <span style="color:var(--text-muted);font-size:0.82rem;">${cs.new_tyre ? 'New' : 'Used'}</span>
+                </div>
+                ${stintsHtml ? `<div class="dd-section-hdr">Pit Stop History</div>${stintsHtml}` : ''}
+            `;
+        } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Pit strategy data unavailable</div>'; }
+    }
+
+    async function loadDDRadio(num) {
+        const el = document.getElementById('dd-radio-content');
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/team-radio/${num}?t=${Date.now()}`).then(r => r.json());
+            const msgs = d.messages || [];
+            if (!msgs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No radio messages yet</div>'; return; }
+            el.innerHTML = `<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px;">${msgs.length} message${msgs.length !== 1 ? 's' : ''}</div>` +
+                msgs.slice(0, 20).map(m => {
+                    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+                    return `<div class="dd-radio-msg">
+                        <span style="color:var(--text-muted);font-size:0.75rem;">${time}</span>
+                        ${m.audio_url ? ` <button onclick="playRadio(this,'${m.audio_url}')" style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;vertical-align:middle;margin-left:4px;">&#9654;</button>` : ''}
+                    </div>`;
+                }).join('');
+        } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Team radio unavailable</div>'; }
+    }
+
+    // ── Past Results ──────────────────────────────────────────────
+    async function loadPastResults() {
+        const el = document.getElementById('past-results-list');
+        try {
+            const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
+            if (!Array.isArray(results) || !results.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No past session results available yet.</div>'; return; }
+            // Show newest first
+            const sorted = [...results].reverse();
+            el.innerHTML = sorted.map(r => {
+                const typeLabel = (r.session_type || r.session_name || '').replace(/_/g, ' ');
+                return `<div class="result-card" onclick="openResultDetail('${r.filename}')">
+                    <div class="result-card-info">
+                        <span class="result-card-round">R${r.round} &middot; ${typeLabel}</span>
+                        <span class="result-card-name">${r.meeting || r.filename}</span>
+                        <span class="result-card-type">${r.circuit || ''}</span>
+                    </div>
+                    <span class="result-card-arrow">&#9654;</span>
+                </div>`;
+            }).join('');
+        } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Could not load past results.</div>'; }
+    }
+
+    async function openResultDetail(filename) {
+        document.getElementById('result-detail-modal').classList.remove('hidden');
+        const body = document.getElementById('result-detail-body');
+        body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/results/${filename}?t=${Date.now()}`).then(r => r.json());
+            const meta = d.meta || {};
+            document.getElementById('result-detail-title').textContent = `${meta.meeting || filename} — ${(meta.session_type || '').replace(/_/g,' ')}`;
+            const results = d.results || [];
+            if (!results.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">No classification data.</div>'; return; }
+            const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+            const tyreTextColors = { MEDIUM:'#111', HARD:'#111' };
+            // Build driver name map from teamsData
+            const numMap = {};
+            teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
+
+            const fl = d.fastest_lap;
+            const flHtml = fl ? `<div style="padding:10px 14px;background:rgba(155,89,182,0.08);border-bottom:2px solid var(--border);font-size:0.85rem;font-weight:700;color:#9b59b6;">Fastest Lap: ${numMap[String(fl.driver_number)]?.name || '#' + fl.driver_number} — ${fl.time} (Lap ${fl.lap})</div>` : '';
+
+            body.innerHTML = flHtml + `<table>
+                <thead><tr>
+                    <th style="text-align:center;width:40px;">P</th>
+                    <th style="text-align:left;">Driver</th>
+                    <th style="text-align:right;">Best Lap</th>
+                    <th style="text-align:right;">Gap</th>
+                    <th style="text-align:center;">Laps</th>
+                    <th style="text-align:center;">Tyres</th>
+                </tr></thead>
+                <tbody>${results.map(r => {
+                    const info = numMap[String(r.driver_number)] || {};
+                    const dName = info.name || '#' + r.driver_number;
+                    const tc = info.color || 'var(--border)';
+                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DSQ</span>' : '';
+                    const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
+                    const stints = (r.stints || []).map(s => {
+                        const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
+                        const txt = tyreTextColors[(s.compound || '').toUpperCase()] || '#fff';
+                        return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${bg};color:${txt};font-size:0.6rem;font-weight:900;" title="${s.compound} (${s.laps}L${s.new ? '' : ', used'})">${(s.compound||'?')[0]}</span>`;
+                    }).join('');
+                    return `<tr>
+                        <td style="text-align:center;font-weight:900;color:${posCol};">${r.position}</td>
+                        <td><span style="display:inline-block;width:3px;height:14px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${dName}</b>${status}</td>
+                        <td style="text-align:right;font-weight:700;">${r.best_lap_time || '-'}</td>
+                        <td style="text-align:right;font-weight:700;color:var(--red);">${r.gap_to_leader || '-'}</td>
+                        <td style="text-align:center;color:var(--text-muted);">${r.laps_completed || '-'}</td>
+                        <td style="text-align:center;"><div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${stints || '-'}</div></td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        } catch(e) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Failed to load session data.</div>'; }
+    }
+
+    function closeResultDetail() {
+        document.getElementById('result-detail-modal').classList.add('hidden');
     }
 
     async function loadHomeData() {
@@ -1440,6 +1714,7 @@
         
         if(t==='timing') {
             loadTimingTab();
+            loadPastResults();
             clearInterval(timingInterval);
             timingInterval = setInterval(loadTimingTab, 30000);
             startLiveSSE();

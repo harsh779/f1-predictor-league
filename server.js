@@ -464,7 +464,7 @@ app.get('/api/next-race', async (req, res) => {
                     corners: apiNext.track.corners, firstGP: apiNext.track.first_gp, record: apiNext.track.lap_record
                 } : undefined,
                 sessions: apiNext.all_sessions || {},
-                lockTime: apiNext.all_sessions?.qualifying || apiNext.session_time
+                lockTime: (() => { const lt = new Date(apiNext.all_sessions?.qualifying || apiNext.session_time); lt.setMinutes(lt.getMinutes() - 1); return lt.toISOString(); })()
             };
             // Normalize session keys (qualifying -> quali, sprint_qualifying -> sprintQuali)
             if (mapped.sessions.qualifying) { mapped.sessions.quali = mapped.sessions.qualifying; }
@@ -481,7 +481,9 @@ app.get('/api/next-race', async (req, res) => {
         return raceEndBuffer > now;
     }) || f1Calendar2026[f1Calendar2026.length - 1];
 
-    const payload = { ...next, lockTime: next.sessions.quali };
+    const lt = new Date(next.sessions.quali);
+    lt.setMinutes(lt.getMinutes() - 1);
+    const payload = { ...next, lockTime: lt.toISOString() };
     res.json(payload);
 });
 
@@ -577,6 +579,7 @@ app.post('/predict', authenticateToken, async (req, res) => {
     if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
     const lockTime = new Date(currentRace.sessions.quali);
+    lockTime.setMinutes(lockTime.getMinutes() - 1);
     if (now > lockTime) {
         return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
     }
@@ -733,6 +736,11 @@ app.get('/api/standings/drivers', (_, res) => liveProxy('/standings/drivers', re
 app.get('/api/standings/constructors', (_, res) => liveProxy('/standings/constructors', res));
 app.get('/api/live/status', (_, res) => liveProxy('/status', res));
 app.get('/api/live/calendar-current', (_, res) => liveProxy('/calendar/current', res));
+app.get('/api/live/results', (_, res) => liveProxy('/results', res));
+app.get('/api/live/results/:filename', (req, res) => liveProxy(`/results/${req.params.filename}`, res));
+app.get('/api/live/pits/:number', (req, res) => liveProxy(`/pits/${req.params.number}`, res));
+app.get('/api/live/team-radio/:number', (req, res) => liveProxy(`/team-radio/${req.params.number}`, res));
+app.get('/api/live/timing/:number', (req, res) => liveProxy(`/timing/${req.params.number}`, res));
 
 // SSE proxy: pipes live timing stream from own API to client
 app.get('/api/live/stream', (req, res) => {
@@ -826,11 +834,11 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.5';
+const APP_VERSION = 'v7.6';
 const APP_CHANGELOG = [
-    'Next race data now fetched live from API (auto-syncs schedule changes)',
-    'Weather fallback uses API calendar coordinates',
-    'Active race weekend detection via /calendar/current',
+    'Driver Deep Dive: tap any driver on LIVE tab for telemetry, timing, pit strategy, and team radio',
+    'Past Sessions: browse completed session results with full classification, tyre stints, and speed traps',
+    'Strategy lockout now 1 minute before Qualifying (was at exact quali time)',
 ];
 async function notifyDeployUpdate() {
     try {
