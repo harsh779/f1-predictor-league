@@ -834,11 +834,10 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.6';
+const APP_VERSION = 'v7.7';
 const APP_CHANGELOG = [
-    'Driver Deep Dive: tap any driver on LIVE tab for telemetry, timing, pit strategy, and team radio',
-    'Past Sessions: browse completed session results with full classification, tyre stints, and speed traps',
-    'Strategy lockout now 1 minute before Qualifying (was at exact quali time)',
+    'Fixed driver names in Past Sessions — all 22 drivers now show correctly',
+    'Updated 2026 driver numbers and team colors to match official grid',
 ];
 async function notifyDeployUpdate() {
     try {
