@@ -928,17 +928,17 @@
 
 <script>
     const teamsData = [
-        { name: "Red Bull Racing", color: "#1E41FF", drivers: [{name: "Max Verstappen", num: 1}, {name: "Isack Hadjar", num: 20}] },
-        { name: "McLaren", color: "#FF8000", drivers: [{name: "Lando Norris", num: 4}, {name: "Oscar Piastri", num: 81}] },
-        { name: "Ferrari", color: "#E80020", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
-        { name: "Mercedes", color: "#27F4D2", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
-        { name: "Aston Martin", color: "#006F62", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
-        { name: "Williams", color: "#00A0E9", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alex Albon", num: 23}] },
-        { name: "Alpine", color: "#FF87BC", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Franco Colapinto", num: 43}] },
-        { name: "Racing Bulls", color: "#1434CB", drivers: [{name: "Liam Lawson", num: 30}, {name: "Arvid Lindblad", num: 8}] },
-        { name: "Haas", color: "#B6BABD", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
-        { name: "Audi", color: "#00FF00", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
-        { name: "Cadillac", color: "#FFB800", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
+        { name: "Red Bull Racing", color: "#4781D7", drivers: [{name: "Max Verstappen", num: 3}, {name: "Isack Hadjar", num: 6}] },
+        { name: "McLaren", color: "#F47600", drivers: [{name: "Lando Norris", num: 1}, {name: "Oscar Piastri", num: 81}] },
+        { name: "Ferrari", color: "#ED1131", drivers: [{name: "Charles Leclerc", num: 16}, {name: "Lewis Hamilton", num: 44}] },
+        { name: "Mercedes", color: "#00D7B6", drivers: [{name: "George Russell", num: 63}, {name: "Kimi Antonelli", num: 12}] },
+        { name: "Aston Martin", color: "#229971", drivers: [{name: "Fernando Alonso", num: 14}, {name: "Lance Stroll", num: 18}] },
+        { name: "Williams", color: "#1868DB", drivers: [{name: "Carlos Sainz", num: 55}, {name: "Alexander Albon", num: 23}] },
+        { name: "Alpine", color: "#00A1E8", drivers: [{name: "Pierre Gasly", num: 10}, {name: "Franco Colapinto", num: 43}] },
+        { name: "Racing Bulls", color: "#6C98FF", drivers: [{name: "Liam Lawson", num: 30}, {name: "Arvid Lindblad", num: 41}] },
+        { name: "Haas", color: "#9C9FA2", drivers: [{name: "Esteban Ocon", num: 31}, {name: "Oliver Bearman", num: 87}] },
+        { name: "Audi", color: "#F50537", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
+        { name: "Cadillac", color: "#909090", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
     ];
 
     const detailedTeams = teamsData.map(t => ({ name: t.name, color: t.color }));
@@ -1575,9 +1575,14 @@
             if (!results.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">No classification data.</div>'; return; }
             const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
             const tyreTextColors = { MEDIUM:'#111', HARD:'#111' };
-            // Build driver name map from teamsData
+            // Build driver name map: prefer embedded drivers from result, fall back to teamsData
             const numMap = {};
             teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
+            if (d.drivers) {
+                Object.entries(d.drivers).forEach(([num, info]) => {
+                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || numMap[num]?.color || 'var(--border)' };
+                });
+            }
 
             const fl = d.fastest_lap;
             const flHtml = fl ? `<div style="padding:10px 14px;background:rgba(155,89,182,0.08);border-bottom:2px solid var(--border);font-size:0.85rem;font-weight:700;color:#9b59b6;">Fastest Lap: ${numMap[String(fl.driver_number)]?.name || '#' + fl.driver_number} — ${fl.time} (Lap ${fl.lap})</div>` : '';
