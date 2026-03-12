@@ -449,7 +449,31 @@ async function performFinalization() {
 }
 
 // --- 7. SECURE CORE ROUTES ---
-app.get('/api/next-race', (req, res) => {
+app.get('/api/next-race', async (req, res) => {
+    // Try API's /calendar/next first (single source of truth)
+    try {
+        const apiNext = await axios.get(`${F1_TIMING_API}/calendar/next`, { timeout: 5000 }).then(r => r.data);
+        if (apiNext && apiNext.round && !apiNext.message) {
+            // Map API field names to app format
+            const mapped = {
+                round: apiNext.round, name: apiNext.meeting, hasSprint: apiNext.has_sprint,
+                circuit: apiNext.circuit, country: apiNext.country,
+                lat: apiNext.lat, lon: apiNext.lon,
+                trackDetails: apiNext.track ? {
+                    length: `${apiNext.track.length_km} km`, laps: apiNext.track.laps,
+                    corners: apiNext.track.corners, firstGP: apiNext.track.first_gp, record: apiNext.track.lap_record
+                } : undefined,
+                sessions: apiNext.all_sessions || {},
+                lockTime: apiNext.all_sessions?.qualifying || apiNext.session_time
+            };
+            // Normalize session keys (qualifying -> quali, sprint_qualifying -> sprintQuali)
+            if (mapped.sessions.qualifying) { mapped.sessions.quali = mapped.sessions.qualifying; }
+            if (mapped.sessions.sprint_qualifying) { mapped.sessions.sprintQuali = mapped.sessions.sprint_qualifying; }
+            return res.json(mapped);
+        }
+    } catch (e) { /* fall through to local */ }
+
+    // Fallback: local hardcoded calendar
     const now = new Date();
     const next = f1Calendar2026.find(r => {
         const raceEndBuffer = new Date(r.sessions.race);
@@ -664,12 +688,22 @@ app.get('/api/live/weather', async (_, res) => {
     } catch (e) { }
     // Fallback: Open-Meteo for the next race's circuit location (free, no API key)
     try {
-        const now = new Date();
-        const next = f1Calendar2026.find(r => {
-            const end = new Date(r.sessions.race);
-            end.setHours(end.getHours() + 4);
-            return end > now;
-        }) || f1Calendar2026[f1Calendar2026.length - 1];
+        let next = null;
+        // Try API calendar for lat/lon
+        try {
+            const apiNext = await axios.get(`${F1_TIMING_API}/calendar/next`, { timeout: 5000 }).then(r => r.data);
+            if (apiNext && apiNext.lat && apiNext.lon) next = { lat: apiNext.lat, lon: apiNext.lon };
+        } catch (e) { /* fall through */ }
+        // Fallback to hardcoded calendar
+        if (!next) {
+            const now = new Date();
+            const localNext = f1Calendar2026.find(r => {
+                const end = new Date(r.sessions.race);
+                end.setHours(end.getHours() + 4);
+                return end > now;
+            }) || f1Calendar2026[f1Calendar2026.length - 1];
+            next = localNext;
+        }
         const meteo = await axios.get(`https://api.open-meteo.com/v1/forecast`, {
             params: { latitude: next.lat, longitude: next.lon, current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation' },
             headers: { 'User-Agent': 'F1PredictionApp/1.0 (https://f1-prediction-app.onrender.com)' },
@@ -698,6 +732,7 @@ app.get('/api/live/telemetry/:number', (req, res) => liveProxy(`/telemetry/${req
 app.get('/api/standings/drivers', (_, res) => liveProxy('/standings/drivers', res));
 app.get('/api/standings/constructors', (_, res) => liveProxy('/standings/constructors', res));
 app.get('/api/live/status', (_, res) => liveProxy('/status', res));
+app.get('/api/live/calendar-current', (_, res) => liveProxy('/calendar/current', res));
 
 // SSE proxy: pipes live timing stream from own API to client
 app.get('/api/live/stream', (req, res) => {
@@ -791,12 +826,11 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.4';
+const APP_VERSION = 'v7.5';
 const APP_CHANGELOG = [
-    'LIVE tab: Race Control messages, Pit Strategy tracker, and Team Radio feed',
-    'New joiner penalty: new players get (lowest standings score - 5) applied on first race',
-    'Missed round penalty clarified: (lowest round score - 5)',
-    'League standings now show per-race score breakdown (tap to expand)',
+    'Next race data now fetched live from API (auto-syncs schedule changes)',
+    'Weather fallback uses API calendar coordinates',
+    'Active race weekend detection via /calendar/current',
 ];
 async function notifyDeployUpdate() {
     try {
