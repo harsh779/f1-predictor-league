@@ -464,7 +464,7 @@ app.get('/api/next-race', async (req, res) => {
                     corners: apiNext.track.corners, firstGP: apiNext.track.first_gp, record: apiNext.track.lap_record
                 } : undefined,
                 sessions: apiNext.all_sessions || {},
-                lockTime: (() => { const lt = new Date(apiNext.all_sessions?.qualifying || apiNext.session_time); lt.setMinutes(lt.getMinutes() - 1); return lt.toISOString(); })()
+                lockTime: (() => { const lockSes = apiNext.has_sprint && apiNext.all_sessions?.sprint_qualifying ? apiNext.all_sessions.sprint_qualifying : (apiNext.all_sessions?.qualifying || apiNext.session_time); const lt = new Date(lockSes); lt.setMinutes(lt.getMinutes() - 1); return lt.toISOString(); })()
             };
             // Normalize session keys (qualifying -> quali, sprint_qualifying -> sprintQuali)
             if (mapped.sessions.qualifying) { mapped.sessions.quali = mapped.sessions.qualifying; }
@@ -481,7 +481,8 @@ app.get('/api/next-race', async (req, res) => {
         return raceEndBuffer > now;
     }) || f1Calendar2026[f1Calendar2026.length - 1];
 
-    const lt = new Date(next.sessions.quali);
+    const lockSes = next.hasSprint && next.sessions.sprintQuali ? next.sessions.sprintQuali : next.sessions.quali;
+    const lt = new Date(lockSes);
     lt.setMinutes(lt.getMinutes() - 1);
     const payload = { ...next, lockTime: lt.toISOString() };
     res.json(payload);
@@ -578,7 +579,8 @@ app.post('/predict', authenticateToken, async (req, res) => {
     });
     if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
-    const lockTime = new Date(currentRace.sessions.quali);
+    const lockSes = currentRace.hasSprint && currentRace.sessions.sprintQuali ? currentRace.sessions.sprintQuali : currentRace.sessions.quali;
+    const lockTime = new Date(lockSes);
     lockTime.setMinutes(lockTime.getMinutes() - 1);
     if (now > lockTime) {
         return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
