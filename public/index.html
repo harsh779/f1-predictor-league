@@ -1150,13 +1150,22 @@
             };
             const p1Secs = toSecs(drivers[0]?.best_lap_time);
 
+            // Precompute gap-to-leader in seconds for each driver (for interval calc)
+            const gapSecs = drivers.map((r, i) => {
+                if (i === 0) return 0;
+                const g = r.gap_to_leader;
+                if (g) { const v = parseFloat(g.replace('+','')); return isNaN(v) ? null : v; }
+                if (p1Secs) { const ms = toSecs(r.best_lap_time); if (ms) return ms - p1Secs; }
+                return null;
+            });
+
             const dotColor = sseConnected ? '#00cc44' : connected ? '#eebb00' : '#e10600';
             const dotLabel = sseConnected ? 'SSE' : connected ? 'Polling' : 'Offline';
             status.innerHTML = `<span title="${dotLabel}" style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;box-shadow:0 0 6px ${dotColor};"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             // ── shared per-driver data ─────────────────────────────────────────
-            const rows = drivers.map(r => {
+            const rows = drivers.map((r, idx) => {
                 const pos     = parseInt(r.position) || 99;
                 const name    = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
                 const team    = r.team || '-';
@@ -1179,6 +1188,10 @@
                 let intText = '-';
                 if (pos === 1) intText = '';
                 else if (r.interval) intText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
+                else if (idx > 0 && gapSecs[idx] != null && gapSecs[idx - 1] != null) {
+                    const delta = gapSecs[idx] - gapSecs[idx - 1];
+                    intText = '+' + Math.abs(delta).toFixed(3);
+                }
 
                 const sectors = [0,1,2].map(i => {
                     const s = (r.sectors || [])[i] || {};
