@@ -45,6 +45,20 @@ async function setupDatabase() {
 
         await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
         await db.execute(`CREATE TABLE IF NOT EXISTS f1_meta (key TEXT PRIMARY KEY, value TEXT)`);
+        await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+
+        // Backfill round history if table is empty but users have scores
+        const histCount = await db.execute("SELECT count(*) as count FROM f1_round_history").then(r => r.rows[0].count);
+        if (histCount === 0) {
+            const scored = await db.execute("SELECT name, total_score FROM f1_drivers WHERE name != 'admin' AND total_score != 0").then(r => r.rows);
+            if (scored.length > 0) {
+                for (const u of scored) {
+                    await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: ['R1', 'Australian Grand Prix', u.name, '{"backfill":true}', u.total_score, '2026-03-08T10:00:00Z'] });
+                }
+                console.log(`[DB] Backfilled round history for ${scored.length} users`);
+            }
+        }
+
         console.log("Database synced.");
     } catch (e) { console.error("DB Error:", e); }
 }
