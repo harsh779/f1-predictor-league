@@ -1347,7 +1347,7 @@
         try {
             const d = await fetch('/api/live/team-radio?t=' + Date.now()).then(r => r.json());
             const msgs = d.messages || [];
-            if (!msgs.length) return;
+            if (!msgs.length) { feed.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No radio messages yet</div>'; return; }
             feed.innerHTML = msgs.slice(0, 20).map(m => {
                 const tc = teamColorMap[(m.team || '').toLowerCase()] || 'var(--border)';
                 const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
