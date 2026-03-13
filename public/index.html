@@ -709,6 +709,7 @@
                                 <th style="text-align:right;">Best</th>
                                 <th style="text-align:right;">Last</th>
                                 <th style="text-align:right;">Gap</th>
+                                <th style="text-align:right;">Int</th>
                                 <th style="text-align:right;">S1</th>
                                 <th style="text-align:right;">S2</th>
                                 <th style="text-align:right;">S3</th>
@@ -716,7 +717,7 @@
                             </tr>
                         </thead>
                         <tbody id="timing-body">
-                            <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
+                            <tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1173,8 +1174,11 @@
                 let gapText = '-';
                 if (pos === 1) gapText = 'LEADER';
                 else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
-                else if (r.interval)      gapText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
                 else if (p1Secs) { const ms = toSecs(r.best_lap_time); if (ms) gapText = '+' + (ms - p1Secs).toFixed(3); }
+
+                let intText = '-';
+                if (pos === 1) intText = '';
+                else if (r.interval) intText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
 
                 const sectors = [0,1,2].map(i => {
                     const s = (r.sectors || [])[i] || {};
@@ -1187,11 +1191,11 @@
 
                 const telem = r.telemetry || {};
                 const driverNum = r.driver_number || '';
-                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, telem, driverNum, r };
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, lastCol, badge, topSpd, telem, driverNum, r };
             });
 
             // ── Desktop: table rows ───────────────────────────────────────────
-            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
                 const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob||s.pb)?'900':'600'};">${s.val}</td>`;
                 const badgeHtml = badge === 'out'
                     ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
@@ -1207,13 +1211,14 @@
                     <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
                     <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
                     <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-muted);">${intText}</td>
                     ${sectors.map(sCell).join('')}
                     <td style="text-align:right;font-size:0.8rem;">${telem.speed ? `<span class="telem-mini"><span class="telem-speed-bar"><span class="telem-speed-fill" style="width:${Math.min(100,(telem.speed/350)*100)}%;background:${telem.speed>300?'#e10600':telem.speed>200?'#eebb00':'#00cc44'};"></span></span>${telem.drs===10||telem.drs===12?'<span class="telem-drs telem-drs-on">DRS</span>':telem.drs===8?'<span class="telem-drs telem-drs-elig">DRS</span>':''}</span> ` : ''}<span style="color:var(--text-muted);">${topSpd}</span></td>
                 </tr>`;
             }).join('');
 
             // ── Mobile: 3-line card rows (ALL data) ───────────────────────────
-            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
                 const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
                 const isLeader  = pos === 1;
 
@@ -1234,6 +1239,7 @@
                                 <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
                                 ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
                                 <span class="tr-gap ${isLeader ? 'ldr' : ''}">${gapText}</span>
+                                ${intText && intText !== '-' ? `<span style="color:var(--text-muted);font-size:0.75rem;font-variant-numeric:tabular-nums;">${intText}</span>` : ''}
                             </div>
                         </div>
                         <div class="tr-line2">
@@ -1262,7 +1268,7 @@
             loadTeamRadio();
 
         } catch(e) {
-            body.innerHTML  = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            body.innerHTML  = `<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
             cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
             if (status) status.innerHTML = '';
             document.getElementById('track-banner').className = '';
