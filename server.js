@@ -64,6 +64,22 @@ app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('X-Frame-Options', 'DENY');
+    res.set('Referrer-Policy', 'same-origin');
+    res.set('Cross-Origin-Opener-Policy', 'same-origin');
+    res.set('Content-Security-Policy', [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "img-src 'self' data: https:",
+        "connect-src 'self' https://f1-live-api.onrender.com https://api.open-meteo.com https://v1.formula-1.api-sports.io https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",
+        "media-src 'self' https:",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self' https://accounts.google.com"
+    ].join('; '));
     next();
 });
 
@@ -391,6 +407,38 @@ async function shouldRevealPredictionsTo(user) {
     return now > lockTime;
 }
 
+function validateUniqueSelection(values) {
+    const normalized = values.filter(Boolean).map(v => normalizeStr(String(v)));
+    return new Set(normalized).size === normalized.length;
+}
+
+function validatePredictionPayload(payload) {
+    const requiredDriverFields = ['p1', 'p2', 'p3', 'p10', 'p11', 'p21', 'p22'];
+    const requiredTeamFields = ['c1', 'c2', 'c5', 'c6', 'c11'];
+    const requiredWildcardFields = ['w_race_loser'];
+    const allRequired = [...requiredDriverFields, ...requiredTeamFields, ...requiredWildcardFields];
+
+    for (const field of allRequired) {
+        if (!payload[field] || !String(payload[field]).trim()) {
+            return `${field} is required`;
+        }
+    }
+
+    const driverValues = requiredDriverFields.map(field => payload[field]);
+    if (!validateUniqueSelection(driverValues)) return 'Driver predictions must be unique';
+
+    const teamValues = requiredTeamFields.map(field => payload[field]);
+    if (!validateUniqueSelection(teamValues)) return 'Constructor predictions must be unique';
+
+    const wildcardValues = [payload.w_race_loser, payload.w_sprint_gainer, payload.w_sprint_loser].filter(Boolean);
+    if (!validateUniqueSelection(wildcardValues)) return 'Wildcard predictions must be unique';
+
+    const allValues = [...driverValues, ...teamValues, ...wildcardValues];
+    if (allValues.some(v => String(v).length > 80)) return 'Prediction values are too long';
+
+    return null;
+}
+
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
@@ -499,7 +547,7 @@ app.get('/auth/google/callback', async (req, res) => {
 
         const token = jwt.sign({ name: effectiveName, auth_id: authId }, JWT_SECRET, { expiresIn: '30d' });
         setSessionCookie(res, token);
-        res.redirect(`/?name=${encodeURIComponent(effectiveName)}`);
+        res.redirect('/');
     } catch (error) { res.redirect('/?error=oauth_failed'); }
 });
 
@@ -957,8 +1005,9 @@ app.post('/predict', authenticateToken, async (req, res) => {
         return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
     }
 
-    if (!d.p1 || !d.p10 || !d.c11 || !d.w_race_loser) {
-        return res.status(400).json({ success: false, message: "Invalid: Incomplete predictions." });
+    const validationError = validatePredictionPayload(d);
+    if (validationError) {
+        return res.status(400).json({ success: false, message: `Invalid: ${validationError}.` });
     }
 
     try {

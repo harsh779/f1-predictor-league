@@ -985,15 +985,12 @@
     teamsData.forEach(t => t.drivers.forEach(d => detailedDrivers.push({ name: d.name, num: d.num, color: t.color })));
     detailedDrivers.sort((a, b) => a.name.localeCompare(b.name));
 
-    let f1_token = localStorage.getItem('f1_token');
     let f1_name = localStorage.getItem('f1_name');
     let f1_is_admin = localStorage.getItem('f1_is_admin') === '1';
     let raceLock = null;
 
     function getAuthHeaders(extra = {}) {
-        const headers = { ...extra };
-        if (f1_token) headers['Authorization'] = `Bearer ${f1_token}`;
-        return headers;
+        return { ...extra };
     }
 
     async function authFetch(url, options = {}) {
@@ -1011,15 +1008,7 @@
     setInterval(checkPredictionLock, 30000);
 
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('token') && urlParams.has('name')) {
-        f1_token = urlParams.get('token');
-        f1_name = urlParams.get('name');
-        localStorage.setItem('f1_token', f1_token);
-        localStorage.setItem('f1_name', f1_name);
-        window.history.replaceState({}, document.title, "/");
-    } else if (urlParams.has('name')) {
-        f1_name = urlParams.get('name');
-        localStorage.setItem('f1_name', f1_name);
+    if (window.location.search) {
         window.history.replaceState({}, document.title, "/");
     }
 
@@ -1065,10 +1054,8 @@
             document.getElementById('auth').style.display = 'none';
             return true;
         } catch (e) {
-            localStorage.removeItem('f1_token');
             localStorage.removeItem('f1_name');
             localStorage.removeItem('f1_is_admin');
-            f1_token = null;
             f1_name = null;
             f1_is_admin = false;
             return false;
@@ -1513,7 +1500,7 @@
                         <div><b>${m.acronym || m.name?.split(' ').pop() || ''}</b><span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px;">${time}</span></div>
                         <div style="color:var(--text-muted);font-size:0.78rem;line-height:1.35;margin-top:2px;">${detail}</div>
                     </div>
-                    ${m.audio_url ? `<button onclick="playRadio(this,'${m.audio_url}')" style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.7rem;">&#9654;</button>` : ''}
+                    ${m.audio_url ? `<button onclick='playRadio(this, ${jsArg(m.audio_url)})' style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.7rem;">&#9654;</button>` : ''}
                 </div>`;
             }).join('');
         } catch(e) {}
@@ -1692,7 +1679,7 @@
                     const detail = formatRadioText(m);
                     return `<div class="dd-radio-msg">
                         <span style="color:var(--text-muted);font-size:0.75rem;">${time}</span>
-                        ${m.audio_url ? ` <button onclick="playRadio(this,'${m.audio_url}')" style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;vertical-align:middle;margin-left:4px;">&#9654;</button>` : ''}
+                        ${m.audio_url ? ` <button onclick='playRadio(this, ${jsArg(m.audio_url)})' style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;vertical-align:middle;margin-left:4px;">&#9654;</button>` : ''}
                         <div style="color:var(--text-main);font-size:0.82rem;line-height:1.4;margin-top:4px;">${detail}</div>
                     </div>`;
                 }).join('');
@@ -1709,7 +1696,7 @@
             const sorted = [...results].reverse();
             el.innerHTML = sorted.map(r => {
                 const typeLabel = (r.session_type || r.session_name || '').replace(/_/g, ' ');
-                return `<div class="result-card" onclick="openResultDetail('${r.filename}')">
+                return `<div class="result-card" onclick='openResultDetail(${jsArg(r.filename)})'>
                     <div class="result-card-info">
                         <span class="result-card-round">R${r.round} &middot; ${typeLabel}</span>
                         <span class="result-card-name">${r.meeting || r.filename}</span>
@@ -1782,7 +1769,7 @@
                     </div>
                     <div class="result-session-grid">
                         ${weekend.sessions.map(session => `
-                            <button class="result-session-btn" onclick="openResultDetail('${session.filename}')">
+                            <button class="result-session-btn" onclick='openResultDetail(${jsArg(session.filename)})'>
                                 <span class="result-session-kicker">R${session.round || '-'} · ${formatSessionTypeLabel(session.session_type || session.session_name)}</span>
                                 <span class="result-session-name">${formatSessionTypeLabel(session.session_type || session.session_name)}</span>
                                 <span class="result-session-meta">${session.circuit || weekend.circuit || 'Classification available'}</span>
