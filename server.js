@@ -260,6 +260,55 @@ function normalizeWeatherPayload(raw) {
     };
 }
 
+function toAbsoluteApiUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    if (/^https?:\/\//i.test(url)) return url;
+    return `${F1_TIMING_API}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+function normalizeRadioMessage(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const text = raw.message || raw.Message || raw.transcript || raw.Transcript || raw.caption || raw.Caption || raw.title || raw.Title || '';
+    const audioUrl = toAbsoluteApiUrl(raw.audio_url || raw.audioUrl || raw.url || raw.Url || raw.path || raw.Path || raw.recording_url || raw.recordingUrl);
+    const timestamp = raw.timestamp || raw.Timestamp || raw.utc || raw.Utc || raw.time || raw.Time || null;
+    const driverNumber = raw.driver_number || raw.driverNumber || raw.racing_number || raw.RacingNumber || raw.number || raw.Number || null;
+    const name = raw.name || raw.driver_name || raw.driverName || raw.full_name || raw.FullName || raw.fullName || null;
+    const acronym = raw.acronym || raw.tla || raw.Tla || raw.short_name || raw.ShortName || raw.broadcast_name || raw.BroadcastName || null;
+    const team = raw.team || raw.Team || raw.team_name || raw.teamName || null;
+
+    if (!text && !audioUrl && !timestamp && !driverNumber && !name && !acronym && !team) return null;
+
+    return {
+        text,
+        audio_url: audioUrl,
+        timestamp,
+        driver_number: driverNumber,
+        name,
+        acronym,
+        team
+    };
+}
+
+function normalizeTeamRadioPayload(payload) {
+    const rawMessages = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.messages)
+            ? payload.messages
+            : Array.isArray(payload?.Messages)
+                ? payload.Messages
+                : [];
+
+    const messages = rawMessages.map(normalizeRadioMessage).filter(Boolean);
+
+    return {
+        timestamp: payload?.timestamp || payload?.Timestamp || null,
+        session: payload?.session || payload?.Session || null,
+        total: payload?.total ?? payload?.Total ?? messages.length,
+        messages
+    };
+}
+
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
@@ -844,14 +893,11 @@ const liveProxy = async (apiPath, res) => {
 
 app.get('/api/live/timing', (_, res) => liveProxy('/timing', res));
 app.get('/api/live/weather', async (_, res) => {
-    // Try F1 live timing weather first
+    // Prefer live timing weather whenever the upstream has a valid payload.
     try {
-        const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 5000 }).then(r => r.data);
-        if (status && status.session && status.session.SessionStatus !== 'Finalised') {
-            const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
-            const normalizedLive = normalizeWeatherPayload({ ...live, source: 'live' });
-            if (normalizedLive) return res.json(normalizedLive);
-        }
+        const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
+        const normalizedLive = normalizeWeatherPayload({ ...live, source: 'live' });
+        if (normalizedLive) return res.json(normalizedLive);
     } catch (e) { }
     // Fallback: Open-Meteo for the next race's circuit location (free, no API key)
     try {
@@ -880,7 +926,14 @@ app.get('/api/live/weather', async (_, res) => {
 app.get('/api/live/track', (_, res) => liveProxy('/track', res));
 app.get('/api/live/race-control', (_, res) => liveProxy('/race-control', res));
 app.get('/api/live/pits', (_, res) => liveProxy('/pits', res));
-app.get('/api/live/team-radio', (_, res) => liveProxy('/team-radio', res));
+app.get('/api/live/team-radio', async (_, res) => {
+    try {
+        const payload = await axios.get(`${F1_TIMING_API}/team-radio`, { timeout: 10000 }).then(r => r.data);
+        res.json(normalizeTeamRadioPayload(payload));
+    } catch (e) {
+        res.status(502).json({ timestamp: null, session: null, total: 0, messages: [], error: 'API unavailable', detail: e.message });
+    }
+});
 app.get('/api/live/telemetry', (_, res) => liveProxy('/telemetry', res));
 app.get('/api/live/telemetry/:number', (req, res) => liveProxy(`/telemetry/${req.params.number}`, res));
 app.get('/api/standings/drivers', (_, res) => liveProxy('/standings/drivers', res));
@@ -890,7 +943,19 @@ app.get('/api/live/calendar-current', (_, res) => liveProxy('/calendar/current',
 app.get('/api/live/results', (_, res) => liveProxy('/results', res));
 app.get('/api/live/results/:filename', (req, res) => liveProxy(`/results/${req.params.filename}`, res));
 app.get('/api/live/pits/:number', (req, res) => liveProxy(`/pits/${req.params.number}`, res));
-app.get('/api/live/team-radio/:number', (req, res) => liveProxy(`/team-radio/${req.params.number}`, res));
+app.get('/api/live/team-radio/:number', async (req, res) => {
+    try {
+        const payload = await axios.get(`${F1_TIMING_API}/team-radio/${encodeURIComponent(req.params.number)}`, { timeout: 10000 }).then(r => r.data);
+        res.json(normalizeTeamRadioPayload(payload));
+    } catch (e) {
+        const upstreamStatus = e.response?.status;
+        const upstreamError = e.response?.data?.error;
+        if (upstreamStatus === 404 && typeof upstreamError === 'string' && upstreamError.toLowerCase().includes('no team radio')) {
+            return res.json({ timestamp: null, session: null, total: 0, messages: [] });
+        }
+        res.status(502).json({ timestamp: null, session: null, total: 0, messages: [], error: 'API unavailable', detail: e.message });
+    }
+});
 app.get('/api/live/timing/:number', (req, res) => liveProxy(`/timing/${req.params.number}`, res));
 
 // SSE proxy: pipes live timing stream from own API to client

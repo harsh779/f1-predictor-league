@@ -1159,6 +1159,10 @@
         }
     }
 
+    function formatRadioText(message) {
+        return message.text || message.message || message.transcript || 'Radio clip available';
+    }
+
     // --- TIMING TAB ---
     let timingInterval = null;
     let liveSSE = null;
@@ -1442,11 +1446,12 @@
             feed.innerHTML = msgs.slice(0, 20).map(m => {
                 const tc = teamColorMap[(m.team || '').toLowerCase()] || 'var(--border)';
                 const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+                const detail = formatRadioText(m);
                 return `<div style="padding:6px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;display:flex;align-items:center;gap:8px;">
                     <span style="width:4px;height:28px;background:${tc};border-radius:2px;flex-shrink:0;"></span>
                     <div style="flex:1;min-width:0;">
-                        <b>${m.acronym || m.name?.split(' ').pop() || ''}</b>
-                        <span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px;">${time}</span>
+                        <div><b>${m.acronym || m.name?.split(' ').pop() || ''}</b><span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px;">${time}</span></div>
+                        <div style="color:var(--text-muted);font-size:0.78rem;line-height:1.35;margin-top:2px;">${detail}</div>
                     </div>
                     ${m.audio_url ? `<button onclick="playRadio(this,'${m.audio_url}')" style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.7rem;">&#9654;</button>` : ''}
                 </div>`;
@@ -1624,9 +1629,11 @@
             el.innerHTML = `<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px;">${msgs.length} message${msgs.length !== 1 ? 's' : ''}</div>` +
                 msgs.slice(0, 20).map(m => {
                     const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+                    const detail = formatRadioText(m);
                     return `<div class="dd-radio-msg">
                         <span style="color:var(--text-muted);font-size:0.75rem;">${time}</span>
                         ${m.audio_url ? ` <button onclick="playRadio(this,'${m.audio_url}')" style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;vertical-align:middle;margin-left:4px;">&#9654;</button>` : ''}
+                        <div style="color:var(--text-main);font-size:0.82rem;line-height:1.4;margin-top:4px;">${detail}</div>
                     </div>`;
                 }).join('');
         } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Team radio unavailable</div>'; }
