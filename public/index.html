@@ -18,9 +18,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
-        // Version 6.6 - Remove dead session card, cleanup
+        const currentVersion = "8.0";
         (function() {
-            const currentVersion = "7.7";
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -32,6 +31,11 @@
                 window.location.href = window.location.pathname + "?v=" + new Date().getTime();
             }
         })();
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(currentVersion)}`).catch(function() {});
+            });
+        }
     </script>
 
     <style>
@@ -1211,6 +1215,10 @@
             .replace(/'/g, '&#39;');
     }
 
+    function jsArg(value) {
+        return JSON.stringify(String(value ?? ''));
+    }
+
     // --- TIMING TAB ---
     let timingInterval = null;
     let liveSSE = null;
@@ -1286,7 +1294,7 @@
 
             const dotColor = sseConnected ? '#00cc44' : connected ? '#eebb00' : '#e10600';
             const dotLabel = sseConnected ? 'SSE' : connected ? 'Polling' : 'Offline';
-            status.innerHTML = `<span title="${dotLabel}" style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;box-shadow:0 0 6px ${dotColor};"></span> <b style="color:var(--text-main);">${sesName}</b> <span style="color:var(--text-muted);">${sesType}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${trackMsg}</b>` : ''}`;
+            status.innerHTML = `<span title="${escapeHtml(dotLabel)}" style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;box-shadow:0 0 6px ${dotColor};"></span> <b style="color:var(--text-main);">${escapeHtml(sesName)}</b> <span style="color:var(--text-muted);">${escapeHtml(sesType)}</span>${trackMsg ? ` &nbsp;·&nbsp; <b style="color:var(--red);">${escapeHtml(trackMsg)}</b>` : ''}`;
             refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             // ── shared per-driver data ─────────────────────────────────────────
@@ -1340,10 +1348,12 @@
                     : badge === 'pit'
                     ? ' <span style="background:rgba(238,187,0,0.15);color:#eebb00;border:1px solid rgba(238,187,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">PIT</span>'
                     : '';
+                const safeName = escapeHtml(name);
+                const safeTeam = escapeHtml(team);
                 return `<tr>
                     <td style="text-align:center;font-weight:900;color:var(--text-main);">${pos === 99 ? '-' : pos}</td>
-                    <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);cursor:pointer;" onclick="openTelemModal('${driverNum}','${name}','${teamCol}')">${name}</b>${badgeHtml}</td>
-                    <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
+                    <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);cursor:pointer;" onclick='openTelemModal(${jsArg(driverNum)}, ${jsArg(name)}, ${jsArg(teamCol)})'>${safeName}</b>${badgeHtml}</td>
+                    <td style="color:var(--text-muted);font-size:0.78rem;">${safeTeam}</td>
                     <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
                     <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
                     <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
@@ -1358,6 +1368,8 @@
             cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
                 const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
                 const isLeader  = pos === 1;
+                const safeName = escapeHtml(name);
+                const safeTeam = escapeHtml(team);
 
                 const s = (i) => {
                     const sec = sectors[i];
@@ -1370,7 +1382,7 @@
                     <div class="tr-bar" style="background:${teamCol};"></div>
                     <div class="tr-content">
                         <div class="tr-line1">
-                            <span class="tr-name" style="cursor:pointer;" onclick="openTelemModal('${driverNum}','${name}','${teamCol}')">${name}</span>
+                            <span class="tr-name" style="cursor:pointer;" onclick='openTelemModal(${jsArg(driverNum)}, ${jsArg(name)}, ${jsArg(teamCol)})'>${safeName}</span>
                             ${badgeHtml}${telem.drs===10||telem.drs===12?'<span class="telem-drs telem-drs-on">DRS</span>':telem.drs===8?'<span class="telem-drs telem-drs-elig">DRS</span>':''}
                             <div class="tr-line1-right">
                                 <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
@@ -1380,7 +1392,7 @@
                             </div>
                         </div>
                         <div class="tr-line2">
-                            <span class="tr-muted">${team}</span>
+                            <span class="tr-muted">${safeTeam}</span>
                             <span class="tr-sep">·</span>
                             <span class="tr-val">${r.best_lap_time || '-'}</span>
                             <span class="tr-sep">·</span>
@@ -1846,6 +1858,248 @@
         document.getElementById('result-detail-modal').classList.add('hidden');
     }
 
+    // Safer overrides for dynamic API-driven views.
+    async function updateLiveWeatherStrip() {
+        const strip = document.getElementById('live-weather-strip');
+        try {
+            const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
+            if (!w || (w.AirTemp == null && w.TrackTemp == null)) { strip.style.display = 'none'; return; }
+            const airTemp = Math.round(Number(w.AirTemp ?? w.TrackTemp));
+            const trackTemp = Math.round(Number(w.TrackTemp ?? w.AirTemp));
+            const humidity = Math.round(Number(w.Humidity ?? 0));
+            const wind = Math.round(Number(w.WindSpeed ?? 0));
+            const rain = Number(w.Rainfall ?? 0) > 0;
+            strip.style.display = 'flex';
+            strip.innerHTML = `
+                <div class="ws-item"><span class="ws-label">Air</span><span class="ws-val">${airTemp}Â°C</span></div>
+                <div class="ws-item"><span class="ws-label">Track</span><span class="ws-val">${trackTemp}Â°C</span></div>
+                <div class="ws-item"><span class="ws-label">Humidity</span><span class="ws-val">${humidity}%</span></div>
+                <div class="ws-item"><span class="ws-label">Wind</span><span class="ws-val">${wind} km/h</span></div>
+                ${rain ? '<div class="ws-item"><span class="ws-val ws-rain">RAIN</span></div>' : ''}
+            `;
+        } catch (e) { strip.style.display = 'none'; }
+    }
+
+    async function loadRaceControl() {
+        const feed = document.getElementById('rc-feed');
+        try {
+            const msgs = await fetch('/api/live/race-control?t=' + Date.now()).then(r => r.json());
+            if (!Array.isArray(msgs) || !msgs.length) return;
+            feed.innerHTML = msgs.slice(0, 30).map(m => {
+                let color = 'var(--text-muted)';
+                if (m.Category === 'Flag') {
+                    if (m.Message?.includes('RED')) color = '#e10600';
+                    else if (m.Message?.includes('YELLOW') || m.Message?.includes('Yellow')) color = '#b89900';
+                    else if (m.Message?.includes('GREEN') || m.Message?.includes('CLEAR')) color = '#00cc44';
+                    else if (m.Message?.includes('BLUE')) color = '#0066ff';
+                } else if (m.Category === 'SafetyCar') color = '#cc8400';
+                const lap = m.Lap ? `L${m.Lap}` : '';
+                return `<div style="padding:5px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;line-height:1.4;">
+                    <span style="color:${color};font-weight:900;">${escapeHtml(lap)}</span> <span style="color:var(--text-main);">${escapeHtml(m.Message || '')}</span>
+                </div>`;
+            }).join('');
+        } catch (e) {}
+    }
+
+    async function loadPitData() {
+        const feed = document.getElementById('pit-feed');
+        try {
+            const d = await fetch('/api/live/pits?t=' + Date.now()).then(r => r.json());
+            const drivers = d.drivers || [];
+            if (!drivers.length) return;
+            const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+            feed.innerHTML = drivers.filter(dr => dr.total_stops > 0 || dr.current_stint).sort((a,b) => (b.total_stops||0) - (a.total_stops||0)).slice(0, 22).map(dr => {
+                const tc = tyreColors[(dr.current_stint?.compound || '').toUpperCase()] || '#888';
+                const safeLabel = escapeHtml(dr.acronym || dr.name?.split(' ').pop() || '');
+                return `<div style="padding:4px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;display:flex;align-items:center;gap:6px;">
+                    <b style="width:40px;flex-shrink:0;">${safeLabel}</b>
+                    <span style="width:14px;height:14px;border-radius:50%;background:${tc};flex-shrink:0;display:inline-block;"></span>
+                    <span style="color:var(--text-muted);">${dr.current_stint?.laps || 0}L</span>
+                    <span style="margin-left:auto;font-weight:700;">${dr.total_stops || 0} stop${(dr.total_stops||0) !== 1 ? 's' : ''}</span>
+                </div>`;
+            }).join('');
+        } catch (e) {}
+    }
+
+    async function loadTeamRadio() {
+        const feed = document.getElementById('radio-feed');
+        try {
+            const d = await fetch('/api/live/team-radio?t=' + Date.now()).then(r => r.json());
+            const msgs = d.messages || [];
+            if (!msgs.length) { feed.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No radio messages yet</div>'; return; }
+            feed.innerHTML = msgs.slice(0, 20).map(m => {
+                const tc = teamColorMap[(m.team || '').toLowerCase()] || 'var(--border)';
+                const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+                const detail = escapeHtml(formatRadioText(m));
+                const label = escapeHtml(m.acronym || m.name?.split(' ').pop() || '');
+                return `<div style="padding:6px 0;border-bottom:1px solid var(--surface-inner);font-size:0.82rem;display:flex;align-items:center;gap:8px;">
+                    <span style="width:4px;height:28px;background:${tc};border-radius:2px;flex-shrink:0;"></span>
+                    <div style="flex:1;min-width:0;">
+                        <div><b>${label}</b><span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px;">${escapeHtml(time)}</span></div>
+                        <div style="color:var(--text-muted);font-size:0.78rem;line-height:1.35;margin-top:2px;">${detail}</div>
+                    </div>
+                    ${m.audio_url ? `<button onclick='playRadio(this, ${jsArg(m.audio_url)})' style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.7rem;">&#9654;</button>` : ''}
+                </div>`;
+            }).join('');
+        } catch (e) {}
+    }
+
+    function openTelemModal(num, name, color) {
+        ddDriverNum = num;
+        document.getElementById('telem-driver-name').innerHTML = `<span style="display:inline-block;width:4px;height:20px;background:${color};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${escapeHtml(name)}`;
+        document.getElementById('telem-modal').classList.remove('hidden');
+        switchDD('telem');
+        if (telemSSE) { telemSSE.close(); telemSSE = null; }
+        telemSSE = new EventSource(`/api/live/telemetry/stream/${encodeURIComponent(num)}`);
+        telemSSE.onmessage = (ev) => {
+            try { const d = JSON.parse(ev.data); updateTelemUI(d.telemetry || d); } catch(e) {}
+        };
+        telemSSE.onerror = () => {
+            if (telemSSE) { telemSSE.close(); telemSSE = null; }
+            fetch(`/api/live/telemetry/${encodeURIComponent(num)}?t=${Date.now()}`).then(r => r.json()).then(d => {
+                const drivers = d.drivers || [];
+                const dr = drivers.find(x => String(x.driver_number) === String(num));
+                if (dr?.telemetry) updateTelemUI(dr.telemetry);
+            }).catch(() => {});
+        };
+        loadDDTiming(num);
+        loadDDStrategy(num);
+        loadDDRadio(num);
+    }
+
+    async function loadDDRadio(num) {
+        const el = document.getElementById('dd-radio-content');
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/team-radio/${encodeURIComponent(num)}?t=${Date.now()}`).then(r => r.json());
+            const msgs = d.messages || [];
+            if (!msgs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No radio messages yet</div>'; return; }
+            el.innerHTML = `<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px;">${msgs.length} message${msgs.length !== 1 ? 's' : ''}</div>` +
+                msgs.slice(0, 20).map(m => {
+                    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '';
+                    const detail = escapeHtml(formatRadioText(m));
+                    return `<div class="dd-radio-msg">
+                        <span style="color:var(--text-muted);font-size:0.75rem;">${escapeHtml(time)}</span>
+                        ${m.audio_url ? ` <button onclick='playRadio(this, ${jsArg(m.audio_url)})' style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;vertical-align:middle;margin-left:4px;">&#9654;</button>` : ''}
+                        <div style="color:var(--text-main);font-size:0.82rem;line-height:1.4;margin-top:4px;">${detail}</div>
+                    </div>`;
+                }).join('');
+        } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Team radio unavailable</div>'; }
+    }
+
+    async function loadPastResults() {
+        const el = document.getElementById('past-results-list');
+        try {
+            const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
+            if (!Array.isArray(results) || !results.length) {
+                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No past session results available yet.</div>';
+                return;
+            }
+
+            const grouped = new Map();
+            [...results].reverse().forEach(r => {
+                const groupKey = `${r.round || 'NA'}::${r.meeting || r.filename}`;
+                if (!grouped.has(groupKey)) {
+                    grouped.set(groupKey, {
+                        round: r.round,
+                        meeting: r.meeting || r.filename,
+                        circuit: r.circuit || '',
+                        sessions: []
+                    });
+                }
+                grouped.get(groupKey).sessions.push(r);
+            });
+
+            const weekends = [...grouped.values()].map(weekend => ({
+                ...weekend,
+                sessions: weekend.sessions.sort((a, b) => getSessionSortOrder(a.session_type || a.session_name) - getSessionSortOrder(b.session_type || b.session_name))
+            }));
+
+            el.innerHTML = weekends.map(weekend => `
+                <div class="result-weekend-card">
+                    <div class="result-weekend-header">
+                        <div class="result-card-info">
+                            <span class="result-card-round">R${escapeHtml(weekend.round || '-')} Â· Weekend Results</span>
+                            <span class="result-card-name">${escapeHtml(weekend.meeting)}</span>
+                            <span class="result-card-type">${escapeHtml(weekend.circuit)}</span>
+                        </div>
+                        <span class="result-weekend-count numeric-ui">${weekend.sessions.length} session${weekend.sessions.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="result-session-grid">
+                        ${weekend.sessions.map(session => `
+                            <button class="result-session-btn" onclick='openResultDetail(${jsArg(session.filename)})'>
+                                <span class="result-session-kicker">R${escapeHtml(session.round || '-')} Â· ${escapeHtml(formatSessionTypeLabel(session.session_type || session.session_name))}</span>
+                                <span class="result-session-name">${escapeHtml(formatSessionTypeLabel(session.session_type || session.session_name))}</span>
+                                <span class="result-session-meta">${escapeHtml(session.circuit || weekend.circuit || 'Classification available')}</span>
+                                <span class="result-session-action">Open Results &#9654;</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        } catch(e) {
+            el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Could not load past results.</div>';
+        }
+    }
+
+    async function openResultDetail(filename) {
+        document.getElementById('result-detail-modal').classList.remove('hidden');
+        const body = document.getElementById('result-detail-body');
+        body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/results/${encodeURIComponent(filename)}?t=${Date.now()}`).then(r => r.json());
+            const meta = d.meta || {};
+            document.getElementById('result-detail-title').textContent = `${meta.meeting || filename} â€” ${(meta.session_type || '').replace(/_/g,' ')}`;
+            const results = d.results || [];
+            if (!results.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">No classification data.</div>'; return; }
+            const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+            const tyreTextColors = { MEDIUM:'#111', HARD:'#111' };
+            const numMap = {};
+            teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
+            if (d.drivers) {
+                Object.entries(d.drivers).forEach(([num, info]) => {
+                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || numMap[num]?.color || 'var(--border)' };
+                });
+            }
+
+            const fl = d.fastest_lap;
+            const flName = fl ? escapeHtml(numMap[String(fl.driver_number)]?.name || '#' + fl.driver_number) : '';
+            const flHtml = fl ? `<div style="padding:10px 14px;background:rgba(155,89,182,0.08);border-bottom:2px solid var(--border);font-size:0.85rem;font-weight:700;color:#9b59b6;">Fastest Lap: ${flName} â€” ${escapeHtml(fl.time)} (Lap ${escapeHtml(fl.lap)})</div>` : '';
+
+            body.innerHTML = flHtml + `<table>
+                <thead><tr>
+                    <th style="text-align:center;width:40px;">P</th>
+                    <th style="text-align:left;">Driver</th>
+                    <th style="text-align:right;">Best Lap</th>
+                    <th style="text-align:right;">Gap</th>
+                    <th style="text-align:center;">Laps</th>
+                    <th style="text-align:center;">Tyres</th>
+                </tr></thead>
+                <tbody>${results.map(r => {
+                    const info = numMap[String(r.driver_number)] || {};
+                    const dName = escapeHtml(info.name || '#' + r.driver_number);
+                    const tc = info.color || 'var(--border)';
+                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DSQ</span>' : '';
+                    const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
+                    const stints = (r.stints || []).map(s => {
+                        const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
+                        const txt = tyreTextColors[(s.compound || '').toUpperCase()] || '#fff';
+                        const title = escapeHtml(`${s.compound} (${s.laps}L${s.new ? '' : ', used'})`);
+                        return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${bg};color:${txt};font-size:0.6rem;font-weight:900;" title="${title}">${escapeHtml((s.compound||'?')[0])}</span>`;
+                    }).join('');
+                    return `<tr>
+                        <td style="text-align:center;font-weight:900;color:${posCol};">${escapeHtml(r.position)}</td>
+                        <td><span style="display:inline-block;width:3px;height:14px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${dName}</b>${status}</td>
+                        <td style="text-align:right;font-weight:700;">${escapeHtml(r.best_lap_time || '-')}</td>
+                        <td style="text-align:right;font-weight:700;color:var(--red);">${escapeHtml(r.gap_to_leader || '-')}</td>
+                        <td style="text-align:center;color:var(--text-muted);">${escapeHtml(r.laps_completed || '-')}</td>
+                        <td style="text-align:center;"><div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${stints || '-'}</div></td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        } catch(e) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Failed to load session data.</div>'; }
+    }
+
     async function loadHomeData() {
         try {
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
@@ -2012,7 +2266,7 @@
         const resp = await authFetch('/api/predictions?t=' + new Date().getTime());
         const d = await resp.json();
         if (!resp.ok) {
-            list.innerHTML = `<div class='predict-group' style='text-align: center; color: var(--text-muted);'>${d.error || 'Predictions are unavailable right now.'}</div>`;
+            list.innerHTML = `<div class='predict-group' style='text-align: center; color: var(--text-muted);'>${escapeHtml(d.error || 'Predictions are unavailable right now.')}</div>`;
             return;
         }
         
