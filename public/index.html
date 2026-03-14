@@ -15,12 +15,12 @@
     <meta name="apple-mobile-web-app-title" content="F1 Strategy">
     <link rel="apple-touch-icon" href="/icon.svg">
 
-    <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Titillium+Web:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     
     <script>
         // Version 6.6 - Remove dead session card, cleanup
         (function() {
-            const currentVersion = "7.6";
+            const currentVersion = "7.7";
             const storedVersion = localStorage.getItem('app_version');
             if (storedVersion !== currentVersion) {
                 localStorage.setItem('app_version', currentVersion);
@@ -48,9 +48,11 @@
             --border: #d1d1d6; 
             --gold: #c59b27;
             --nav-bg: #eef0f2;
+            --font-base: 'Titillium Web', sans-serif;
+            --font-numeric: 'Barlow Condensed', 'Titillium Web', sans-serif;
         }
 
-        body { margin: 0; font-family: 'Titillium Web', sans-serif; background: var(--bg-light); color: var(--text-main); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        body { margin: 0; font-family: var(--font-base); background: var(--bg-light); color: var(--text-main); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-light); }
         ::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 4px; }
@@ -130,6 +132,26 @@
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(225, 6, 0, 0.4); }
         
         .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
+        .numeric-ui, .numeric-ui * { font-family: var(--font-numeric); font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em; }
+        #h-round, #h-deadline, #h-track-intel b, .podium-item .pos, .podium-item .ppts, .race-chip, .chip-round,
+        #timing-table th, #timing-table td, .tr-pos, .tr-gap, .tr-val, .tr-sec, .result-detail-body th, .result-detail-body td,
+        .dd-stat-val, #timing-refresh-label, .result-weekend-count, .result-session-kicker, .result-session-action {
+            font-family: var(--font-numeric);
+            font-variant-numeric: tabular-nums lining-nums;
+            letter-spacing: 0.02em;
+        }
+        .lock-state { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+        .lock-label { color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+        .lock-pill { display:inline-flex; align-items:center; gap:8px; border-radius:999px; padding:8px 14px; font-weight:800; }
+        .lock-pill.open { background: rgba(0, 153, 64, 0.08); border: 1px solid rgba(0, 153, 64, 0.22); color: #007a34; }
+        .lock-pill.locked { background: rgba(225, 6, 0, 0.08); border: 1px solid rgba(225, 6, 0, 0.22); color: var(--red); }
+        .lock-note { color: var(--text-muted); font-size: 0.9rem; }
+        .weather-status { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap: wrap; }
+        .weather-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background: var(--surface-inner); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+        .weather-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; }
+        .weather-stat { background: var(--surface-inner); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+        .weather-stat-label { color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+        .weather-stat-value { color: var(--text-main); font-size: 1.3rem; font-weight: 800; line-height: 1; }
         
         /* --- 4. DASHBOARD GRID SYSTEM --- */
         .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 30px; }
@@ -428,6 +450,16 @@
         .result-card-name { font-weight:900; font-size:1rem; color:var(--text-main); }
         .result-card-type { font-size:0.75rem; color:var(--text-muted); }
         .result-card-arrow { color:var(--text-muted); font-size:0.8rem; }
+        .result-weekend-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
+        .result-weekend-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+        .result-weekend-count { color: var(--text-muted); font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
+        .result-session-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
+        .result-session-btn { background: linear-gradient(180deg, var(--surface-inner), #fff); border:1px solid var(--border); border-radius:12px; padding:12px 14px; cursor:pointer; transition:all 0.2s ease; text-align:left; }
+        .result-session-btn:hover { border-color: var(--red); box-shadow: 0 6px 16px rgba(225,6,0,0.08); transform: translateY(-1px); }
+        .result-session-kicker { color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em; display:block; margin-bottom:6px; }
+        .result-session-name { color: var(--text-main); font-size: 1rem; font-weight: 900; display:block; margin-bottom:4px; }
+        .result-session-meta { color: var(--text-muted); font-size: 0.8rem; display:block; }
+        .result-session-action { color: var(--red); font-size: 0.8rem; font-weight: 700; margin-top: 10px; display:inline-flex; align-items:center; gap:6px; }
 
         .result-detail-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(5px); display:flex; justify-content:center; align-items:center; z-index:9999; }
         .result-detail-card { background:var(--bg-light); border-radius:16px; padding:0; max-width:700px; width:95%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.4); animation:slideUp 0.3s ease; overflow:hidden; }
@@ -441,6 +473,7 @@
             .result-detail-card { border-radius:16px 16px 0 0; max-height:90vh; width:100%; max-width:100%; }
             .result-detail-body th, .result-detail-body td { padding:8px 5px; font-size:0.78rem; }
             .dd-timing-grid { grid-template-columns:1fr 1fr; }
+            .result-weekend-header { flex-direction: column; }
         }
     </style>
 </head>
@@ -1073,7 +1106,7 @@
             const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
             if (!w || !w.AirTemp) throw new Error('No weather data');
             const rain = parseFloat(w.Rainfall) > 0;
-            const isForecast = w._source === 'open-meteo';
+            const isForecast = w.source === 'open-meteo';
             const label = isForecast ? 'Forecast' : 'Live';
             document.getElementById('weather-widget').innerHTML = `
                 <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${w.AirTemp}°C <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">${rain ? 'Rain' : 'Dry'}</span></div>
@@ -1081,7 +1114,48 @@
                 <div style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; opacity:0.7;">${label}</div>
             `;
         } catch(e) {
-            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Radar offline.</span>";
+            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Track conditions temporarily unavailable.</span>";
+        }
+    }
+
+    // Override the original weather widget renderer with a source-agnostic version.
+    async function fetchWeather() {
+        try {
+            const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
+            if (!w || (w.AirTemp == null && w.TrackTemp == null)) throw new Error('No weather data');
+            const airTemp = Number(w.AirTemp ?? w.TrackTemp);
+            const trackTemp = Number(w.TrackTemp ?? w.AirTemp);
+            const humidity = Number(w.Humidity ?? 0);
+            const wind = Number(w.WindSpeed ?? 0);
+            const rain = Number(w.Rainfall ?? 0) > 0;
+            const label = w.source === 'open-meteo' ? 'Forecast fallback' : 'Live timing';
+            document.getElementById('weather-widget').innerHTML = `
+                <div class="weather-status">
+                    <div class="weather-stat-value numeric-ui">${Math.round(airTemp)}°C</div>
+                    <span class="weather-badge">${rain ? 'Rain threat' : 'Dry running'}</span>
+                    <span class="weather-badge">${label}</span>
+                </div>
+                <div class="weather-grid">
+                    <div class="weather-stat">
+                        <div class="weather-stat-label">Track</div>
+                        <div class="weather-stat-value numeric-ui">${Math.round(trackTemp)}°C</div>
+                    </div>
+                    <div class="weather-stat">
+                        <div class="weather-stat-label">Wind</div>
+                        <div class="weather-stat-value numeric-ui">${Math.round(wind)} km/h</div>
+                    </div>
+                    <div class="weather-stat">
+                        <div class="weather-stat-label">Humidity</div>
+                        <div class="weather-stat-value numeric-ui">${Math.round(humidity)}%</div>
+                    </div>
+                    <div class="weather-stat">
+                        <div class="weather-stat-label">Condition</div>
+                        <div class="weather-stat-value" style="font-size:1.05rem;">${w.condition || (rain ? 'Showers nearby' : 'Stable')}</div>
+                    </div>
+                </div>
+            `;
+        } catch(e) {
+            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Track conditions temporarily unavailable.</span>";
         }
     }
 
@@ -1580,6 +1654,82 @@
         } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Could not load past results.</div>'; }
     }
 
+    function formatSessionTypeLabel(sessionType) {
+        const label = String(sessionType || '').replace(/_/g, ' ').trim();
+        if (!label) return 'Session';
+        return label.replace(/\b\w/g, m => m.toUpperCase());
+    }
+
+    function getSessionSortOrder(sessionType) {
+        const key = String(sessionType || '').toLowerCase().replace(/\s+/g, '_');
+        const order = {
+            fp1: 1, first_practice: 1,
+            fp2: 2, second_practice: 2,
+            fp3: 3, third_practice: 3,
+            sprint_qualifying: 4, sprint_shootout: 4,
+            sprint: 5,
+            qualifying: 6, quali: 6,
+            race: 7
+        };
+        return order[key] || 99;
+    }
+
+    // Override the flat list with grouped race-weekend cards while keeping the detail modal.
+    async function loadPastResults() {
+        const el = document.getElementById('past-results-list');
+        try {
+            const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
+            if (!Array.isArray(results) || !results.length) {
+                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No past session results available yet.</div>';
+                return;
+            }
+
+            const grouped = new Map();
+            [...results].reverse().forEach(r => {
+                const groupKey = `${r.round || 'NA'}::${r.meeting || r.filename}`;
+                if (!grouped.has(groupKey)) {
+                    grouped.set(groupKey, {
+                        round: r.round,
+                        meeting: r.meeting || r.filename,
+                        circuit: r.circuit || '',
+                        sessions: []
+                    });
+                }
+                grouped.get(groupKey).sessions.push(r);
+            });
+
+            const weekends = [...grouped.values()].map(weekend => ({
+                ...weekend,
+                sessions: weekend.sessions.sort((a, b) => getSessionSortOrder(a.session_type || a.session_name) - getSessionSortOrder(b.session_type || b.session_name))
+            }));
+
+            el.innerHTML = weekends.map(weekend => `
+                <div class="result-weekend-card">
+                    <div class="result-weekend-header">
+                        <div class="result-card-info">
+                            <span class="result-card-round">R${weekend.round || '-'} · Weekend Results</span>
+                            <span class="result-card-name">${weekend.meeting}</span>
+                            <span class="result-card-type">${weekend.circuit}</span>
+                        </div>
+                        <span class="result-weekend-count numeric-ui">${weekend.sessions.length} session${weekend.sessions.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="result-session-grid">
+                        ${weekend.sessions.map(session => `
+                            <button class="result-session-btn" onclick="openResultDetail('${session.filename}')">
+                                <span class="result-session-kicker">R${session.round || '-'} · ${formatSessionTypeLabel(session.session_type || session.session_name)}</span>
+                                <span class="result-session-name">${formatSessionTypeLabel(session.session_type || session.session_name)}</span>
+                                <span class="result-session-meta">${session.circuit || weekend.circuit || 'Classification available'}</span>
+                                <span class="result-session-action">Open Results &#9654;</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        } catch(e) {
+            el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Could not load past results.</div>';
+        }
+    }
+
     async function openResultDetail(filename) {
         document.getElementById('result-detail-modal').classList.remove('hidden');
         const body = document.getElementById('result-detail-body');
@@ -1644,7 +1794,7 @@
     async function loadHomeData() {
         try {
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
-            document.getElementById('h-round').innerText = `Round ${r.round} of 24`;
+            document.getElementById('h-round').innerText = `Round ${r.round} of ${r.totalRounds || 24}`;
             document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
             
             if(r.trackDetails) {
@@ -1659,10 +1809,24 @@
 
             if (r.lockTime) {
                 raceLock = new Date(r.lockTime);
-                const dlFormat = raceLock.toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                document.getElementById('h-deadline').innerHTML = `<b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">${dlFormat}</span>`;
+                const dlFormat = raceLock.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                if (r.isLocked) {
+                    document.getElementById('h-deadline').innerHTML = `
+                        <div class="lock-state">
+                            <span class="lock-pill locked numeric-ui">Locked For ${r.name}</span>
+                            <span class="lock-note">Predictions stay closed for this race weekend.</span>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('h-deadline').innerHTML = `
+                        <div class="lock-state">
+                            <span class="lock-label">Strategy Lockout</span>
+                            <span class="lock-pill open numeric-ui">${dlFormat}</span>
+                        </div>
+                    `;
+                }
             } else {
-                document.getElementById('h-deadline').innerHTML = `<b style="color: var(--text-main);">Strategy Lockout:</b> <span style="color: var(--red); font-weight: 900;">TBC</span>`;
+                document.getElementById('h-deadline').innerHTML = `<div class="lock-state"><span class="lock-label">Strategy Lockout</span><span class="lock-pill locked numeric-ui">TBC</span></div>`;
             }
             
             checkPredictionLock();

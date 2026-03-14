@@ -207,6 +207,59 @@ function findLatestCompletedRace(calendar, now = new Date()) {
     return [...calendar].reverse().find(r => new Date(r.sessions.race) < now) || null;
 }
 
+async function hasActivePredictions() {
+    try {
+        const count = await db.execute("SELECT COUNT(*) AS count FROM f1_predictions_v4").then(r => Number(r.rows[0]?.count || 0));
+        return count > 0;
+    } catch (e) {
+        console.warn('[CAL] Failed to inspect active predictions:', e.message);
+        return true;
+    }
+}
+
+async function findStrategyRace(calendar, now = new Date()) {
+    const current = findUpcomingRace(calendar, now);
+    if (!current) return null;
+
+    const raceTime = new Date(current.sessions.race);
+    if (now > raceTime) {
+        const activePredictions = await hasActivePredictions();
+        if (!activePredictions) {
+            const idx = calendar.findIndex(r => Number(r.round) === Number(current.round));
+            if (idx >= 0 && idx < calendar.length - 1) return calendar[idx + 1];
+        }
+    }
+
+    return current;
+}
+
+function normalizeWeatherPayload(raw) {
+    if (!raw) return null;
+    const pick = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '');
+    const num = (v) => {
+        const parsed = Number(v);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const airTemp = num(pick(raw.AirTemp, raw.air_temp, raw.temperature_2m));
+    const trackTemp = num(pick(raw.TrackTemp, raw.track_temp, raw.surface_temp, airTemp));
+    const humidity = num(pick(raw.Humidity, raw.humidity, raw.relative_humidity_2m));
+    const windSpeed = num(pick(raw.WindSpeed, raw.wind_speed, raw.wind_speed_10m));
+    const rainfall = num(pick(raw.Rainfall, raw.precipitation, 0));
+
+    if ([trackTemp, airTemp, humidity, windSpeed].every(v => v === null)) return null;
+
+    return {
+        TrackTemp: trackTemp,
+        AirTemp: airTemp,
+        Humidity: humidity,
+        WindSpeed: windSpeed,
+        Rainfall: rainfall ?? 0,
+        condition: raw.condition || (rainfall > 0 ? 'Showers nearby' : 'Trackside forecast stable'),
+        source: raw.source || 'live'
+    };
+}
+
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
@@ -580,39 +633,16 @@ async function performFinalization() {
 
 // --- 7. SECURE CORE ROUTES ---
 app.get('/api/next-race', async (req, res) => {
-    // Try API's /calendar/next first (single source of truth)
-    try {
-        const apiNext = await axios.get(`${F1_TIMING_API}/calendar/next`, { timeout: 5000 }).then(r => r.data);
-        if (apiNext && apiNext.round && !apiNext.message) {
-            // Map API field names to app format
-            const mapped = {
-                round: apiNext.round, name: apiNext.meeting, hasSprint: apiNext.has_sprint,
-                circuit: apiNext.circuit, country: apiNext.country,
-                lat: apiNext.lat, lon: apiNext.lon,
-                trackDetails: apiNext.track ? {
-                    length: `${apiNext.track.length_km} km`, laps: apiNext.track.laps,
-                    corners: apiNext.track.corners, firstGP: apiNext.track.first_gp, record: apiNext.track.lap_record
-                } : undefined,
-                sessions: apiNext.all_sessions || {},
-                date: apiNext.all_sessions?.race || apiNext.session_time,
-                lockTime: (() => { const lockSes = apiNext.has_sprint && apiNext.all_sessions?.sprint_qualifying ? apiNext.all_sessions.sprint_qualifying : (apiNext.all_sessions?.qualifying || apiNext.session_time); const lt = new Date(lockSes); lt.setMinutes(lt.getMinutes() - 1); return lt.toISOString(); })()
-            };
-            // Normalize session keys (qualifying -> quali, sprint_qualifying -> sprintQuali)
-            if (mapped.sessions.qualifying) { mapped.sessions.quali = mapped.sessions.qualifying; }
-            if (mapped.sessions.sprint_qualifying) { mapped.sessions.sprintQuali = mapped.sessions.sprint_qualifying; }
-            return res.json(mapped);
-        }
-    } catch (e) { /* fall through to local */ }
-
-    // Fallback: local hardcoded calendar
     const now = new Date();
     const seasonCalendar = await getSeasonCalendar();
-    const next = findUpcomingRace(seasonCalendar, now);
+    const next = await findStrategyRace(seasonCalendar, now);
+    if (!next) return res.status(404).json({ error: 'No race available' });
 
     const lockSes = next.hasSprint && next.sessions.sprintQuali ? next.sessions.sprintQuali : next.sessions.quali;
     const lt = new Date(lockSes);
     lt.setMinutes(lt.getMinutes() - 1);
-    const payload = { ...next, lockTime: lt.toISOString() };
+    const isLocked = now > lt;
+    const payload = { ...next, totalRounds: seasonCalendar.length, lockTime: lt.toISOString(), isLocked, lockStatus: isLocked ? 'locked' : 'open' };
     res.json(payload);
 });
 
@@ -707,7 +737,7 @@ app.post('/predict', authenticateToken, async (req, res) => {
 
     const now = new Date();
     const seasonCalendar = await getSeasonCalendar();
-    const currentRace = findUpcomingRace(seasonCalendar, now);
+    const currentRace = await findStrategyRace(seasonCalendar, now);
     if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
     const lockSes = currentRace.hasSprint && currentRace.sessions.sprintQuali ? currentRace.sessions.sprintQuali : currentRace.sessions.quali;
@@ -819,38 +849,29 @@ app.get('/api/live/weather', async (_, res) => {
         const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 5000 }).then(r => r.data);
         if (status && status.session && status.session.SessionStatus !== 'Finalised') {
             const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
-            if (live && live.AirTemp) return res.json(live);
+            const normalizedLive = normalizeWeatherPayload({ ...live, source: 'live' });
+            if (normalizedLive) return res.json(normalizedLive);
         }
     } catch (e) { }
     // Fallback: Open-Meteo for the next race's circuit location (free, no API key)
     try {
-        let next = null;
-        // Try API calendar for lat/lon
-        try {
-            const apiNext = await axios.get(`${F1_TIMING_API}/calendar/next`, { timeout: 5000 }).then(r => r.data);
-            if (apiNext && apiNext.lat && apiNext.lon) next = { lat: apiNext.lat, lon: apiNext.lon };
-        } catch (e) { /* fall through */ }
-        // Fallback to hardcoded calendar
-        if (!next) {
-            const now = new Date();
-            const seasonCalendar = await getSeasonCalendar();
-            const localNext = findUpcomingRace(seasonCalendar, now);
-            next = localNext;
-        }
+        const now = new Date();
+        const seasonCalendar = await getSeasonCalendar();
+        const next = await findStrategyRace(seasonCalendar, now);
+        if (!next?.lat || !next?.lon) throw new Error('No circuit coordinates available');
         const meteo = await axios.get(`https://api.open-meteo.com/v1/forecast`, {
             params: { latitude: next.lat, longitude: next.lon, current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation' },
             headers: { 'User-Agent': 'F1PredictionApp/1.0 (https://f1-prediction-app.onrender.com)' },
             timeout: 8000
         }).then(r => r.data);
-        const c = meteo.current;
-        res.json({
-            AirTemp: String(c.temperature_2m),
-            TrackTemp: String(Math.round(c.temperature_2m * 1.15)),
-            Humidity: String(c.relative_humidity_2m),
-            WindSpeed: String(c.wind_speed_10m),
-            Rainfall: String(c.precipitation > 0 ? 1 : 0),
-            _source: 'open-meteo'
+        const fallbackWeather = normalizeWeatherPayload({
+            ...meteo.current,
+            TrackTemp: Math.round(Number(meteo.current.temperature_2m) * 1.15),
+            Rainfall: meteo.current.precipitation > 0 ? 1 : 0,
+            source: 'open-meteo'
         });
+        if (fallbackWeather) return res.json(fallbackWeather);
+        res.status(503).json({ error: 'Weather unavailable' });
     } catch (e) {
         console.error('[Weather Fallback]', e.message);
         res.status(503).json({ error: 'Weather unavailable', detail: e.message });
