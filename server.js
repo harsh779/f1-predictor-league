@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@libsql/client');
 const path = require('path');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
@@ -9,6 +10,7 @@ const port = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026';
 const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.onrender.com';
+const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(',').map(x => x.trim()).filter(Boolean));
 
 app.use(express.json());
 
@@ -31,6 +33,8 @@ async function setupDatabase() {
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN auth_id TEXT`); } catch (e) { }
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN has_participated INTEGER DEFAULT 0`); } catch (e) { }
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_vip INTEGER DEFAULT 0`); } catch (e) { }
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN is_admin INTEGER DEFAULT 0`); } catch (e) { }
+        try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN auth_email TEXT`); } catch (e) { }
 
         // 🌍 NEW: Columns for Season-Long Predictions
         try { await db.execute(`ALTER TABLE f1_drivers ADD COLUMN season_driver TEXT`); } catch (e) { }
@@ -44,7 +48,15 @@ async function setupDatabase() {
         w_race_loser TEXT, w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
 
-        await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip) VALUES ('admin', 'admin_override', 1) ON CONFLICT(name) DO NOTHING" });
+        await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip, is_admin) VALUES ('admin', 'admin_override', 1, 1) ON CONFLICT(name) DO NOTHING" });
+        await db.execute("UPDATE f1_drivers SET is_admin = 1 WHERE auth_id = 'admin_override'");
+        const existingGoogleAdmins = await db.execute("SELECT COUNT(*) AS count FROM f1_drivers WHERE is_admin = 1 AND auth_id LIKE 'google_%'").then(r => Number(r.rows[0]?.count || 0));
+        if (existingGoogleAdmins === 0) {
+            await db.execute("UPDATE f1_drivers SET is_admin = 1 WHERE lower(name) LIKE '%harsh%' AND auth_id LIKE 'google_%'");
+        }
+        if (configuredAdminAuthIds.size > 0) {
+            await db.execute({ sql: `UPDATE f1_drivers SET is_admin = 1 WHERE auth_id IN (${Array.from(configuredAdminAuthIds).map(() => '?').join(',')})`, args: Array.from(configuredAdminAuthIds) });
+        }
         await db.execute(`CREATE TABLE IF NOT EXISTS f1_meta (key TEXT PRIMARY KEY, value TEXT)`);
         await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
 
@@ -309,6 +321,31 @@ function normalizeTeamRadioPayload(payload) {
     };
 }
 
+function isConfiguredAdmin(authId) {
+    return Boolean(authId) && configuredAdminAuthIds.has(authId);
+}
+
+async function findUserByAuthId(authId) {
+    if (!authId) return null;
+    return db.execute({
+        sql: "SELECT id, name, auth_id, auth_email, is_admin FROM f1_drivers WHERE auth_id = ? LIMIT 1",
+        args: [authId]
+    }).then(r => r.rows[0] || null);
+}
+
+async function shouldRevealPredictionsTo(user) {
+    if (user?.isAdmin) return true;
+    const now = new Date();
+    const seasonCalendar = await getSeasonCalendar();
+    const currentRace = await findStrategyRace(seasonCalendar, now);
+    if (!currentRace) return true;
+    const lockSes = currentRace.hasSprint && currentRace.sessions.sprintQuali ? currentRace.sessions.sprintQuali : currentRace.sessions.quali;
+    if (!lockSes) return false;
+    const lockTime = new Date(lockSes);
+    lockTime.setMinutes(lockTime.getMinutes() - 1);
+    return now > lockTime;
+}
+
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
@@ -328,27 +365,47 @@ function normalizeConstructor(c) {
 }
 
 // --- 4. JWT AUTHENTICATION MIDDLEWARE ---
-function authenticateToken(req, res, next) {
+async function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ error: "Access Denied: Invalid Token" });
-        req.user = user;
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const authId = decoded.auth_id || decoded.id;
+        const dbUser = await findUserByAuthId(authId);
+        if (!dbUser) return res.status(403).json({ error: "Access Denied: Unknown User" });
+
+        req.user = {
+            driverId: dbUser.id,
+            name: dbUser.name,
+            auth_id: dbUser.auth_id,
+            email: dbUser.auth_email || null,
+            isAdmin: Number(dbUser.is_admin || 0) === 1 || isConfiguredAdmin(dbUser.auth_id)
+        };
         next();
-    });
+    } catch (err) {
+        return res.status(403).json({ error: "Access Denied: Invalid Token" });
+    }
+}
+
+function requireAdmin(req, res, next) {
+    if (!req.user?.isAdmin) return res.status(403).json({ success: false, error: 'Unauthorized' });
+    next();
 }
 
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
 app.get('/auth/google', (req, res) => {
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email&prompt=select_account`;
+    const state = jwt.sign({ type: 'oauth_state', nonce: crypto.randomUUID() }, JWT_SECRET, { expiresIn: '10m' });
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email&prompt=select_account&state=${encodeURIComponent(state)}`;
     res.redirect(url);
 });
 
 app.get('/auth/google/callback', async (req, res) => {
     try {
-        const { code } = req.query;
+        const { code, state } = req.query;
+        const verifiedState = jwt.verify(String(state || ''), JWT_SECRET);
+        if (verifiedState?.type !== 'oauth_state') throw new Error('Invalid OAuth state');
         const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
             client_id: process.env.GOOGLE_CLIENT_ID,
             client_secret: process.env.GOOGLE_CLIENT_SECRET,
@@ -360,12 +417,42 @@ app.get('/auth/google/callback', async (req, res) => {
         });
 
         const googleUser = userResponse.data;
+        const authId = `google_${googleUser.id}`;
+        const name = (googleUser.name || '').trim();
+        const email = googleUser.email || null;
+        const existingByAuth = await findUserByAuthId(authId);
+        const existingByName = name
+            ? await db.execute({ sql: "SELECT id, name, auth_id, is_admin FROM f1_drivers WHERE name = ? LIMIT 1", args: [name] }).then(r => r.rows[0] || null)
+            : null;
 
-        await db.execute({ sql: `INSERT INTO f1_drivers (name, auth_id) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET auth_id=excluded.auth_id`, args: [googleUser.name, `google_${googleUser.id}`] });
+        let effectiveName = name || existingByAuth?.name || 'Driver';
+        const promotedAdmin = isConfiguredAdmin(authId);
 
-        const token = jwt.sign({ name: googleUser.name, id: `google_${googleUser.id}` }, JWT_SECRET, { expiresIn: '30d' });
+        if (existingByAuth) {
+            if (existingByName && existingByName.id !== existingByAuth.id && existingByName.auth_id && existingByName.auth_id !== authId) {
+                effectiveName = existingByAuth.name;
+            }
+            await db.execute({
+                sql: "UPDATE f1_drivers SET name = ?, auth_email = ?, is_admin = CASE WHEN ? THEN 1 ELSE is_admin END WHERE auth_id = ?",
+                args: [effectiveName, email, promotedAdmin ? 1 : 0, authId]
+            });
+        } else if (existingByName && existingByName.auth_id && existingByName.auth_id !== authId) {
+            return res.redirect('/?error=name_taken');
+        } else if (existingByName) {
+            await db.execute({
+                sql: "UPDATE f1_drivers SET auth_id = ?, auth_email = ?, is_admin = CASE WHEN ? THEN 1 ELSE is_admin END WHERE id = ?",
+                args: [authId, email, promotedAdmin ? 1 : 0, existingByName.id]
+            });
+        } else {
+            await db.execute({
+                sql: "INSERT INTO f1_drivers (name, auth_id, auth_email, is_admin) VALUES (?, ?, ?, ?)",
+                args: [effectiveName, authId, email, promotedAdmin ? 1 : 0]
+            });
+        }
 
-        res.redirect(`/?token=${token}&name=${encodeURIComponent(googleUser.name)}`);
+        const token = jwt.sign({ name: effectiveName, auth_id: authId }, JWT_SECRET, { expiresIn: '30d' });
+
+        res.redirect(`/?token=${token}&name=${encodeURIComponent(effectiveName)}`);
     } catch (error) { res.redirect('/?error=oauth_failed'); }
 });
 
@@ -617,51 +704,61 @@ async function performFinalization() {
             const isNewJoiner = !playersWithHistory.has(d.name) && d.name !== 'admin';
             let fs = scores[d.name] !== undefined ? scores[d.name] : penalty;
             finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined, isNewJoiner };
-            if (d.name !== 'admin') {
-                await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [fs, d.name] });
-            }
         }
 
-        // New joiner penalty: lowest total_score in standings - 5 (applied once)
-        // Must run AFTER all round scores are applied so standings reflect this round
-        const newJoiners = Object.entries(finalScores).filter(([name, data]) => data.isNewJoiner);
-        if (newJoiners.length > 0) {
-            // Get lowest total_score among established (non-new-joiner) participants
-            const establishedNames = Object.entries(finalScores).filter(([n, d]) => !d.isNewJoiner && n !== 'admin').map(([n]) => n);
-            let lowestStanding = 0;
-            if (establishedNames.length > 0) {
-                const estRows = await db.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
-                lowestStanding = estRows?.min_score ?? 0;
-            }
-            const newJoinerPenalty = lowestStanding - 5;
-
-            for (const [name] of newJoiners) {
-                await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [newJoinerPenalty, name] });
-                finalScores[name].newJoinerPenalty = newJoinerPenalty;
-                console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${name} (lowest standing: ${lowestStanding})`);
-            }
-        }
-
-        // --- SAVE ROUND HISTORY ---
-        await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
         const roundLabel = `R${raceData.round}`;
-        for (const p of predictions) {
-            const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
-            await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, new Date().toISOString()] });
-        }
-        // Save penalty entries for non-submitters
-        for (const [name, data] of Object.entries(finalScores)) {
-            if (!data.hadPrediction && name !== 'admin') {
-                await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, new Date().toISOString()] });
-            }
-            // Save new joiner penalty as separate history entry
-            if (data.newJoinerPenalty !== undefined && name !== 'admin') {
-                await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"new joiner"}', data.newJoinerPenalty, new Date().toISOString()] });
-            }
-        }
-        console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
+        const timestamp = new Date().toISOString();
 
-        await db.execute("DELETE FROM f1_predictions_v4");
+        await db.execute("BEGIN");
+        try {
+            for (const d of activeDrivers) {
+                const scoreDelta = finalScores[d.name]?.score ?? 0;
+                if (d.name !== 'admin') {
+                    await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [scoreDelta, d.name] });
+                }
+            }
+
+            // New joiner penalty: lowest total_score in standings - 5 (applied once)
+            // Must run AFTER all round scores are applied so standings reflect this round
+            const newJoiners = Object.entries(finalScores).filter(([name, data]) => data.isNewJoiner);
+            if (newJoiners.length > 0) {
+                const establishedNames = Object.entries(finalScores).filter(([n, d]) => !d.isNewJoiner && n !== 'admin').map(([n]) => n);
+                let lowestStanding = 0;
+                if (establishedNames.length > 0) {
+                    const estRows = await db.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
+                    lowestStanding = estRows?.min_score ?? 0;
+                }
+                const newJoinerPenalty = lowestStanding - 5;
+
+                for (const [name] of newJoiners) {
+                    await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [newJoinerPenalty, name] });
+                    finalScores[name].newJoinerPenalty = newJoinerPenalty;
+                    console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${name} (lowest standing: ${lowestStanding})`);
+                }
+            }
+
+            // --- SAVE ROUND HISTORY ---
+            await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+            for (const p of predictions) {
+                const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
+                await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, timestamp] });
+            }
+            for (const [name, data] of Object.entries(finalScores)) {
+                if (!data.hadPrediction && name !== 'admin') {
+                    await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, timestamp] });
+                }
+                if (data.newJoinerPenalty !== undefined && name !== 'admin') {
+                    await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"new joiner"}', data.newJoinerPenalty, timestamp] });
+                }
+            }
+            console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
+
+            await db.execute("DELETE FROM f1_predictions_v4");
+            await db.execute("COMMIT");
+        } catch (writeError) {
+            try { await db.execute("ROLLBACK"); } catch (_) { }
+            throw writeError;
+        }
 
         // --- DISCORD SCORE BREAKDOWN ---
         const sorted = Object.entries(finalScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
@@ -674,7 +771,11 @@ async function performFinalization() {
             if (data.newJoinerPenalty !== undefined) tag += ` (new joiner: ${data.newJoinerPenalty})`;
             breakdown += `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**${tag}\n`;
         });
-        await sendDiscordNotification(breakdown);
+        try {
+            await sendDiscordNotification(breakdown);
+        } catch (notifyError) {
+            console.warn('[FINALIZE] Discord notification failed after commit:', notifyError.message);
+        }
 
         return { success: true, message: "Round Finalized." };
     } catch (e) { return { success: false, message: e.message }; }
@@ -779,6 +880,14 @@ app.post('/api/season-picks', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+app.get('/api/me', authenticateToken, async (req, res) => {
+    res.json({
+        name: req.user.name,
+        auth_id: req.user.auth_id,
+        isAdmin: req.user.isAdmin
+    });
+});
+
 // --- RACE PREDICTION SUBMIT ---
 app.post('/predict', authenticateToken, async (req, res) => {
     const d = req.body;
@@ -816,13 +925,15 @@ app.post('/predict', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-app.post('/api/finalize', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).json({ success: false });
+app.post('/api/finalize', authenticateToken, requireAdmin, async (req, res) => {
     const result = await performFinalization();
     res.status(result.success ? 200 : 400).json(result);
 });
 
-app.get('/api/predictions', async (req, res) => {
+app.get('/api/predictions', authenticateToken, async (req, res) => {
+    if (!await shouldRevealPredictionsTo(req.user)) {
+        return res.status(403).json({ error: 'Predictions unlock after strategy lockout.' });
+    }
     const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name");
     res.json(r.rows);
 });
@@ -840,30 +951,26 @@ app.get('/api/round-scores', async (req, res) => {
 });
 
 // --- 8. ADMIN ROUTES ---
-app.get('/api/admin/users', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
         res.json(r.rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/admin/toggle-vip', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+app.post('/api/admin/toggle-vip', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await db.execute({ sql: "UPDATE f1_drivers SET is_vip = ? WHERE name = ?", args: [req.body.vipStatus ? 1 : 0, req.body.targetUser] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/admin/reset-user', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+app.post('/api/admin/reset-user', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [req.body.targetUser] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/admin/set-score', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, res) => {
     const { targetUser, score } = req.body;
     if (!targetUser || score === undefined) return res.status(400).json({ error: 'targetUser and score required' });
     try {
@@ -873,8 +980,7 @@ app.post('/api/admin/set-score', authenticateToken, async (req, res) => {
 });
 
 
-app.get('/api/admin/round-history', authenticateToken, async (req, res) => {
-    if (!req.user.name.toLowerCase().includes('harsh')) return res.status(403).send("Unauthorized");
+app.get('/api/admin/round-history', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const rows = await db.execute("SELECT * FROM f1_round_history ORDER BY id DESC").then(r => r.rows);
         res.json(rows);

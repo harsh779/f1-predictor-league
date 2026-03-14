@@ -983,6 +983,7 @@
 
     let f1_token = localStorage.getItem('f1_token');
     let f1_name = localStorage.getItem('f1_name');
+    let f1_is_admin = localStorage.getItem('f1_is_admin') === '1';
     let raceLock = null;
 
     function checkPredictionLock() {
@@ -1022,7 +1023,8 @@
         }
     });
 
-    function start() { 
+    async function start() { 
+        await loadCurrentUser();
         checkAdm(); 
         loadHomeData(); 
         buildGridTab(); 
@@ -1030,6 +1032,23 @@
         
         const savedTab = localStorage.getItem('f1_active_tab') || 'home';
         tab(savedTab); 
+    }
+
+    async function loadCurrentUser() {
+        if (!f1_token) return;
+        try {
+            const resp = await fetch('/api/me?t=' + Date.now(), { headers: { 'Authorization': `Bearer ${f1_token}` } });
+            if (!resp.ok) throw new Error('Unauthorized');
+            const me = await resp.json();
+            f1_name = me.name || f1_name;
+            f1_is_admin = !!me.isAdmin;
+            localStorage.setItem('f1_name', f1_name);
+            localStorage.setItem('f1_is_admin', f1_is_admin ? '1' : '0');
+            document.getElementById('logged-in-name').innerText = f1_name;
+            document.getElementById('user-menu').classList.remove('hidden');
+        } catch (e) {
+            logout();
+        }
     }
 
     function toggleUserMenu() {
@@ -1161,6 +1180,15 @@
 
     function formatRadioText(message) {
         return message.text || message.message || message.transcript || 'Radio clip available';
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // --- TIMING TAB ---
@@ -1962,45 +1990,67 @@
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
-        const d = await fetch('/api/predictions?t=' + new Date().getTime()).then(r=>r.json());
+        const resp = await fetch('/api/predictions?t=' + new Date().getTime(), { headers: { 'Authorization': `Bearer ${f1_token}` } });
+        const d = await resp.json();
+        if (!resp.ok) {
+            list.innerHTML = `<div class='predict-group' style='text-align: center; color: var(--text-muted);'>${d.error || 'Predictions are unavailable right now.'}</div>`;
+            return;
+        }
         
         if (d.length === 0) { 
             list.innerHTML = "<div class='predict-group' style='text-align: center; color: var(--text-muted);'>No telemetry submitted yet for this session.</div>"; 
         } else {
-            list.innerHTML = d.map(x=>`
+            list.innerHTML = d.map(x=>{
+                const safeUser = escapeHtml(x.user_name);
+                const p1 = escapeHtml(x.p1);
+                const p2 = escapeHtml(x.p2);
+                const p3 = escapeHtml(x.p3);
+                const p10 = escapeHtml(x.p10);
+                const p11 = escapeHtml(x.p11);
+                const p21 = escapeHtml(x.p21);
+                const p22 = escapeHtml(x.p22);
+                const c1 = escapeHtml(x.c1);
+                const c2 = escapeHtml(x.c2);
+                const c5 = escapeHtml(x.c5);
+                const c6 = escapeHtml(x.c6);
+                const c11 = escapeHtml(x.c11);
+                const raceLoser = escapeHtml(x.w_race_loser);
+                const sprintGainer = escapeHtml(x.w_sprint_gainer);
+                const sprintLoser = escapeHtml(x.w_sprint_loser);
+                return `
                 <div class="predict-group" style="border-left: 4px solid var(--red); padding: 20px;">
-                    <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><span style="text-transform:uppercase;">${x.user_name}</span></h3>
+                    <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;"><span style="text-transform:uppercase;">${safeUser}</span></h3>
                     <div class="live-grid-container">
                         
                         <div class="live-card-section">
                             <strong class="live-card-title">Drivers</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">P1:</span> <b>${x.p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${x.p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${x.p3}</b><br>
-                                <span style="color:var(--text-muted)">P10:</span> <b>${x.p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b>${x.p11}</b><br>
-                                <span style="color:var(--text-muted)">P21:</span> <b>${x.p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b>${x.p22}</b>
+                                <span style="color:var(--text-muted)">P1:</span> <b>${p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${p3}</b><br>
+                                <span style="color:var(--text-muted)">P10:</span> <b>${p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b>${p11}</b><br>
+                                <span style="color:var(--text-muted)">P21:</span> <b>${p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b>${p22}</b>
                             </div>
                         </div>
 
                         <div class="live-card-section">
                             <strong class="live-card-title">Constructors</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">1st:</span> <b>${x.c1}</b> | <span style="color:var(--text-muted)">2nd:</span> <b>${x.c2}</b><br>
-                                <span style="color:var(--text-muted)">5th:</span> <b>${x.c5}</b> | <span style="color:var(--text-muted)">6th:</span> <b>${x.c6}</b><br>
-                                <span style="color:var(--text-muted)">11th:</span> <b>${x.c11}</b>
+                                <span style="color:var(--text-muted)">1st:</span> <b>${c1}</b> | <span style="color:var(--text-muted)">2nd:</span> <b>${c2}</b><br>
+                                <span style="color:var(--text-muted)">5th:</span> <b>${c5}</b> | <span style="color:var(--text-muted)">6th:</span> <b>${c6}</b><br>
+                                <span style="color:var(--text-muted)">11th:</span> <b>${c11}</b>
                             </div>
                         </div>
 
                         <div class="live-card-section">
                             <strong class="live-card-title" style="color:var(--gold); border-bottom-color: rgba(197, 155, 39, 0.3);">Wildcards</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">Race Loser:</span> <b style="color:var(--red)">${x.w_race_loser}</b>
-                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b style="color:#009940">${x.w_sprint_gainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b style="color:var(--red)">${x.w_sprint_loser}</b>` : ''}
+                                <span style="color:var(--text-muted)">Race Loser:</span> <b style="color:var(--red)">${raceLoser}</b>
+                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b style="color:#009940">${sprintGainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b style="color:var(--red)">${sprintLoser}</b>` : ''}
                             </div>
                         </div>
 
                     </div>
                 </div>
-            `).join('');
+            `;}).join('');
         }
     }
 
@@ -2027,12 +2077,15 @@
         else {
             board.innerHTML = d.map((x,i)=>{
                 let isVip = (x.is_vip === 1);
-                let nameHtml = isVip ? `<span class="vip-gold">${x.name}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${x.name}</span>`;
+                const safeName = escapeHtml(x.name);
+                const safeSeasonDriver = escapeHtml(x.season_driver || 'TBC');
+                const safeSeasonConstructor = escapeHtml(x.season_constructor || 'TBC');
+                let nameHtml = isVip ? `<span class="vip-gold">${safeName}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${safeName}</span>`;
                 let posColor = i===0 ? '#c59b27' : (i===1 ? '#999999' : (i===2 ? '#b87333' : 'var(--text-muted)'));
 
                 let seasonPicks = `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-                                     WDC: <b style="color: var(--text-main)">${x.season_driver || 'TBC'}</b> |
-                                     WCC: <b style="color: var(--text-main)">${x.season_constructor || 'TBC'}</b>
+                                     WDC: <b style="color: var(--text-main)">${safeSeasonDriver}</b> |
+                                     WCC: <b style="color: var(--text-main)">${safeSeasonConstructor}</b>
                                    </div>`;
 
                 const rounds = userRounds[x.name] || [];
@@ -2207,9 +2260,11 @@
     function logout() { localStorage.clear(); window.location.href = window.location.pathname; }
     
     function checkAdm() { 
-        if(f1_name && f1_name.toLowerCase().includes('harsh')) {
+        if (f1_is_admin) {
             document.getElementById('admin-panel').classList.remove('hidden'); 
             loadAdminUserList(); 
+        } else {
+            document.getElementById('admin-panel').classList.add('hidden');
         }
     }
 
@@ -2228,14 +2283,14 @@
             list.innerHTML = users.map(u => `
                 <div style="background: var(--surface); padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 10px;">
                     <div>
-                        <strong style="color:var(--text-main); font-size:1.1rem; display: block; margin-bottom: 4px;">${u.name}${u.is_vip ? ' (VIP)' : ''}</strong>
+                        <strong style="color:var(--text-main); font-size:1.1rem; display: block; margin-bottom: 4px;">${escapeHtml(u.name)}${u.is_vip ? ' (VIP)' : ''}</strong>
                         <span style="color:var(--text-muted); font-size:0.9rem; font-weight: 700;">Score: ${u.total_score} pts</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button onclick="toggleVip('${u.name}', ${u.is_vip})" style="background:${u.is_vip ? 'var(--surface-inner)' : 'rgba(197, 155, 39, 0.1)'}; color:${u.is_vip ? 'var(--text-muted)' : 'var(--gold)'}; border:1px solid ${u.is_vip ? 'var(--border)' : 'var(--gold)'}; padding:8px 12px; border-radius:6px; cursor:pointer; font-family: 'Titillium Web'; font-weight:bold; transition: all 0.2s;">
+                        <button onclick='toggleVip(${JSON.stringify(u.name)}, ${u.is_vip})' style="background:${u.is_vip ? 'var(--surface-inner)' : 'rgba(197, 155, 39, 0.1)'}; color:${u.is_vip ? 'var(--text-muted)' : 'var(--gold)'}; border:1px solid ${u.is_vip ? 'var(--border)' : 'var(--gold)'}; padding:8px 12px; border-radius:6px; cursor:pointer; font-family: 'Titillium Web'; font-weight:bold; transition: all 0.2s;">
                             ${u.is_vip ? 'Remove VIP' : 'Make VIP'}
                         </button>
-                        <button onclick="resetPoints('${u.name}')" style="background:var(--surface-inner); color:var(--red); border:1px solid var(--border); padding:8px 12px; border-radius:6px; cursor:pointer; font-family: 'Titillium Web'; font-weight:bold; transition: all 0.2s;">
+                        <button onclick='resetPoints(${JSON.stringify(u.name)})' style="background:var(--surface-inner); color:var(--red); border:1px solid var(--border); padding:8px 12px; border-radius:6px; cursor:pointer; font-family: 'Titillium Web'; font-weight:bold; transition: all 0.2s;">
                             Reset Score
                         </button>
                     </div>
