@@ -986,6 +986,17 @@
     let f1_is_admin = localStorage.getItem('f1_is_admin') === '1';
     let raceLock = null;
 
+    function getAuthHeaders(extra = {}) {
+        const headers = { ...extra };
+        if (f1_token) headers['Authorization'] = `Bearer ${f1_token}`;
+        return headers;
+    }
+
+    async function authFetch(url, options = {}) {
+        const headers = getAuthHeaders(options.headers || {});
+        return fetch(url, { ...options, headers, credentials: 'same-origin' });
+    }
+
     function checkPredictionLock() {
         if (raceLock && new Date() >= raceLock) {
             document.getElementById('p-form').style.display = 'none';
@@ -1001,7 +1012,11 @@
         f1_name = urlParams.get('name');
         localStorage.setItem('f1_token', f1_token);
         localStorage.setItem('f1_name', f1_name);
-        window.history.replaceState({}, document.title, "/"); 
+        window.history.replaceState({}, document.title, "/");
+    } else if (urlParams.has('name')) {
+        f1_name = urlParams.get('name');
+        localStorage.setItem('f1_name', f1_name);
+        window.history.replaceState({}, document.title, "/");
     }
 
     function showToast(message, type = 'error') {
@@ -1014,17 +1029,15 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        if(!f1_token || !f1_name) { 
-            document.getElementById('auth').style.display = 'flex'; 
-        } else { 
-            document.getElementById('logged-in-name').innerText = f1_name;
-            document.getElementById('user-menu').classList.remove('hidden');
-            start(); 
-        }
+        start();
     });
 
     async function start() { 
-        await loadCurrentUser();
+        const hasSession = await loadCurrentUser();
+        if (!hasSession) {
+            document.getElementById('auth').style.display = 'flex';
+            return;
+        }
         checkAdm(); 
         loadHomeData(); 
         buildGridTab(); 
@@ -1035,9 +1048,8 @@
     }
 
     async function loadCurrentUser() {
-        if (!f1_token) return;
         try {
-            const resp = await fetch('/api/me?t=' + Date.now(), { headers: { 'Authorization': `Bearer ${f1_token}` } });
+            const resp = await authFetch('/api/me?t=' + Date.now());
             if (!resp.ok) throw new Error('Unauthorized');
             const me = await resp.json();
             f1_name = me.name || f1_name;
@@ -1046,8 +1058,16 @@
             localStorage.setItem('f1_is_admin', f1_is_admin ? '1' : '0');
             document.getElementById('logged-in-name').innerText = f1_name;
             document.getElementById('user-menu').classList.remove('hidden');
+            document.getElementById('auth').style.display = 'none';
+            return true;
         } catch (e) {
-            logout();
+            localStorage.removeItem('f1_token');
+            localStorage.removeItem('f1_name');
+            localStorage.removeItem('f1_is_admin');
+            f1_token = null;
+            f1_name = null;
+            f1_is_admin = false;
+            return false;
         }
     }
 
@@ -1947,9 +1967,8 @@
     }
 
     async function loadSeasonPicks() {
-        if(!f1_token) return;
         try {
-            const res = await fetch('/api/season-picks', { headers: { 'Authorization': `Bearer ${f1_token}` } });
+            const res = await authFetch('/api/season-picks');
             const d = await res.json();
             if(d.season_driver) {
                 document.getElementById('s_driver').value = d.season_driver;
@@ -1976,9 +1995,9 @@
         if(!sd || !st) { showToast('Select both champions!', 'error'); return; }
         
         try {
-            const res = await fetch('/api/season-picks', {
+            const res = await authFetch('/api/season-picks', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${f1_token}` },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ season_driver: sd, season_constructor: st })
             });
             const d = await res.json();
@@ -1990,7 +2009,7 @@
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
-        const resp = await fetch('/api/predictions?t=' + new Date().getTime(), { headers: { 'Authorization': `Bearer ${f1_token}` } });
+        const resp = await authFetch('/api/predictions?t=' + new Date().getTime());
         const d = await resp.json();
         if (!resp.ok) {
             list.innerHTML = `<div class='predict-group' style='text-align: center; color: var(--text-muted);'>${d.error || 'Predictions are unavailable right now.'}</div>`;
@@ -2232,9 +2251,9 @@
             w_race_loser:val('wl'), w_sprint_gainer: val('sg'), w_sprint_loser: val('sl')
         };
         
-        const res = await fetch('/predict', { 
+        const res = await authFetch('/predict', { 
             method:'POST', 
-            headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
+            headers:{'Content-Type':'application/json'}, 
             body:JSON.stringify(body) 
         });
         if(res.ok) { showToast('Strategy Transmitted and Locked', 'success'); } 
@@ -2247,9 +2266,9 @@
         if(!confirm('WARNING: Finalize the race weekend and calculate scores?')) return;
         showToast('Processing telemetry...', 'success');
         
-        const res = await fetch('/api/finalize', { 
+        const res = await authFetch('/api/finalize', { 
             method:'POST', 
-            headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${f1_token}`}, 
+            headers:{'Content-Type':'application/json'}, 
             body:JSON.stringify({}) 
         });
         const d = await res.json();
@@ -2257,7 +2276,11 @@
         else { showToast('Error: ' + d.message, 'error'); }
     }
     
-    function logout() { localStorage.clear(); window.location.href = window.location.pathname; }
+    async function logout() {
+        try { await authFetch('/auth/logout', { method: 'POST' }); } catch (e) {}
+        localStorage.clear();
+        window.location.href = window.location.pathname;
+    }
     
     function checkAdm() { 
         if (f1_is_admin) {
@@ -2270,7 +2293,7 @@
 
     async function loadAdminUserList() {
         try {
-            const resp = await fetch(`/api/admin/users?t=` + new Date().getTime(), { headers: { 'Authorization': `Bearer ${f1_token}` } });
+            const resp = await authFetch(`/api/admin/users?t=` + new Date().getTime());
             if(!resp.ok) return;
             const users = await resp.json();
             const list = document.getElementById('admin-user-list');
@@ -2302,8 +2325,8 @@
     async function toggleVip(targetUser, currentStatus) {
         if(!confirm(`Toggle VIP status for ${targetUser}?`)) return;
         try {
-            await fetch('/api/admin/toggle-vip', {
-                method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${f1_token}`},
+            await authFetch('/api/admin/toggle-vip', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ targetUser, vipStatus: !currentStatus })
             });
             loadAdminUserList();
@@ -2314,8 +2337,8 @@
     async function resetPoints(targetUser) {
         if(!confirm(`ARE YOU SURE? This completely resets ${targetUser}'s score to 0.`)) return;
         try {
-            await fetch('/api/admin/reset-user', {
-                method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${f1_token}`},
+            await authFetch('/api/admin/reset-user', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ targetUser })
             });
             loadAdminUserList();

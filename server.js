@@ -11,8 +11,53 @@ const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026';
 const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.onrender.com';
 const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(',').map(x => x.trim()).filter(Boolean));
+const SESSION_COOKIE_NAME = 'f1_session';
 
 app.use(express.json());
+
+function parseCookies(req) {
+    const header = req.headers.cookie || '';
+    return header.split(';').reduce((acc, part) => {
+        const idx = part.indexOf('=');
+        if (idx === -1) return acc;
+        const key = part.slice(0, idx).trim();
+        const value = part.slice(idx + 1).trim();
+        if (key) acc[key] = decodeURIComponent(value);
+        return acc;
+    }, {});
+}
+
+function serializeCookie(name, value, options = {}) {
+    const parts = [`${name}=${encodeURIComponent(value)}`];
+    if (options.httpOnly) parts.push('HttpOnly');
+    if (options.secure) parts.push('Secure');
+    if (options.sameSite) parts.push(`SameSite=${options.sameSite}`);
+    if (options.path) parts.push(`Path=${options.path}`);
+    if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
+    return parts.join('; ');
+}
+
+function setSessionCookie(res, token) {
+    const secure = APP_URL.startsWith('https://');
+    res.setHeader('Set-Cookie', serializeCookie(SESSION_COOKIE_NAME, token, {
+        httpOnly: true,
+        sameSite: 'Lax',
+        secure,
+        path: '/',
+        maxAge: 30 * 24 * 60 * 60
+    }));
+}
+
+function clearSessionCookie(res) {
+    const secure = APP_URL.startsWith('https://');
+    res.setHeader('Set-Cookie', serializeCookie(SESSION_COOKIE_NAME, '', {
+        httpOnly: true,
+        sameSite: 'Lax',
+        secure,
+        path: '/',
+        maxAge: 0
+    }));
+}
 
 // 🚀 CACHE KILLER: Forces browsers to load the newest version instantly
 app.use((req, res, next) => {
@@ -367,7 +412,9 @@ function normalizeConstructor(c) {
 // --- 4. JWT AUTHENTICATION MIDDLEWARE ---
 async function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const headerToken = authHeader && authHeader.split(' ')[1];
+    const cookieToken = parseCookies(req)[SESSION_COOKIE_NAME];
+    const token = headerToken || cookieToken;
     if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
 
     try {
@@ -451,9 +498,14 @@ app.get('/auth/google/callback', async (req, res) => {
         }
 
         const token = jwt.sign({ name: effectiveName, auth_id: authId }, JWT_SECRET, { expiresIn: '30d' });
-
-        res.redirect(`/?token=${token}&name=${encodeURIComponent(effectiveName)}`);
+        setSessionCookie(res, token);
+        res.redirect(`/?name=${encodeURIComponent(effectiveName)}`);
     } catch (error) { res.redirect('/?error=oauth_failed'); }
+});
+
+app.post('/auth/logout', (_req, res) => {
+    clearSessionCookie(res);
+    res.json({ success: true });
 });
 
 // --- 6. SCORING ENGINE (V4 NEW RULES) ---
