@@ -59,6 +59,43 @@ function clearSessionCookie(res) {
     }));
 }
 
+function decodeXmlEntities(value = '') {
+    return String(value)
+        .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&#x2F;/gi, '/')
+        .trim();
+}
+
+function stripTags(value = '') {
+    return decodeXmlEntities(value).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function extractXmlTag(block, tagName) {
+    const match = block.match(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i'));
+    return match ? stripTags(match[1]) : '';
+}
+
+function extractXmlAttr(block, tagName, attrName) {
+    const match = block.match(new RegExp(`<${tagName}\\b[^>]*\\s${attrName}="([^"]+)"[^>]*\\/?>`, 'i'));
+    return match ? decodeXmlEntities(match[1]) : '';
+}
+
+function parseMotorsportRss(xml = '') {
+    const items = [...String(xml).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)];
+    return items.slice(0, 4).map(([, block]) => {
+        const title = extractXmlTag(block, 'title');
+        const link = extractXmlTag(block, 'link');
+        const pubDate = extractXmlTag(block, 'pubDate');
+        const thumbnail = extractXmlAttr(block, 'media:thumbnail', 'url') || extractXmlAttr(block, 'enclosure', 'url');
+        return { title, link, pubDate, thumbnail };
+    }).filter(item => item.title && item.link);
+}
+
 // 🚀 CACHE KILLER: Forces browsers to load the newest version instantly
 app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -1164,6 +1201,24 @@ app.get('/api/live/team-radio/:number', async (req, res) => {
     }
 });
 app.get('/api/live/timing/:number', (req, res) => liveProxy(`/timing/${req.params.number}`, res));
+
+app.get('/api/paddock-news', async (_, res) => {
+    try {
+        const xml = await axios.get('https://www.motorsport.com/rss/f1/news/', {
+            timeout: 10000,
+            responseType: 'text',
+            headers: { 'User-Agent': 'F1PredictionApp/1.0' }
+        }).then(r => r.data);
+        const items = parseMotorsportRss(xml);
+        if (!items.length) {
+            return res.status(502).json({ error: 'News feed unavailable', items: [] });
+        }
+        res.json({ source: 'motorsport-rss', items });
+    } catch (e) {
+        console.error('[Paddock News]', e.message);
+        res.status(502).json({ error: 'News feed unavailable', items: [] });
+    }
+});
 
 // SSE proxy: pipes live timing stream from own API to client
 app.get('/api/live/stream', (req, res) => {

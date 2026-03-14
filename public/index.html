@@ -1206,12 +1206,53 @@
         return JSON.stringify(String(value ?? ''));
     }
 
+    function formatNewsDate(value) {
+        const parsed = value ? new Date(value) : null;
+        return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleDateString() : '';
+    }
+
+    function renderPaddockNews(items = []) {
+        const feed = document.getElementById('news-feed');
+        if (!Array.isArray(items) || items.length === 0) {
+            feed.innerHTML = '<div style="color: var(--text-muted);">Paddock news feed currently offline.</div>';
+            return;
+        }
+
+        feed.innerHTML = items.slice(0, 4).map(item => {
+            const imageUrl = escapeHtml(item.thumbnail || '');
+            const articleUrl = escapeHtml(item.link || '#');
+            const title = escapeHtml(item.title || 'Read article');
+            const dateLabel = escapeHtml(formatNewsDate(item.pubDate));
+            return `
+                <div class="news-item">
+                    <img src="${imageUrl}" alt="News" style="${imageUrl ? '' : 'display:none;'}" onerror="this.style.display='none'">
+                    <div class="news-item-content">
+                        <h4><a href="${articleUrl}" target="_blank" rel="noopener noreferrer">${title}</a></h4>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">${dateLabel}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function loadPaddockNews() {
+        try {
+            const response = await fetch('/api/paddock-news?t=' + Date.now());
+            if (!response.ok) throw new Error('news unavailable');
+            const payload = await response.json();
+            renderPaddockNews(payload.items || []);
+        } catch (e) {
+            renderPaddockNews([]);
+        }
+    }
+
     // --- TIMING TAB ---
     let timingInterval = null;
     let liveSSE = null;
     let sseRetries = 0;
     let lastSSERender = 0;
     let sseConnected = false;
+    let liveSessionFinished = false;
 
     function startLiveSSE() {
         if (liveSSE) return;
@@ -2087,6 +2128,404 @@
         } catch(e) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Failed to load session data.</div>'; }
     }
 
+    function getSessionDescriptor(sessionLike) {
+        return [sessionLike?.session_type, sessionLike?.session_name, sessionLike?.filename]
+            .filter(Boolean)
+            .join(' ')
+            .replace(/[_-]+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    function isPracticeSession(sessionLike) {
+        return /\b(fp1|fp2|fp3|practice|free practice|first practice|second practice|third practice)\b/.test(getSessionDescriptor(sessionLike));
+    }
+
+    function isSprintWeekend(weekendSessions = []) {
+        return weekendSessions.some(session => getSessionDescriptor(session).includes('sprint'));
+    }
+
+    function formatSessionTypeLabel(sessionLike, weekendSessions = []) {
+        const descriptor = getSessionDescriptor(sessionLike);
+        if (!descriptor) return 'Session';
+        if (descriptor.includes('sprint shootout')) return 'Sprint Shootout';
+        if (descriptor.includes('sprint qualifying')) return 'Sprint Qualifying';
+        if (descriptor.includes('shootout') && isSprintWeekend(weekendSessions)) return 'Sprint Shootout';
+        if (descriptor.includes('qualifying') && descriptor.includes('sprint')) return 'Sprint Qualifying';
+        if (descriptor.includes('sprint')) return descriptor.includes('qualifying') ? 'Sprint Qualifying' : 'Sprint';
+        if (descriptor.includes('qualifying') || descriptor.includes('quali')) return isSprintWeekend(weekendSessions) ? 'Grand Prix Qualifying' : 'Qualifying';
+        if (descriptor.includes('race') || descriptor.includes('grand prix')) return isSprintWeekend(weekendSessions) ? 'Grand Prix' : 'Race';
+        return descriptor.replace(/\b\w/g, m => m.toUpperCase());
+    }
+
+    function formatResultNotation(sessionLike, weekendSessions = []) {
+        const label = formatSessionTypeLabel(sessionLike, weekendSessions);
+        if (label === 'Race' || label === 'Grand Prix') return 'Grand Prix result';
+        if (label === 'Qualifying') return 'Qualifying result';
+        if (label === 'Grand Prix Qualifying') return 'Grand Prix qualifying result';
+        if (label === 'Sprint') return 'Sprint result';
+        return `${label} result`;
+    }
+
+    function getSessionSortOrder(sessionType) {
+        const key = getSessionDescriptor(sessionType).replace(/\s+/g, '_');
+        const order = {
+            fp1: 1, first_practice: 1,
+            fp2: 2, second_practice: 2,
+            fp3: 3, third_practice: 3,
+            sprint_qualifying: 4, sprint_shootout: 4,
+            sprint: 5,
+            qualifying: 6, quali: 6,
+            race: 7
+        };
+        return order[key] || 99;
+    }
+
+    function isSessionFinished(session) {
+        const descriptor = [
+            session?.SessionStatus,
+            session?.Status,
+            session?.status,
+            session?.session_status,
+            session?.Phase
+        ].filter(Boolean).join(' ').toLowerCase();
+        return /(finalised|finalized|finished|ended|complete|completed|inactive|over)/.test(descriptor);
+    }
+
+    function updateTrackBanner(ts, session) {
+        const banner = document.getElementById('track-banner');
+        const sessionDone = session ? isSessionFinished(session) : liveSessionFinished;
+        if (sessionDone || !ts || !ts.Message) {
+            banner.className = '';
+            banner.style.display = 'none';
+            return;
+        }
+        const msg = ts.Message;
+        banner.className = '';
+        if (msg === 'AllClear' || msg === 'Green') { banner.className = 'banner-green'; banner.textContent = 'Track Clear'; }
+        else if (msg.includes('Yellow')) { banner.className = 'banner-yellow'; banner.textContent = 'Yellow Flag'; }
+        else if (msg.includes('SC') && !msg.includes('VSC')) { banner.className = 'banner-sc'; banner.textContent = 'Safety Car'; }
+        else if (msg.includes('VSC')) { banner.className = 'banner-sc'; banner.textContent = 'Virtual Safety Car'; }
+        else if (msg.includes('Red')) { banner.className = 'banner-red'; banner.textContent = 'Red Flag'; }
+        else { banner.className = 'banner-green'; banner.textContent = msg; }
+        banner.id = 'track-banner';
+    }
+
+    async function updateLiveWeatherStrip() {
+        const strip = document.getElementById('live-weather-strip');
+        try {
+            const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
+            if (!w || (w.AirTemp == null && w.TrackTemp == null)) { strip.style.display = 'none'; return; }
+            const airTemp = Math.round(Number(w.AirTemp ?? w.TrackTemp));
+            const trackTemp = Math.round(Number(w.TrackTemp ?? w.AirTemp));
+            const humidity = Math.round(Number(w.Humidity ?? 0));
+            const wind = Math.round(Number(w.WindSpeed ?? 0));
+            const rain = Number(w.Rainfall ?? 0) > 0;
+            strip.style.display = 'flex';
+            strip.innerHTML = `
+                <div class="ws-item"><span class="ws-label">Air</span><span class="ws-val">${airTemp}&deg;C</span></div>
+                <div class="ws-item"><span class="ws-label">Track</span><span class="ws-val">${trackTemp}&deg;C</span></div>
+                <div class="ws-item"><span class="ws-label">Humidity</span><span class="ws-val">${humidity}%</span></div>
+                <div class="ws-item"><span class="ws-label">Wind</span><span class="ws-val">${wind} km/h</span></div>
+                ${rain ? '<div class="ws-item"><span class="ws-val ws-rain">RAIN</span></div>' : ''}
+            `;
+        } catch (e) { strip.style.display = 'none'; }
+    }
+
+    async function loadPastResults() {
+        const el = document.getElementById('past-results-list');
+        try {
+            const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
+            if (!Array.isArray(results) || !results.length) {
+                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No past session results available yet.</div>';
+                return;
+            }
+
+            const filteredResults = results.filter(r => !isPracticeSession(r));
+            if (!filteredResults.length) {
+                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No past race or qualifying results available yet.</div>';
+                return;
+            }
+
+            const grouped = new Map();
+            [...filteredResults].reverse().forEach(r => {
+                const groupKey = `${r.round || 'NA'}::${r.meeting || r.filename}`;
+                if (!grouped.has(groupKey)) {
+                    grouped.set(groupKey, {
+                        round: r.round,
+                        meeting: r.meeting || r.filename,
+                        circuit: r.circuit || '',
+                        sessions: []
+                    });
+                }
+                grouped.get(groupKey).sessions.push(r);
+            });
+
+            const weekends = [...grouped.values()].map(weekend => ({
+                ...weekend,
+                sessions: weekend.sessions.sort((a, b) => getSessionSortOrder(a) - getSessionSortOrder(b))
+            }));
+
+            el.innerHTML = weekends.map(weekend => `
+                <div class="result-weekend-card">
+                    <div class="result-weekend-header">
+                        <div class="result-card-info">
+                            <span class="result-card-round">R${escapeHtml(weekend.round || '-')} &middot; Weekend Results</span>
+                            <span class="result-card-name">${escapeHtml(weekend.meeting)}</span>
+                            <span class="result-card-type">${escapeHtml(weekend.circuit)}</span>
+                        </div>
+                        <span class="result-weekend-count numeric-ui">${weekend.sessions.length} session${weekend.sessions.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="result-session-grid">
+                        ${weekend.sessions.map(session => `
+                            <button class="result-session-btn" onclick='openResultDetail(${jsArg(session.filename)})'>
+                                <span class="result-session-kicker">R${escapeHtml(session.round || '-')} &middot; ${escapeHtml(formatSessionTypeLabel(session, weekend.sessions))}</span>
+                                <span class="result-session-name">${escapeHtml(formatSessionTypeLabel(session, weekend.sessions))}</span>
+                                <span class="result-session-meta">${escapeHtml(formatResultNotation(session, weekend.sessions))}${session.circuit || weekend.circuit ? ` &middot; ${escapeHtml(session.circuit || weekend.circuit)}` : ''}</span>
+                                <span class="result-session-action">Open Results &#9654;</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Could not load past results.</div>';
+        }
+    }
+
+    async function openResultDetail(filename) {
+        document.getElementById('result-detail-modal').classList.remove('hidden');
+        const body = document.getElementById('result-detail-body');
+        body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Loading...</div>';
+        try {
+            const d = await fetch(`/api/live/results/${encodeURIComponent(filename)}?t=${Date.now()}`).then(r => r.json());
+            const meta = d.meta || {};
+            document.getElementById('result-detail-title').textContent = `${meta.meeting || filename} - ${formatSessionTypeLabel(meta)}`;
+            const results = d.results || [];
+            if (!results.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">No classification data.</div>'; return; }
+            const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+            const tyreTextColors = { MEDIUM:'#111', HARD:'#111' };
+            const numMap = {};
+            teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
+            if (d.drivers) {
+                Object.entries(d.drivers).forEach(([num, info]) => {
+                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || numMap[num]?.color || 'var(--border)' };
+                });
+            }
+
+            const fl = d.fastest_lap;
+            const flName = fl ? escapeHtml(numMap[String(fl.driver_number)]?.name || '#' + fl.driver_number) : '';
+            const flHtml = fl ? `<div style="padding:10px 14px;background:rgba(155,89,182,0.08);border-bottom:2px solid var(--border);font-size:0.85rem;font-weight:700;color:#9b59b6;">Fastest Lap: ${flName} - ${escapeHtml(fl.time)} (Lap ${escapeHtml(fl.lap)})</div>` : '';
+
+            body.innerHTML = flHtml + `<table>
+                <thead><tr>
+                    <th style="text-align:center;width:40px;">P</th>
+                    <th style="text-align:left;">Driver</th>
+                    <th style="text-align:right;">Best Lap</th>
+                    <th style="text-align:right;">Gap</th>
+                    <th style="text-align:center;">Laps</th>
+                    <th style="text-align:center;">Tyres</th>
+                </tr></thead>
+                <tbody>${results.map(r => {
+                    const info = numMap[String(r.driver_number)] || {};
+                    const dName = escapeHtml(info.name || '#' + r.driver_number);
+                    const tc = info.color || 'var(--border)';
+                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DSQ</span>' : '';
+                    const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
+                    const stints = (r.stints || []).map(s => {
+                        const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
+                        const txt = tyreTextColors[(s.compound || '').toUpperCase()] || '#fff';
+                        return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${bg};color:${txt};font-size:0.6rem;font-weight:900;" title="${escapeHtml(s.compound || '?')} (${escapeHtml(s.laps || 0)}L${s.new ? '' : ', used'})">${escapeHtml((s.compound || '?')[0])}</span>`;
+                    }).join('');
+                    return `<tr>
+                        <td style="text-align:center;font-weight:900;color:${posCol};">${escapeHtml(r.position)}</td>
+                        <td><span style="display:inline-block;width:3px;height:14px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${dName}</b>${status}</td>
+                        <td style="text-align:right;font-weight:700;">${escapeHtml(r.best_lap_time || '-')}</td>
+                        <td style="text-align:right;font-weight:700;color:var(--red);">${escapeHtml(r.gap_to_leader || '-')}</td>
+                        <td style="text-align:center;color:var(--text-muted);">${escapeHtml(r.laps_completed || '-')}</td>
+                        <td style="text-align:center;"><div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${stints || '-'}</div></td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        } catch (e) {
+            body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Failed to load session data.</div>';
+        }
+    }
+
+    async function loadTimingTab() {
+        const body = document.getElementById('timing-body');
+        const cards = document.getElementById('timing-cards');
+        const status = document.getElementById('timing-status');
+        const refresh = document.getElementById('timing-refresh-label');
+
+        try {
+            const d = await fetch('/api/live-widget?t=' + Date.now()).then(r => r.json());
+            if (d.error) throw new Error(d.error);
+
+            const drivers = d.timing?.drivers || [];
+            if (drivers.length === 0) throw new Error('No data');
+
+            const session = d.status?.session;
+            const sesName = session?.Name || d.timing?.session || '';
+            const sesType = session?.Type || '';
+            const connected = d.status?.connected;
+            const trackMsg = d.status?.track_status?.Message || '';
+            liveSessionFinished = isSessionFinished(session);
+
+            const toSecs = (t) => {
+                if (!t) return null;
+                const p = t.split(':');
+                return p.length === 2 ? parseInt(p[0]) * 60 + parseFloat(p[1]) : parseFloat(p[0]);
+            };
+            const p1Secs = toSecs(drivers[0]?.best_lap_time);
+
+            const gapSecs = drivers.map((r, i) => {
+                if (i === 0) return 0;
+                const g = r.gap_to_leader;
+                if (g) {
+                    const v = parseFloat(g.replace('+', ''));
+                    return isNaN(v) ? null : v;
+                }
+                if (p1Secs) {
+                    const ms = toSecs(r.best_lap_time);
+                    if (ms) return ms - p1Secs;
+                }
+                return null;
+            });
+
+            const dotColor = liveSessionFinished ? '#6b7280' : sseConnected ? '#00cc44' : connected ? '#eebb00' : '#e10600';
+            const dotLabel = liveSessionFinished ? 'Session Over' : sseConnected ? 'SSE' : connected ? 'Polling' : 'Offline';
+            status.innerHTML = `<span title="${escapeHtml(dotLabel)}" style="width:10px;height:10px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;box-shadow:0 0 6px ${dotColor};"></span> <b style="color:var(--text-main);">${escapeHtml(sesName)}</b> <span style="color:var(--text-muted);">${escapeHtml(sesType || dotLabel)}</span>${trackMsg && !liveSessionFinished ? ` &nbsp;&middot;&nbsp; <b style="color:var(--red);">${escapeHtml(trackMsg)}</b>` : ''}`;
+            refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const rows = drivers.map((r, idx) => {
+                const pos = parseInt(r.position) || 99;
+                const name = r.acronym || (r.name ? r.name.split(' ').pop() : '#' + r.driver_number);
+                const team = r.team || '-';
+                const teamCol = r.team_colour ? '#' + r.team_colour : 'var(--border)';
+
+                const tyre = (r.tyre_compound || '').toUpperCase();
+                let tyreColor = '#fff';
+                let tBg = '#444';
+                const tLetter = tyre ? tyre[0] : '-';
+                if (tyre === 'SOFT') tBg = '#e10600';
+                if (tyre === 'MEDIUM') { tyreColor = '#111'; tBg = '#eebb00'; }
+                if (tyre === 'HARD') { tyreColor = '#111'; tBg = '#e8e8e8'; }
+                if (tyre === 'INTERMEDIATE') tBg = '#00cc66';
+                if (tyre === 'WET') tBg = '#0066ff';
+
+                let gapText = '-';
+                if (pos === 1) gapText = 'LEADER';
+                else if (r.gap_to_leader) gapText = r.gap_to_leader.startsWith('+') ? r.gap_to_leader : '+' + r.gap_to_leader;
+                else if (p1Secs) {
+                    const ms = toSecs(r.best_lap_time);
+                    if (ms) gapText = '+' + (ms - p1Secs).toFixed(3);
+                }
+
+                let intText = '-';
+                if (pos === 1) intText = '';
+                else if (r.interval) intText = r.interval.startsWith('+') ? r.interval : '+' + r.interval;
+                else if (idx > 0 && gapSecs[idx] != null && gapSecs[idx - 1] != null) {
+                    const delta = gapSecs[idx] - gapSecs[idx - 1];
+                    intText = '+' + Math.abs(delta).toFixed(3);
+                }
+
+                const sectors = [0, 1, 2].map(i => {
+                    const s = (r.sectors || [])[i] || {};
+                    return { val: s.value || '-', col: s.overall_best ? '#9b59b6' : s.personal_best ? '#00cc44' : null, ob: s.overall_best, pb: s.personal_best };
+                });
+
+                const lastCol = r.last_lap_overall_best ? '#9b59b6' : r.last_lap_personal_best ? '#00cc44' : null;
+                const badge = r.retired ? 'out' : r.in_pit ? 'pit' : null;
+                const topSpd = r.speed_traps?.fl || r.speed_traps?.st || '-';
+                const telem = r.telemetry || {};
+                const driverNum = r.driver_number || '';
+                return { pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, lastCol, badge, topSpd, telem, driverNum, r };
+            });
+
+            body.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, badge, topSpd, telem, driverNum, r }) => {
+                const sCell = (s) => `<td style="padding:9px 5px;text-align:right;font-size:0.8rem;color:${s.col || 'inherit'};font-weight:${(s.ob || s.pb) ? '900' : '600'};">${s.val}</td>`;
+                const badgeHtml = badge === 'out'
+                    ? ' <span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">OUT</span>'
+                    : badge === 'pit'
+                    ? ' <span style="background:rgba(238,187,0,0.15);color:#eebb00;border:1px solid rgba(238,187,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;">PIT</span>'
+                    : '';
+                const safeName = escapeHtml(name);
+                const safeTeam = escapeHtml(team);
+                return `<tr>
+                    <td style="text-align:center;font-weight:900;color:var(--text-main);">${pos === 99 ? '-' : pos}</td>
+                    <td><span style="display:inline-block;width:3px;height:16px;background:${teamCol};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b style="color:var(--text-main);cursor:pointer;" onclick='openTelemModal(${jsArg(driverNum)}, ${jsArg(name)}, ${jsArg(teamCol)})'>${safeName}</b>${badgeHtml}</td>
+                    <td style="color:var(--text-muted);font-size:0.78rem;">${safeTeam}</td>
+                    <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
+                    <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
+                    <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
+                    <td style="text-align:right;font-weight:700;color:var(--text-muted);">${intText}</td>
+                    ${sectors.map(sCell).join('')}
+                    <td style="text-align:right;font-size:0.8rem;">${telem.speed ? `<span class="telem-mini"><span class="telem-speed-bar"><span class="telem-speed-fill" style="width:${Math.min(100, (telem.speed / 350) * 100)}%;background:${telem.speed > 300 ? '#e10600' : telem.speed > 200 ? '#eebb00' : '#00cc44'};"></span></span>${telem.drs === 10 || telem.drs === 12 ? '<span class="telem-drs telem-drs-on">DRS</span>' : telem.drs === 8 ? '<span class="telem-drs telem-drs-elig">DRS</span>' : ''}</span> ` : ''}<span style="color:var(--text-muted);">${topSpd}</span></td>
+                </tr>`;
+            }).join('');
+
+            cards.innerHTML = rows.map(({ pos, name, team, teamCol, tLetter, tBg, tyreColor, gapText, intText, sectors, lastCol, badge, topSpd, telem, driverNum, r }) => {
+                const badgeHtml = badge ? `<span class="tr-badge ${badge}">${badge.toUpperCase()}</span>` : '';
+                const isLeader = pos === 1;
+                const safeName = escapeHtml(name);
+                const safeTeam = escapeHtml(team);
+
+                const s = (i) => {
+                    const sec = sectors[i];
+                    return `<span class="tr-sec" style="color:${sec.col || 'var(--text-muted)'};">S${i + 1} ${sec.val}</span>`;
+                };
+
+                return `
+                <div class="tr-block">
+                    <div class="tr-pos-col"><span class="tr-pos">${pos === 99 ? '-' : pos}</span></div>
+                    <div class="tr-bar" style="background:${teamCol};"></div>
+                    <div class="tr-content">
+                        <div class="tr-line1">
+                            <span class="tr-name" style="cursor:pointer;" onclick='openTelemModal(${jsArg(driverNum)}, ${jsArg(name)}, ${jsArg(teamCol)})'>${safeName}</span>
+                            ${badgeHtml}${telem.drs === 10 || telem.drs === 12 ? '<span class="telem-drs telem-drs-on">DRS</span>' : telem.drs === 8 ? '<span class="telem-drs telem-drs-elig">DRS</span>' : ''}
+                            <div class="tr-line1-right">
+                                <span class="tr-tyre-pill" style="background:${tBg};color:${tyreColor};">${tLetter}</span>
+                                ${r.tyre_laps ? `<span class="tr-tyre-age">${r.tyre_laps}L</span>` : ''}
+                                <span class="tr-gap ${isLeader ? 'ldr' : ''}">${gapText}</span>
+                                ${intText && intText !== '-' ? `<span style="color:var(--text-muted);font-size:0.75rem;font-variant-numeric:tabular-nums;">${intText}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="tr-line2">
+                            <span class="tr-muted">${safeTeam}</span>
+                            <span class="tr-sep">&middot;</span>
+                            <span class="tr-val">${r.best_lap_time || '-'}</span>
+                            <span class="tr-sep">&middot;</span>
+                            <span style="font-weight:700;font-variant-numeric:tabular-nums;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</span>
+                            <span class="tr-sep">&middot;</span>
+                            <span class="tr-muted">${r.laps_completed || 0}L</span>
+                            <span class="tr-sep">&middot;</span>
+                            <span class="tr-muted">${topSpd} km/h</span>
+                        </div>
+                        <div class="tr-line3">
+                            ${s(0)}<span class="tr-sep">&middot;</span>${s(1)}<span class="tr-sep">&middot;</span>${s(2)}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            updateTrackBanner(d.status?.track_status, session);
+            updateLiveWeatherStrip();
+            loadRaceControl();
+            loadPitData();
+            loadTeamRadio();
+        } catch (e) {
+            body.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
+            if (status) status.innerHTML = '';
+            liveSessionFinished = false;
+            document.getElementById('track-banner').className = '';
+            document.getElementById('track-banner').style.display = 'none';
+            document.getElementById('live-weather-strip').style.display = 'none';
+        }
+    }
+
     async function loadHomeData() {
         try {
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
@@ -2138,28 +2577,12 @@
                 podiumUI.innerHTML = top5.map((x, i) => `
                     <div class="podium-item ${i < 3 ? 'podium-'+(i+1) : ''}">
                         <span class="pos">${i+1}.</span>
-                        <span class="pname">${x.name}</span>
-                        <span class="ppts">${x.total_score} pts</span>
+                        <span class="pname">${escapeHtml(x.name)}</span>
+                        <span class="ppts">${escapeHtml(x.total_score)} pts</span>
                     </div>
                 `).join('');
             }
-
-            const rssUrl = 'https://api.rss2json.com/v1/api.json?rss_url=https://www.motorsport.com/rss/f1/news/';
-            const newsRes = await fetch(rssUrl).then(res=>res.json());
-            if(newsRes.status === 'ok' && newsRes.items) {
-                const items = newsRes.items.slice(0, 4);
-                document.getElementById('news-feed').innerHTML = items.map(n => `
-                    <div class="news-item">
-                        <img src="${n.thumbnail || (typeof n.enclosure === 'object' ? n.enclosure?.link : n.enclosure) || ''}" alt="News" style="${!(n.thumbnail || n.enclosure) ? 'display:none;' : ''}" onerror="this.style.display='none'">
-                        <div class="news-item-content">
-                            <h4><a href="${n.link}" target="_blank">${n.title}</a></h4>
-                            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">${new Date(n.pubDate).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                `).join('');
-            } else {
-                document.getElementById('news-feed').innerHTML = '<div style="color: var(--text-muted);">Paddock news feed currently offline.</div>'; 
-            }
+            loadPaddockNews();
 
             if (r.hasSprint) { 
                 document.getElementById('sprint-box').classList.remove('hidden');
@@ -2171,7 +2594,10 @@
                 document.getElementById('sl').required = false;
             }
             
-        } catch (e) { showToast("Telemetry sync failed.", "error"); }
+        } catch (e) {
+            console.error('[Home Data]', e);
+            showToast("Home data failed to load.", "error");
+        }
     }
 
     function tab(t, btnElement) {
