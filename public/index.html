@@ -707,7 +707,6 @@
                                 <th style="text-align:center;">Laps</th>
                                 <th style="text-align:center;">Tyre</th>
                                 <th style="text-align:right;">Best</th>
-                                <th style="text-align:right;">Last</th>
                                 <th style="text-align:right;">Gap</th>
                                 <th style="text-align:right;">Int</th>
                                 <th style="text-align:right;">S1</th>
@@ -717,7 +716,7 @@
                             </tr>
                         </thead>
                         <tbody id="timing-body">
-                            <tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
+                            <tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-muted);">Loading timing data...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1222,7 +1221,6 @@
                     <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed || 0}</td>
                     <td style="text-align:center;"><span style="background:${tBg};color:${tyreColor};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${tLetter}</span>${r.tyre_laps ? `<span style="color:var(--text-muted);font-size:0.68rem;margin-left:3px;">${r.tyre_laps}L</span>` : ''}</td>
                     <td style="text-align:right;font-weight:700;color:var(--text-main);">${r.best_lap_time || '-'}</td>
-                    <td style="text-align:right;font-weight:700;color:${lastCol || 'var(--text-muted)'};">${r.last_lap_time || '-'}</td>
                     <td style="text-align:right;font-weight:900;color:var(--red);">${gapText}</td>
                     <td style="text-align:right;font-weight:700;color:var(--text-muted);">${intText}</td>
                     ${sectors.map(sCell).join('')}
@@ -1281,7 +1279,7 @@
             loadTeamRadio();
 
         } catch(e) {
-            body.innerHTML  = `<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
+            body.innerHTML  = `<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</td></tr>`;
             cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
             if (status) status.innerHTML = '';
             document.getElementById('track-banner').className = '';
@@ -1948,7 +1946,7 @@
         const d = await fetch('/api/calendar?t=' + new Date().getTime()).then(r=>r.json());
         
         body.innerHTML = d.map(x => {
-            const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
+            const formatTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
             
             let sess = x.hasSprint ? `
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; color: var(--text-muted); margin-top: 12px; background: var(--surface-inner); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
