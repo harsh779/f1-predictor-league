@@ -170,6 +170,15 @@ async function setupDatabase() {
             }
         }
 
+        // One-time fix: Paritosh new joiner penalty was -113 (post-round), should be -70 (pre-round)
+        const pFix = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'fix_paritosh_r2'", args: [] });
+        if (!pFix.rows[0]) {
+            await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + 43 WHERE name = 'Paritosh Gohel'", args: [] });
+            await db.execute({ sql: "UPDATE f1_round_history SET score = -70 WHERE round = 'R2' AND user_name = 'Paritosh Gohel' AND prediction LIKE '%new joiner%'", args: [] });
+            await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('fix_paritosh_r2', 'done')", args: [] });
+            console.log("[DB] Fixed Paritosh R2 new joiner penalty: -113 -> -70 (delta +43)");
+        }
+
         console.log("Database synced.");
     } catch (e) { console.error("DB Error:", e); }
 }
@@ -871,6 +880,17 @@ async function performFinalization() {
         const roundLabel = `R${raceData.round}`;
         const timestamp = new Date().toISOString();
 
+        // Capture lowest standing BEFORE applying round scores (for new joiner penalty)
+        const newJoiners = Object.entries(finalScores).filter(([name, data]) => data.isNewJoiner);
+        let preRoundLowestStanding = 0;
+        if (newJoiners.length > 0) {
+            const establishedNames = Object.entries(finalScores).filter(([n, d]) => !d.isNewJoiner && n !== 'admin').map(([n]) => n);
+            if (establishedNames.length > 0) {
+                const estRows = await db.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
+                preRoundLowestStanding = estRows?.min_score ?? 0;
+            }
+        }
+
         const tx = await db.transaction("write");
         try {
             for (const d of activeDrivers) {
@@ -880,22 +900,14 @@ async function performFinalization() {
                 }
             }
 
-            // New joiner penalty: lowest total_score in standings - 5 (applied once)
-            // Must run AFTER all round scores are applied so standings reflect this round
-            const newJoiners = Object.entries(finalScores).filter(([name, data]) => data.isNewJoiner);
+            // New joiner penalty: pre-round lowest standing - 5 (applied once)
             if (newJoiners.length > 0) {
-                const establishedNames = Object.entries(finalScores).filter(([n, d]) => !d.isNewJoiner && n !== 'admin').map(([n]) => n);
-                let lowestStanding = 0;
-                if (establishedNames.length > 0) {
-                    const estRows = await tx.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
-                    lowestStanding = estRows?.min_score ?? 0;
-                }
-                const newJoinerPenalty = lowestStanding - 5;
+                const newJoinerPenalty = preRoundLowestStanding - 5;
 
                 for (const [name] of newJoiners) {
                     await tx.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [newJoinerPenalty, name] });
                     finalScores[name].newJoinerPenalty = newJoinerPenalty;
-                    console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${name} (lowest standing: ${lowestStanding})`);
+                    console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${name} (pre-round lowest: ${preRoundLowestStanding})`);
                 }
             }
 
