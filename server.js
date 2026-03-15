@@ -343,6 +343,29 @@ async function findStrategyRace(calendar, now = new Date()) {
     return current;
 }
 
+function getWeekendSessionTimeline(race) {
+    if (!race?.sessions) return [];
+    const entries = [
+        { key: 'fp1', label: 'FP1', time: race.sessions.fp1 },
+        { key: 'fp2', label: 'FP2', time: race.sessions.fp2 },
+        { key: 'fp3', label: 'FP3', time: race.sessions.fp3 },
+        { key: 'sprintQuali', label: 'Sprint Qualifying', time: race.sessions.sprintQuali },
+        { key: 'sprint', label: 'Sprint', time: race.sessions.sprint },
+        { key: 'quali', label: race.hasSprint ? 'Grand Prix Qualifying' : 'Qualifying', time: race.sessions.quali },
+        { key: 'race', label: 'Race', time: race.sessions.race }
+    ];
+
+    return entries
+        .filter(session => session.time)
+        .map(session => ({ ...session, startsAt: new Date(session.time) }))
+        .filter(session => !Number.isNaN(session.startsAt.getTime()))
+        .sort((a, b) => a.startsAt - b.startsAt);
+}
+
+function findNextWeekendSession(race, now = new Date()) {
+    return getWeekendSessionTimeline(race).find(session => session.startsAt > now) || null;
+}
+
 function normalizeWeatherPayload(raw) {
     if (!raw) return null;
     const pick = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '');
@@ -929,7 +952,19 @@ app.get('/api/next-race', async (req, res) => {
     const lt = new Date(lockSes);
     lt.setMinutes(lt.getMinutes() - 1);
     const isLocked = now > lt;
-    const payload = { ...next, totalRounds: seasonCalendar.length, lockTime: lt.toISOString(), isLocked, lockStatus: isLocked ? 'locked' : 'open' };
+    const nextSession = findNextWeekendSession(next, now);
+    const payload = {
+        ...next,
+        totalRounds: seasonCalendar.length,
+        lockTime: lt.toISOString(),
+        isLocked,
+        lockStatus: isLocked ? 'locked' : 'open',
+        nextSession: nextSession ? {
+            key: nextSession.key,
+            label: nextSession.label,
+            time: nextSession.time
+        } : null
+    };
     res.json(payload);
 });
 

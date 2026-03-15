@@ -2531,6 +2531,10 @@
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
             document.getElementById('h-round').innerText = `Round ${r.round} of ${r.totalRounds || 24}`;
             document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
+            const formatSessionTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
+            const nextSessionMarkup = r.nextSession?.time ? `
+                <span class="lock-note">Next session: <strong style="color:var(--text-main);">${r.nextSession.label}</strong> <strong class="numeric-ui" style="color:var(--text-main);">${formatSessionTime(r.nextSession.time)}</strong></span>
+            ` : '';
             
             if(r.trackDetails) {
                 document.getElementById('h-track-intel').innerHTML = `
@@ -2550,6 +2554,7 @@
                         <div class="lock-state">
                             <span class="lock-pill locked numeric-ui">Locked For ${r.name}</span>
                             <span class="lock-note">Predictions stay closed for this race weekend.</span>
+                            ${nextSessionMarkup}
                         </div>
                     `;
                 } else {
@@ -2557,6 +2562,7 @@
                         <div class="lock-state">
                             <span class="lock-label">Strategy Lockout</span>
                             <span class="lock-pill open numeric-ui">${dlFormat}</span>
+                            ${nextSessionMarkup}
                         </div>
                     `;
                 }
