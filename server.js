@@ -1233,31 +1233,30 @@ app.get('/api/calendar', async (_req, res) => {
     }
 });
 
-// --- Driver Career Stats (through end of 2025 season) ---
-// Career stats through end of 2025 season (verified via Ergast API)
+// --- Driver Career Stats (verified against formula1.com, March 2026) ---
 const DRIVER_CAREER = {
-    'Max Verstappen':    { nationality: 'Dutch',       dob: '1997-09-30', championships: 4, wins: 71, podiums: 127, poles: 62, races: 235, debut: 2015 },
-    'Lewis Hamilton':    { nationality: 'British',     dob: '1985-01-07', championships: 7, wins: 105, podiums: 203, poles: 117, races: 382, debut: 2007 },
-    'Fernando Alonso':   { nationality: 'Spanish',     dob: '1981-07-29', championships: 2, wins: 32, podiums: 106, poles: 23, races: 430, debut: 2001 },
-    'Charles Leclerc':   { nationality: 'Monegasque',  dob: '1997-10-16', championships: 0, wins: 8, podiums: 51, poles: 32, races: 175, debut: 2018 },
-    'Lando Norris':      { nationality: 'British',     dob: '1999-11-13', championships: 0, wins: 11, podiums: 44, poles: 29, races: 154, debut: 2019 },
-    'Oscar Piastri':     { nationality: 'Australian',  dob: '2001-04-06', championships: 0, wins: 9, podiums: 26, poles: 14, races: 72, debut: 2023 },
-    'Carlos Sainz':      { nationality: 'Spanish',     dob: '1994-09-01', championships: 0, wins: 4, podiums: 29, poles: 11, races: 234, debut: 2015 },
-    'George Russell':    { nationality: 'British',     dob: '1998-02-15', championships: 0, wins: 6, podiums: 26, poles: 13, races: 154, debut: 2019 },
-    'Sergio Perez':      { nationality: 'Mexican',     dob: '1990-01-26', championships: 0, wins: 6, podiums: 39, poles: 4, races: 285, debut: 2011 },
-    'Valtteri Bottas':   { nationality: 'Finnish',     dob: '1989-08-28', championships: 0, wins: 10, podiums: 67, poles: 19, races: 249, debut: 2013 },
-    'Pierre Gasly':      { nationality: 'French',      dob: '1996-02-07', championships: 0, wins: 1, podiums: 4, poles: 0, races: 180, debut: 2017 },
-    'Esteban Ocon':      { nationality: 'French',      dob: '1996-09-17', championships: 0, wins: 1, podiums: 4, poles: 0, races: 174, debut: 2016 },
-    'Nico Hulkenberg':   { nationality: 'German',      dob: '1987-08-19', championships: 0, wins: 0, podiums: 1, poles: 1, races: 256, debut: 2010 },
-    'Lance Stroll':      { nationality: 'Canadian',    dob: '1998-10-29', championships: 0, wins: 0, podiums: 3, poles: 1, races: 193, debut: 2017 },
+    'Max Verstappen':    { nationality: 'Dutch',       dob: '1997-09-30', championships: 4, wins: 71, podiums: 127, poles: 48, races: 235, debut: 2015 },
+    'Lewis Hamilton':    { nationality: 'British',     dob: '1985-01-07', championships: 7, wins: 105, podiums: 203, poles: 104, races: 382, debut: 2007 },
+    'Fernando Alonso':   { nationality: 'Spanish',     dob: '1981-07-29', championships: 2, wins: 32, podiums: 106, poles: 22, races: 429, debut: 2001 },
+    'Charles Leclerc':   { nationality: 'Monegasque',  dob: '1997-10-16', championships: 0, wins: 8, podiums: 51, poles: 27, races: 173, debut: 2018 },
+    'Lando Norris':      { nationality: 'British',     dob: '1999-11-13', championships: 1, wins: 11, podiums: 44, poles: 16, races: 154, debut: 2019 },
+    'Oscar Piastri':     { nationality: 'Australian',  dob: '2001-04-06', championships: 0, wins: 9, podiums: 26, poles: 6, races: 72, debut: 2023 },
+    'Carlos Sainz':      { nationality: 'Spanish',     dob: '1994-09-01', championships: 0, wins: 4, podiums: 29, poles: 6, races: 232, debut: 2015 },
+    'George Russell':    { nationality: 'British',     dob: '1998-02-15', championships: 0, wins: 6, podiums: 26, poles: 8, races: 154, debut: 2019 },
+    'Sergio Perez':      { nationality: 'Mexican',     dob: '1990-01-26', championships: 0, wins: 6, podiums: 39, poles: 3, races: 283, debut: 2011 },
+    'Valtteri Bottas':   { nationality: 'Finnish',     dob: '1989-08-28', championships: 0, wins: 10, podiums: 67, poles: 20, races: 248, debut: 2013 },
+    'Pierre Gasly':      { nationality: 'French',      dob: '1996-02-07', championships: 0, wins: 1, podiums: 5, poles: 0, races: 179, debut: 2017 },
+    'Esteban Ocon':      { nationality: 'French',      dob: '1996-09-17', championships: 0, wins: 1, podiums: 4, poles: 0, races: 182, debut: 2016 },
+    'Nico Hulkenberg':   { nationality: 'German',      dob: '1987-08-19', championships: 0, wins: 0, podiums: 1, poles: 1, races: 253, debut: 2010 },
+    'Lance Stroll':      { nationality: 'Canadian',    dob: '1998-10-29', championships: 0, wins: 0, podiums: 3, poles: 1, races: 192, debut: 2017 },
     'Alexander Albon':   { nationality: 'Thai',        dob: '1996-03-23', championships: 0, wins: 0, podiums: 2, poles: 0, races: 130, debut: 2019 },
     'Liam Lawson':       { nationality: 'New Zealander', dob: '2002-02-11', championships: 0, wins: 0, podiums: 0, poles: 0, races: 37, debut: 2023 },
-    'Franco Colapinto':  { nationality: 'Argentine',   dob: '2003-05-27', championships: 0, wins: 0, podiums: 0, poles: 0, races: 9, debut: 2024 },
-    'Kimi Antonelli':    { nationality: 'Italian',     dob: '2006-08-25', championships: 0, wins: 1, podiums: 3, poles: 0, races: 24, debut: 2025 },
-    'Isack Hadjar':      { nationality: 'French',      dob: '2004-09-28', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true },
-    'Oliver Bearman':    { nationality: 'British',     dob: '2005-05-08', championships: 0, wins: 0, podiums: 0, poles: 0, races: 27, debut: 2024 },
-    'Gabriel Bortoleto': { nationality: 'Brazilian',   dob: '2004-10-14', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true },
-    'Arvid Lindblad':    { nationality: 'British',     dob: '2006-09-17', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true }
+    'Franco Colapinto':  { nationality: 'Argentine',   dob: '2003-05-27', championships: 0, wins: 0, podiums: 0, poles: 0, races: 29, debut: 2024 },
+    'Kimi Antonelli':    { nationality: 'Italian',     dob: '2006-08-25', championships: 0, wins: 1, podiums: 5, poles: 1, races: 26, debut: 2025 },
+    'Isack Hadjar':      { nationality: 'French',      dob: '2004-09-28', championships: 0, wins: 0, podiums: 1, poles: 0, races: 25, debut: 2025 },
+    'Oliver Bearman':    { nationality: 'British',     dob: '2005-05-08', championships: 0, wins: 0, podiums: 0, poles: 0, races: 29, debut: 2024 },
+    'Gabriel Bortoleto': { nationality: 'Brazilian',   dob: '2004-10-14', championships: 0, wins: 0, podiums: 0, poles: 0, races: 26, debut: 2025 },
+    'Arvid Lindblad':    { nationality: 'British',     dob: '2006-09-17', championships: 0, wins: 0, podiums: 0, poles: 0, races: 2, debut: 2026, rookie: true }
 };
 
 let driverHeadshotCache = null;
@@ -1958,10 +1957,11 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.9';
+const APP_VERSION = 'v8.0';
 const APP_CHANGELOG = [
-    'New: Tap any driver name to see career stats (wins, podiums, poles, championships) with headshot',
-    'Redesigned home race card with country flag, dates, and integrated track KPIs',
+    'Fixed driver career stats: verified all 22 drivers against official F1 website',
+    'Corrected pole positions, race counts, and championship data (Norris 2025 WDC)',
+    'Hadjar & Bortoleto no longer marked as rookies (debuted 2025)',
 ];
 async function notifyDeployUpdate() {
     try {
