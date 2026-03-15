@@ -120,6 +120,11 @@
             .predict-group { padding: 15px !important; margin-bottom: 15px !important; }
             #grid-container { grid-template-columns: 1fr !important; }
             input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
+            .race-hero-card { flex-direction: column !important; padding: 22px 18px !important; gap: 20px !important; }
+            .race-hero-right { align-items: stretch !important; }
+            .race-hero-kpis { min-width: 0 !important; }
+            .race-hero-name { font-size: 2rem !important; }
+            .race-hero-dates { font-size: 1.15rem !important; }
             #h-header { font-size: 1.8rem !important; }
             .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
@@ -137,7 +142,7 @@
         
         .section-title { border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--text-main); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 2rem; margin-top: 0;}
         .numeric-ui, .numeric-ui * { font-family: var(--font-numeric); font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em; }
-        #h-round, #h-deadline, #h-track-intel b, .podium-item .pos, .podium-item .ppts, .race-chip, .chip-round,
+        #h-round, #h-deadline, .race-kpi-value, .podium-item .pos, .podium-item .ppts, .race-chip, .chip-round,
         #timing-table th, #timing-table td, .tr-pos, .tr-gap, .tr-val, .tr-sec, .result-detail-body th, .result-detail-body td,
         .dd-stat-val, #timing-refresh-label, .result-weekend-count, .result-session-kicker, .result-session-action {
             font-family: var(--font-numeric);
@@ -161,6 +166,124 @@
         .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 30px; }
         .dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
         .dash-card-title { font-size: 1.1rem; color: var(--red); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
+
+        /* --- Race Hero Card --- */
+        .race-hero-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 30px 35px;
+            margin-bottom: 25px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 30px;
+            justify-content: space-between;
+            align-items: stretch;
+            position: relative;
+            overflow: hidden;
+        }
+        .race-hero-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 6px;
+            background: var(--red);
+            border-radius: 14px 0 0 14px;
+        }
+        .race-hero-left {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .race-hero-round {
+            color: var(--text-muted);
+            font-weight: 800;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin: 0 0 6px 0;
+            letter-spacing: 2px;
+        }
+        .race-hero-title-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 4px;
+        }
+        .race-hero-flag {
+            width: 38px;
+            height: 26px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .race-hero-name {
+            margin: 0;
+            font-size: 2.8rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            line-height: 1.1;
+            color: var(--text-main);
+            letter-spacing: 0.5px;
+        }
+        .race-hero-gp-title {
+            margin: 6px 0 0 0;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .race-hero-dates {
+            margin: 14px 0 0 0;
+            font-size: 1.4rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-main);
+        }
+        .race-hero-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .race-hero-kpis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            min-width: 240px;
+        }
+        .race-kpi {
+            background: var(--surface-inner);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+        }
+        .race-kpi-wide {
+            grid-column: 1 / -1;
+        }
+        .race-kpi-label {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .race-kpi-value {
+            color: var(--text-main);
+            font-size: 1.15rem;
+            font-weight: 800;
+            font-family: var(--font-numeric);
+            font-variant-numeric: tabular-nums lining-nums;
+        }
 
         /* News Widget */
         .news-item { display: flex; gap: 15px; border-bottom: 1px solid var(--border); padding: 15px 0; align-items: center;}
@@ -584,30 +707,32 @@
 
 <main>
     <div id="home" class="tab active">
-        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
-            <div style="flex: 1; min-width: 250px;">
-                <p id="h-round" style="color: var(--red); font-weight: 900; font-size: 1.1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
-                <h2 id="h-header" style="margin: 0 0 10px 0; font-size: 2.5rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
+        <!-- Race Hero Card -->
+        <div class="race-hero-card">
+            <div class="race-hero-left">
+                <p id="h-round" class="race-hero-round">Loading Telemetry...</p>
+                <div class="race-hero-title-row">
+                    <img id="h-flag" class="race-hero-flag" src="" alt="" style="display:none;">
+                    <h2 id="h-header" class="race-hero-name"><span class="skeleton" style="width: 200px; height: 42px; display:inline-block;"></span></h2>
+                </div>
+                <p id="h-gp-title" class="race-hero-gp-title"><span class="skeleton" style="width: 70%; height: 16px; display:inline-block;"></span></p>
+                <p id="h-race-dates" class="race-hero-dates numeric-ui"><span class="skeleton" style="width: 120px; height: 22px; display:inline-block;"></span></p>
                 <div id="h-deadline" style="margin: 15px 0 0 0; font-size: 1.1rem;"><div class="skeleton" style="width: 50%; height: 20px; margin-top: 10px;"></div></div>
             </div>
-            
-            <div style="display: flex; align-items: center;">
-                <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 20px 40px; font-size: 1.3rem;">Lock Strategy</button>
+            <div class="race-hero-right">
+                <div id="h-track-kpis" class="race-hero-kpis">
+                    <div class="race-kpi"><span class="race-kpi-label">Length</span><span class="race-kpi-value skeleton" style="width:60px;height:20px;display:inline-block;">&nbsp;</span></div>
+                    <div class="race-kpi"><span class="race-kpi-label">Laps</span><span class="race-kpi-value skeleton" style="width:40px;height:20px;display:inline-block;">&nbsp;</span></div>
+                    <div class="race-kpi"><span class="race-kpi-label">Corners</span><span class="race-kpi-value skeleton" style="width:40px;height:20px;display:inline-block;">&nbsp;</span></div>
+                    <div class="race-kpi"><span class="race-kpi-label">First GP</span><span class="race-kpi-value skeleton" style="width:50px;height:20px;display:inline-block;">&nbsp;</span></div>
+                    <div class="race-kpi race-kpi-wide"><span class="race-kpi-label">Lap Record</span><span class="race-kpi-value skeleton" style="width:80px;height:20px;display:inline-block;">&nbsp;</span></div>
+                </div>
+                <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 14px 30px; font-size: 1.1rem; margin-top: 15px;">Lock Strategy</button>
             </div>
         </div>
 
         <div class="dash-grid">
             <div style="display: flex; flex-direction: column; gap: 25px;">
-                <div class="dash-card">
-                    <h3 class="dash-card-title">Circuit Intelligence</h3>
-                    <div id="h-track-intel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 1.05rem; line-height: 1.6;">
-                        <div class="skeleton" style="width: 80%; height: 20px;"></div>
-                        <div class="skeleton" style="width: 70%; height: 20px;"></div>
-                        <div class="skeleton" style="width: 90%; height: 20px;"></div>
-                        <div class="skeleton" style="width: 60%; height: 20px;"></div>
-                    </div>
-                </div>
-
                 <div class="dash-card">
                     <h3 class="dash-card-title">Live Track Conditions</h3>
                     <div id="weather-widget">
@@ -2531,23 +2656,67 @@
         }
     }
 
+    const COUNTRY_FLAGS = {
+        'Australia':'au','China':'cn','Japan':'jp','United States':'us','USA':'us','Canada':'ca',
+        'Monaco':'mc','Spain':'es','Austria':'at','Great Britain':'gb','Belgium':'be','Hungary':'hu',
+        'Netherlands':'nl','Italy':'it','Azerbaijan':'az','Singapore':'sg','Mexico':'mx','Brazil':'br',
+        'Qatar':'qa','Abu Dhabi':'ae','Bahrain':'bh','Saudi Arabia':'sa'
+    };
+    const SHORT_NAMES = {
+        'Australian Grand Prix':'Australia','Chinese Grand Prix':'China','Japanese Grand Prix':'Japan',
+        'Miami Grand Prix':'Miami','Canadian Grand Prix':'Canada','Monaco Grand Prix':'Monaco',
+        'Spanish Grand Prix':'Spain','Austrian Grand Prix':'Austria','British Grand Prix':'Great Britain',
+        'Belgian Grand Prix':'Belgium','Hungarian Grand Prix':'Hungary','Dutch Grand Prix':'Netherlands',
+        'Italian Grand Prix':'Italy','Madrid Grand Prix':'Madrid','Azerbaijan Grand Prix':'Azerbaijan',
+        'Singapore Grand Prix':'Singapore','United States Grand Prix':'Austin',
+        'Mexico City Grand Prix':'Mexico City','São Paulo Grand Prix':'São Paulo',
+        'Las Vegas Grand Prix':'Las Vegas','Qatar Grand Prix':'Qatar','Abu Dhabi Grand Prix':'Abu Dhabi'
+    };
+
+    function getRaceWeekendDates(sessions) {
+        const allTimes = Object.values(sessions || {}).filter(Boolean).map(t => new Date(t));
+        if (!allTimes.length) return '';
+        allTimes.sort((a, b) => a - b);
+        const first = allTimes[0], last = allTimes[allTimes.length - 1];
+        const d1 = first.toLocaleDateString('en-GB', { day: '2-digit', timeZone: 'UTC' });
+        const d2 = last.toLocaleDateString('en-GB', { day: '2-digit', timeZone: 'UTC' });
+        const mon = last.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }).toUpperCase();
+        return d1 === d2 ? `${d1} ${mon}` : `${d1} – ${d2} ${mon}`;
+    }
+
     async function loadHomeData() {
         try {
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
             document.getElementById('h-round').innerText = `Round ${r.round} of ${r.totalRounds || 22}`;
-            document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
+
+            const shortName = SHORT_NAMES[r.name] || r.name?.replace(/ Grand Prix$/i, '') || r.circuit;
+            document.getElementById('h-header').innerText = shortName;
+
+            const cc = COUNTRY_FLAGS[r.country];
+            const flagEl = document.getElementById('h-flag');
+            if (cc) {
+                flagEl.src = `https://flagcdn.com/w80/${cc}.png`;
+                flagEl.alt = r.country;
+                flagEl.style.display = '';
+            } else {
+                flagEl.style.display = 'none';
+            }
+
+            document.getElementById('h-gp-title').innerText = `Formula 1 ${r.name} 2026`;
+            document.getElementById('h-race-dates').innerText = getRaceWeekendDates(r.sessions);
+
             const formatSessionTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
             const nextSessionMarkup = r.nextSession?.time ? `
                 <span class="lock-note">Next session: <strong style="color:var(--text-main);">${r.nextSession.label}</strong> <strong class="numeric-ui" style="color:var(--text-main);">${formatSessionTime(r.nextSession.time)}</strong></span>
             ` : '';
-            
+
             if(r.trackDetails) {
-                document.getElementById('h-track-intel').innerHTML = `
-                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Track Length</span><b style="color:var(--text-main);">${r.trackDetails.length}</b></div>
-                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Race Laps</span><b style="color:var(--text-main);">${r.trackDetails.laps}</b></div>
-                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Corners</span><b style="color:var(--text-main);">${r.trackDetails.corners}</b></div>
-                    <div><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">First GP</span><b style="color:var(--text-main);">${r.trackDetails.firstGP}</b></div>
-                    <div style="grid-column: 1 / -1;"><span style="color:var(--text-muted); display:block; font-size:0.8rem; text-transform:uppercase;">Lap Record</span><b style="color:var(--text-main);">${r.trackDetails.record}</b></div>
+                document.getElementById('h-track-kpis').innerHTML = `
+                    <div class="race-kpi"><span class="race-kpi-label">Length</span><span class="race-kpi-value">${r.trackDetails.length}</span></div>
+                    <div class="race-kpi"><span class="race-kpi-label">Laps</span><span class="race-kpi-value">${r.trackDetails.laps}</span></div>
+                    <div class="race-kpi"><span class="race-kpi-label">Corners</span><span class="race-kpi-value">${r.trackDetails.corners}</span></div>
+                    <div class="race-kpi"><span class="race-kpi-label">First GP</span><span class="race-kpi-value">${r.trackDetails.firstGP}</span></div>
+                    <div class="race-kpi race-kpi-wide"><span class="race-kpi-label">Lap Record</span><span class="race-kpi-value">${r.trackDetails.record}</span></div>
                 `;
             }
 
