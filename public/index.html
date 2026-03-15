@@ -1332,6 +1332,22 @@
             .replace(/'/g, '&#39;');
     }
 
+    function formatDisplayName(value) {
+        const trimmed = String(value ?? '').trim();
+        if (!trimmed) return '';
+
+        return trimmed
+            .split(/\s+/)
+            .map(part => part
+                .split(/([-'])/)
+                .map(segment => {
+                    if (!segment || segment === '-' || segment === "'") return segment;
+                    return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase();
+                })
+                .join(''))
+            .join(' ');
+    }
+
     function jsArg(value) {
         return JSON.stringify(String(value ?? ''));
     }
@@ -2757,7 +2773,7 @@
                 podiumUI.innerHTML = top5.map((x, i) => `
                     <div class="podium-item ${i < 3 ? 'podium-'+(i+1) : ''}">
                         <span class="pos">${i+1}.</span>
-                        <span class="pname">${escapeHtml(x.name)}</span>
+                        <span class="pname">${escapeHtml(formatDisplayName(x.name))}</span>
                         <span class="ppts">${escapeHtml(x.total_score)} pts</span>
                     </div>
                 `).join('');
@@ -2867,7 +2883,7 @@
             list.innerHTML = "<div class='predict-group' style='text-align: center; color: var(--text-muted);'>No telemetry submitted yet for this session.</div>"; 
         } else {
             list.innerHTML = d.map(x=>{
-                const safeUser = escapeHtml(x.user_name);
+                const safeUser = escapeHtml(formatDisplayName(x.user_name));
                 const p1 = escapeHtml(x.p1);
                 const p2 = escapeHtml(x.p2);
                 const p3 = escapeHtml(x.p3);
@@ -2943,7 +2959,7 @@
         else {
             board.innerHTML = d.map((x,i)=>{
                 let isVip = (x.is_vip === 1);
-                const safeName = escapeHtml(x.name);
+                const safeName = escapeHtml(formatDisplayName(x.name));
                 const safeSeasonDriver = escapeHtml(x.season_driver || 'TBC');
                 const safeSeasonConstructor = escapeHtml(x.season_constructor || 'TBC');
                 let nameHtml = isVip ? `<span class="vip-gold">${safeName}</span><span class="vip-badge">Constructors Club</span>` : `<span style="font-weight: 700;">${safeName}</span>`;
@@ -3153,7 +3169,7 @@
             list.innerHTML = users.map(u => `
                 <div style="background: var(--surface); padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 10px;">
                     <div>
-                        <strong style="color:var(--text-main); font-size:1.1rem; display: block; margin-bottom: 4px;">${escapeHtml(u.name)}${u.is_vip ? ' (VIP)' : ''}</strong>
+                        <strong style="color:var(--text-main); font-size:1.1rem; display: block; margin-bottom: 4px;">${escapeHtml(formatDisplayName(u.name))}${u.is_vip ? ' (VIP)' : ''}</strong>
                         <span style="color:var(--text-muted); font-size:0.9rem; font-weight: 700;">Score: ${u.total_score} pts</span>
                     </div>
                     <div style="display:flex; gap:10px;">
