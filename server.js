@@ -652,6 +652,58 @@ async function sendDiscordNotification(msg) {
     }
 }
 
+function calcDetailedBreakdown(p, actualDriverPositions, actualCRanges, raceLosers, sprintGainers, sprintLosers) {
+    let driverPts = 0, constructorPts = 0, wildcardPts = 0;
+    const driverDetails = []; const teamDetails = []; const wcDetails = [];
+
+    [{ pred: p.p1, rank: 1, label: 'P1' }, { pred: p.p2, rank: 2, label: 'P2' }, { pred: p.p3, rank: 3, label: 'P3' },
+     { pred: p.p10, rank: 10, label: 'P10' }, { pred: p.p11, rank: 11, label: 'P11' },
+     { pred: p.p21, rank: 21, label: 'P21' }, { pred: p.p22, rank: 22, label: 'P22' }
+    ].forEach(({ pred, rank, label }) => {
+        if (!pred) return;
+        let act = actualDriverPositions[normalizeStr(pred)]; if (!act) act = 22;
+        const diff = Math.abs(rank - act);
+        const pts = diff === 0 ? 2 : -diff;
+        driverPts += pts;
+        const surname = pred.split(' ').pop();
+        driverDetails.push(`${label} ${surname}→P${act}(${pts >= 0 ? '+' : ''}${pts})`);
+    });
+
+    [{ pred: p.c1, rank: 1, label: 'C1' }, { pred: p.c2, rank: 2, label: 'C2' },
+     { pred: p.c5, rank: 5, label: 'C5' }, { pred: p.c6, rank: 6, label: 'C6' }, { pred: p.c11, rank: 11, label: 'C11' }
+    ].forEach(({ pred, rank, label }) => {
+        if (!pred) return;
+        const range = actualCRanges[normalizeConstructor(pred)];
+        if (!range) return;
+        let diff = 0;
+        if (rank >= range.min && rank <= range.max) diff = 0;
+        else if (rank < range.min) diff = range.min - rank;
+        else diff = rank - range.max;
+        const pts = diff === 0 ? 2 : -diff;
+        constructorPts += pts;
+        const actPos = range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`;
+        teamDetails.push(`${label} ${pred}→${actPos}(${pts >= 0 ? '+' : ''}${pts})`);
+    });
+
+    if (p.w_race_loser) {
+        const hit = raceLosers.includes(normalizeStr(p.w_race_loser));
+        if (hit) wildcardPts += 5;
+        wcDetails.push(`RL: ${p.w_race_loser.split(' ').pop()}(${hit ? '+5' : 'miss'})`);
+    }
+    if (p.w_sprint_gainer) {
+        const hit = sprintGainers.includes(normalizeStr(p.w_sprint_gainer));
+        if (hit) wildcardPts += 5;
+        wcDetails.push(`SG: ${p.w_sprint_gainer.split(' ').pop()}(${hit ? '+5' : 'miss'})`);
+    }
+    if (p.w_sprint_loser) {
+        const hit = sprintLosers.includes(normalizeStr(p.w_sprint_loser));
+        if (hit) wildcardPts += 5;
+        wcDetails.push(`SL: ${p.w_sprint_loser.split(' ').pop()}(${hit ? '+5' : 'miss'})`);
+    }
+
+    return { driverPts, constructorPts, wildcardPts, total: driverPts + constructorPts + wildcardPts, driverDetails, teamDetails, wcDetails };
+}
+
 async function performFinalization() {
     try {
         // 1. Fetch Race Data — own API first, Ergast fallback
@@ -824,51 +876,10 @@ async function performFinalization() {
         let scores = {}; let scoreBreakdowns = {}; let lowest = Infinity;
 
         predictions.forEach(p => {
-            let driverPts = 0, constructorPts = 0, wildcardPts = 0;
-
-            const driversToScore = [
-                { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
-                { pred: p.p10, rank: 10 }, { pred: p.p11, rank: 11 },
-                { pred: p.p21, rank: 21 }, { pred: p.p22, rank: 22 }
-            ];
-
-            driversToScore.forEach(item => {
-                if (!item.pred) return;
-                let act = actualDriverPositions[normalizeStr(item.pred)];
-                if (!act) act = 22; // Replacement defaults
-
-                const diff = Math.abs(item.rank - act);
-                if (diff === 0) driverPts += 2;
-                else driverPts -= diff;
-            });
-
-            const teamsToScore = [
-                { pred: p.c1, rank: 1 }, { pred: p.c2, rank: 2 },
-                { pred: p.c5, rank: 5 }, { pred: p.c6, rank: 6 }, { pred: p.c11, rank: 11 }
-            ];
-
-            teamsToScore.forEach(item => {
-                if (!item.pred) return;
-                const range = actualCRanges[normalizeConstructor(item.pred)];
-                if (!range) return;
-
-                let diff = 0;
-                if (item.rank >= range.min && item.rank <= range.max) diff = 0;
-                else if (item.rank < range.min) diff = range.min - item.rank;
-                else diff = item.rank - range.max;
-
-                if (diff === 0) constructorPts += 2;
-                else constructorPts -= diff;
-            });
-
-            if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) wildcardPts += 5;
-            if (p.w_sprint_gainer && sprintGainers.includes(normalizeStr(p.w_sprint_gainer))) wildcardPts += 5;
-            if (p.w_sprint_loser && sprintLosers.includes(normalizeStr(p.w_sprint_loser))) wildcardPts += 5;
-
-            const score = driverPts + constructorPts + wildcardPts;
-            scores[p.user_name] = score;
-            scoreBreakdowns[p.user_name] = { driverPts, constructorPts, wildcardPts };
-            if (score < lowest) lowest = score;
+            const detail = calcDetailedBreakdown(p, actualDriverPositions, actualCRanges, raceLosers, sprintGainers, sprintLosers);
+            scores[p.user_name] = detail.total;
+            scoreBreakdowns[p.user_name] = detail;
+            if (detail.total < lowest) lowest = detail.total;
         });
 
         // Apply "Lowest - 5" Penalty for players who missed this round
@@ -951,11 +962,16 @@ async function performFinalization() {
         breakdown += `No-submission penalty: ${penalty}\n\n`;
         sorted.forEach(([name, data], i) => {
             const bd = scoreBreakdowns[name];
-            let line = `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**`;
-            if (bd) line += `  [D: ${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts} | C: ${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts} | W: ${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}]`;
+            let line = `**${i + 1}. ${name}: ${data.score >= 0 ? '+' : ''}${data.score}**`;
             if (!data.hadPrediction) line += ' (no sub)';
             if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
             breakdown += line + '\n';
+            if (bd) {
+                breakdown += `Drivers (${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts}): ${bd.driverDetails.join(', ')}\n`;
+                breakdown += `Teams (${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts}): ${bd.teamDetails.join(', ')}\n`;
+                if (bd.wcDetails.length > 0) breakdown += `Wildcards (${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}): ${bd.wcDetails.join(', ')}\n`;
+            }
+            breakdown += '\n';
         });
         try {
             await sendDiscordNotification(breakdown);
@@ -1197,19 +1213,9 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                 playerScores[row.user_name] = { score: row.score, hadPrediction: false };
             } else {
                 playerScores[row.user_name] = { score: row.score, hadPrediction: true };
-                // Recalculate D/C/W breakdown from stored prediction + actual results
                 if (results && !pred.backfill) {
-                    let driverPts = 0, constructorPts = 0, wildcardPts = 0;
-                    [{ p: pred.p1, r: 1 }, { p: pred.p2, r: 2 }, { p: pred.p3, r: 3 }, { p: pred.p10, r: 10 }, { p: pred.p11, r: 11 }, { p: pred.p21, r: 21 }, { p: pred.p22, r: 22 }].forEach(({ p, r }) => {
-                        if (!p) return; let act = actualDriverPositions[normalizeStr(p)]; if (!act) act = 22; const diff = Math.abs(r - act); if (diff === 0) driverPts += 2; else driverPts -= diff;
-                    });
-                    [{ p: pred.c1, r: 1 }, { p: pred.c2, r: 2 }, { p: pred.c5, r: 5 }, { p: pred.c6, r: 6 }, { p: pred.c11, r: 11 }].forEach(({ p, r }) => {
-                        if (!p) return; const range = actualCRanges[normalizeConstructor(p)]; if (!range) return; let diff = 0; if (r >= range.min && r <= range.max) diff = 0; else if (r < range.min) diff = range.min - r; else diff = r - range.max; if (diff === 0) constructorPts += 2; else constructorPts -= diff;
-                    });
-                    if (pred.w_race_loser && raceLosers.includes(normalizeStr(pred.w_race_loser))) wildcardPts += 5;
-                    if (pred.w_sprint_gainer && sprintGainers.includes(normalizeStr(pred.w_sprint_gainer))) wildcardPts += 5;
-                    if (pred.w_sprint_loser && sprintLosers.includes(normalizeStr(pred.w_sprint_loser))) wildcardPts += 5;
-                    scoreBreakdowns[row.user_name] = { driverPts, constructorPts, wildcardPts };
+                    const detail = calcDetailedBreakdown(pred, actualDriverPositions, actualCRanges, raceLosers, sprintGainers, sprintLosers);
+                    scoreBreakdowns[row.user_name] = detail;
                 }
             }
         }
@@ -1225,11 +1231,16 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         breakdown += '\n';
         sorted.forEach(([name, data], i) => {
             const bd = scoreBreakdowns[name];
-            let line = `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**`;
-            if (bd) line += `  [D: ${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts} | C: ${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts} | W: ${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}]`;
+            let line = `**${i + 1}. ${name}: ${data.score >= 0 ? '+' : ''}${data.score}**`;
             if (!data.hadPrediction) line += ' (no sub)';
             if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
             breakdown += line + '\n';
+            if (bd) {
+                breakdown += `Drivers (${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts}): ${bd.driverDetails.join(', ')}\n`;
+                breakdown += `Teams (${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts}): ${bd.teamDetails.join(', ')}\n`;
+                if (bd.wcDetails.length > 0) breakdown += `Wildcards (${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}): ${bd.wcDetails.join(', ')}\n`;
+            }
+            breakdown += '\n';
         });
 
         await sendDiscordNotification(breakdown);
