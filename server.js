@@ -179,6 +179,14 @@ async function setupDatabase() {
             console.log("[DB] Fixed Paritosh R2 new joiner penalty: -113 -> -70 (delta +43)");
         }
 
+        // One-time fix: Move Paritosh's new joiner penalty from R2 to R1
+        const pFix2 = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'fix_paritosh_r2_round'", args: [] });
+        if (!pFix2.rows[0]) {
+            await db.execute({ sql: "UPDATE f1_round_history SET round = 'R1', race_name = 'New Joiner Penalty' WHERE round = 'R2' AND user_name = 'Paritosh Gohel' AND prediction LIKE '%new joiner%'", args: [] });
+            await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('fix_paritosh_r2_round', 'done')", args: [] });
+            console.log("[DB] Moved Paritosh new joiner penalty from R2 to R1");
+        }
+
         console.log("Database synced.");
     } catch (e) { console.error("DB Error:", e); }
 }
@@ -922,7 +930,8 @@ async function performFinalization() {
                     await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, timestamp] });
                 }
                 if (data.newJoinerPenalty !== undefined && name !== 'admin') {
-                    await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"new joiner"}', data.newJoinerPenalty, timestamp] });
+                    const penaltyRound = `R${parseInt(raceData.round) - 1}`;
+                    await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [penaltyRound, 'New Joiner Penalty', name, '{"penalty":"new joiner"}', data.newJoinerPenalty, timestamp] });
                 }
             }
             console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
