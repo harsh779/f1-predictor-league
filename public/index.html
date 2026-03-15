@@ -121,7 +121,7 @@
             #grid-container { grid-template-columns: 1fr !important; }
             input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
             #h-header { font-size: 1.8rem !important; }
-            #h-circuit-svg { flex: 0 0 140px !important; height: 140px !important; }
+            #h-circuit-svg { display: none !important; }
             .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
             .auth-card { padding: 35px 25px; }
@@ -585,7 +585,8 @@
 
 <main>
     <div id="home" class="tab active">
-        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
+        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between; position: relative; overflow: hidden;">
+            <div id="h-circuit-svg" style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); opacity: 0; width: 180px; height: 150px; pointer-events: none; transition: opacity 0.5s ease;"></div>
             <div style="flex: 1; min-width: 250px; z-index: 1;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
                     <img id="h-flag" style="width: 36px; height: 24px; border-radius: 3px; object-fit: cover; box-shadow: 0 1px 4px rgba(0,0,0,0.25); display: none;" alt="" />
@@ -604,16 +605,11 @@
             <div style="display: flex; flex-direction: column; gap: 25px;">
                 <div class="dash-card">
                     <h3 class="dash-card-title">Circuit Intelligence</h3>
-                    <div style="display: flex; gap: 25px; align-items: center; flex-wrap: wrap;">
-                        <div id="h-circuit-svg" style="flex: 0 0 180px; height: 180px; display: flex; align-items: center; justify-content: center; background: var(--bg-light); border-radius: 12px; border: 1px solid var(--border); padding: 15px;">
-                            <div class="skeleton" style="width: 100%; height: 100%; border-radius: 8px;"></div>
-                        </div>
-                        <div id="h-track-intel" style="flex: 1; min-width: 200px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 1.05rem; line-height: 1.6;">
-                            <div class="skeleton" style="width: 80%; height: 20px;"></div>
-                            <div class="skeleton" style="width: 70%; height: 20px;"></div>
-                            <div class="skeleton" style="width: 90%; height: 20px;"></div>
-                            <div class="skeleton" style="width: 60%; height: 20px;"></div>
-                        </div>
+                    <div id="h-track-intel" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 1.05rem; line-height: 1.6;">
+                        <div class="skeleton" style="width: 80%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 70%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 90%; height: 20px;"></div>
+                        <div class="skeleton" style="width: 60%; height: 20px;"></div>
                     </div>
                 </div>
 
@@ -2590,10 +2586,8 @@
             const circuitEl = document.getElementById('h-circuit-svg');
             if (circuitPath) {
                 const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                const strokeColor = isDark ? 'var(--red)' : '#e10600';
-                circuitEl.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" stroke="${strokeColor}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 6px rgba(225,6,0,0.15));"><path d="${circuitPath}"/></svg>`;
-            } else {
-                circuitEl.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">No layout available</div>';
+                circuitEl.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" stroke="${isDark ? 'rgba(225,6,0,0.12)' : 'rgba(225,6,0,0.1)'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${circuitPath}"/></svg>`;
+                circuitEl.style.opacity = '1';
             }
             const formatSessionTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
             const nextSessionMarkup = r.nextSession?.time ? `
