@@ -1233,22 +1233,32 @@ app.get('/api/calendar', async (_req, res) => {
     }
 });
 
-// --- Driver Career Stats ---
-const DRIVER_ID_MAP = {
-    'Max Verstappen': 'max_verstappen', 'Isack Hadjar': 'hadjar',
-    'Lando Norris': 'norris', 'Oscar Piastri': 'piastri',
-    'Charles Leclerc': 'leclerc', 'Lewis Hamilton': 'hamilton',
-    'George Russell': 'russell', 'Kimi Antonelli': 'antonelli',
-    'Fernando Alonso': 'alonso', 'Lance Stroll': 'stroll',
-    'Carlos Sainz': 'sainz', 'Alexander Albon': 'albon',
-    'Pierre Gasly': 'gasly', 'Franco Colapinto': 'colapinto',
-    'Liam Lawson': 'lawson', 'Arvid Lindblad': 'lindblad',
-    'Esteban Ocon': 'ocon', 'Oliver Bearman': 'bearman',
-    'Nico Hulkenberg': 'hulkenberg', 'Gabriel Bortoleto': 'bortoleto',
-    'Sergio Perez': 'perez', 'Valtteri Bottas': 'bottas'
+// --- Driver Career Stats (through end of 2025 season) ---
+const DRIVER_CAREER = {
+    'Max Verstappen':    { nationality: 'Dutch',       dob: '1997-09-30', championships: 4, wins: 63, podiums: 113, poles: 40, races: 213, debut: 2015 },
+    'Lewis Hamilton':    { nationality: 'British',     dob: '1985-01-07', championships: 7, wins: 105, podiums: 202, poles: 104, races: 353, debut: 2007 },
+    'Fernando Alonso':   { nationality: 'Spanish',     dob: '1981-07-29', championships: 2, wins: 32, podiums: 106, poles: 22, races: 400, debut: 2001 },
+    'Charles Leclerc':   { nationality: 'Monegasque',  dob: '1997-10-16', championships: 0, wins: 8, podiums: 40, poles: 26, races: 146, debut: 2018 },
+    'Lando Norris':      { nationality: 'British',     dob: '1999-11-13', championships: 0, wins: 7, podiums: 28, poles: 10, races: 130, debut: 2019 },
+    'Oscar Piastri':     { nationality: 'Australian',  dob: '2001-04-06', championships: 0, wins: 3, podiums: 13, poles: 2, races: 48, debut: 2023 },
+    'Carlos Sainz':      { nationality: 'Spanish',     dob: '1994-09-01', championships: 0, wins: 4, podiums: 25, poles: 6, races: 210, debut: 2015 },
+    'George Russell':    { nationality: 'British',     dob: '1998-02-15', championships: 0, wins: 3, podiums: 17, poles: 5, races: 120, debut: 2019 },
+    'Sergio Perez':      { nationality: 'Mexican',     dob: '1990-01-26', championships: 0, wins: 6, podiums: 39, poles: 3, races: 280, debut: 2011 },
+    'Valtteri Bottas':   { nationality: 'Finnish',     dob: '1989-08-28', championships: 0, wins: 10, podiums: 67, poles: 20, races: 246, debut: 2013 },
+    'Pierre Gasly':      { nationality: 'French',      dob: '1996-02-07', championships: 0, wins: 1, podiums: 4, poles: 0, races: 160, debut: 2017 },
+    'Esteban Ocon':      { nationality: 'French',      dob: '1996-09-17', championships: 0, wins: 1, podiums: 4, poles: 0, races: 150, debut: 2016 },
+    'Nico Hulkenberg':   { nationality: 'German',      dob: '1987-08-19', championships: 0, wins: 0, podiums: 0, poles: 1, races: 228, debut: 2010 },
+    'Lance Stroll':      { nationality: 'Canadian',    dob: '1998-10-29', championships: 0, wins: 0, podiums: 3, poles: 1, races: 168, debut: 2017 },
+    'Alexander Albon':   { nationality: 'Thai',        dob: '1996-03-23', championships: 0, wins: 0, podiums: 2, poles: 0, races: 106, debut: 2019 },
+    'Liam Lawson':       { nationality: 'New Zealander', dob: '2002-02-11', championships: 0, wins: 0, podiums: 0, poles: 0, races: 16, debut: 2024 },
+    'Franco Colapinto':  { nationality: 'Argentine',   dob: '2003-05-27', championships: 0, wins: 0, podiums: 0, poles: 0, races: 9, debut: 2024 },
+    'Kimi Antonelli':    { nationality: 'Italian',     dob: '2006-08-25', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true },
+    'Isack Hadjar':      { nationality: 'French',      dob: '2004-09-28', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true },
+    'Oliver Bearman':    { nationality: 'British',     dob: '2005-05-08', championships: 0, wins: 0, podiums: 0, poles: 0, races: 5, debut: 2024 },
+    'Gabriel Bortoleto': { nationality: 'Brazilian',   dob: '2004-10-14', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true },
+    'Arvid Lindblad':    { nationality: 'British',     dob: '2006-09-17', championships: 0, wins: 0, podiums: 0, poles: 0, races: 0, debut: 2026, rookie: true }
 };
-const driverStatsCache = {};
-const DRIVER_STATS_TTL = 24 * 60 * 60 * 1000;
+
 let driverHeadshotCache = null;
 let driverHeadshotCacheTime = 0;
 
@@ -1266,82 +1276,28 @@ async function fetchDriverHeadshots() {
 
 app.get('/api/driver-stats/:name', async (req, res) => {
     const name = decodeURIComponent(req.params.name).trim();
-    const cached = driverStatsCache[name];
-    if (cached && Date.now() - cached.fetchedAt < DRIVER_STATS_TTL) return res.json(cached.data);
-
-    const ergastId = DRIVER_ID_MAP[name];
-    const ERGAST = 'https://api.jolpi.ca/ergast/f1';
-
-    const ergastCount = async (path) => {
-        try {
-            const r = await axios.get(`${ERGAST}${path}`, { timeout: 10000 });
-            return parseInt(r.data?.MRData?.total || '0');
-        } catch { return 0; }
-    };
-    const ergastDriverInfo = async (id) => {
-        try {
-            const r = await axios.get(`${ERGAST}/drivers/${id}.json`, { timeout: 10000 });
-            return r.data?.MRData?.DriverTable?.Drivers?.[0] || null;
-        } catch { return null; }
-    };
-    const ergastChampionships = async (id) => {
-        try {
-            const r = await axios.get(`${ERGAST}/drivers/${id}/driverStandings/1.json?limit=100`, { timeout: 10000 });
-            return parseInt(r.data?.MRData?.total || '0');
-        } catch { return 0; }
-    };
-    const ergastTotalRaces = async (id) => {
-        try {
-            const r = await axios.get(`${ERGAST}/drivers/${id}/results.json?limit=1`, { timeout: 10000 });
-            return parseInt(r.data?.MRData?.total || '0');
-        } catch { return 0; }
-    };
+    const career = DRIVER_CAREER[name];
 
     try {
         const headshots = await fetchDriverHeadshots();
-        const headshotEntry = headshots[name] || Object.values(headshots).find(d => d.name && d.name.toLowerCase().includes(name.split(' ').pop().toLowerCase()));
+        const h = headshots[name] || Object.values(headshots).find(d => d.name && d.name.toLowerCase().includes(name.split(' ').pop().toLowerCase()));
 
-        let stats;
-        if (ergastId) {
-            const [wins, poles, info, championships, totalRaces] = await Promise.all([
-                ergastCount(`/drivers/${ergastId}/results/1.json?limit=1`),
-                ergastCount(`/drivers/${ergastId}/qualifying/1.json?limit=1`),
-                ergastDriverInfo(ergastId),
-                ergastChampionships(ergastId),
-                ergastTotalRaces(ergastId)
-            ]);
-
-            // Count podiums: need separate calls for P1, P2, P3
-            const [p2, p3] = await Promise.all([
-                ergastCount(`/drivers/${ergastId}/results/2.json?limit=1`),
-                ergastCount(`/drivers/${ergastId}/results/3.json?limit=1`)
-            ]);
-
-            stats = {
-                name,
-                number: headshotEntry?.driver_number || info?.permanentNumber || null,
-                team: headshotEntry?.team || null,
-                teamColour: headshotEntry?.team_colour || null,
-                headshot: headshotEntry?.headshot_url || null,
-                nationality: info?.nationality || null,
-                dateOfBirth: info?.dateOfBirth || null,
-                championships, wins, podiums: wins + p2 + p3, poles, totalRaces,
-                wikiUrl: info?.url || null
-            };
-        } else {
-            stats = {
-                name,
-                number: headshotEntry?.driver_number || null,
-                team: headshotEntry?.team || null,
-                teamColour: headshotEntry?.team_colour || null,
-                headshot: headshotEntry?.headshot_url || null,
-                nationality: null, dateOfBirth: null,
-                championships: 0, wins: 0, podiums: 0, poles: 0, totalRaces: 0,
-                rookie: true, wikiUrl: null
-            };
-        }
-
-        driverStatsCache[name] = { data: stats, fetchedAt: Date.now() };
+        const stats = {
+            name,
+            number: h?.driver_number || null,
+            team: h?.team || null,
+            teamColour: h?.team_colour || null,
+            headshot: h?.headshot_url || null,
+            nationality: career?.nationality || null,
+            dateOfBirth: career?.dob || null,
+            championships: career?.championships || 0,
+            wins: career?.wins || 0,
+            podiums: career?.podiums || 0,
+            poles: career?.poles || 0,
+            totalRaces: career?.races || 0,
+            debut: career?.debut || null,
+            rookie: career?.rookie || false
+        };
         res.json(stats);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch driver stats', detail: e.message });
@@ -2001,9 +1957,10 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.8';
+const APP_VERSION = 'v7.9';
 const APP_CHANGELOG = [
-    'Fixed Race Loser wildcard showing N/A — Ergast qualifying fallback when own API qualifying data is missing',
+    'New: Tap any driver name to see career stats (wins, podiums, poles, championships) with headshot',
+    'Redesigned home race card with country flag, dates, and integrated track KPIs',
 ];
 async function notifyDeployUpdate() {
     try {
