@@ -678,7 +678,7 @@ async function sendDiscordNotification(msg) {
     }
 }
 
-function buildDiscordBreakdown(raceName, roundLabel, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, penalty, hasResults) {
+function buildDiscordBreakdown(raceName, roundLabel, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, penalty, hasResults, seasonTotals) {
     let msg = `**${raceName} (${roundLabel}) — Score Breakdown**\n`;
     msg += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
     if (sprintResults.length > 0) msg += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
@@ -687,21 +687,29 @@ function buildDiscordBreakdown(raceName, roundLabel, sorted, scoreBreakdowns, ra
 
     // Summary table
     const maxName = Math.max(...sorted.map(([n]) => n.length), 6);
+    const hasSeason = seasonTotals && Object.keys(seasonTotals).length > 0;
     msg += '```\n';
-    msg += ` #  ${'Player'.padEnd(maxName)}  Total    D    C    W\n`;
-    msg += ' ' + '-'.repeat(maxName + 30) + '\n';
+    msg += hasSeason
+        ? ` #  ${'Player'.padEnd(maxName)}  Round  Season    D    C    W\n`
+        : ` #  ${'Player'.padEnd(maxName)}  Total    D    C    W\n`;
+    msg += ' ' + '-'.repeat(maxName + (hasSeason ? 40 : 30)) + '\n';
     sorted.forEach(([name, data], i) => {
         const bd = scoreBreakdowns[name];
         const rank = String(i + 1).padStart(2);
-        const total = String(data.score).padStart(5);
+        const roundScore = String(data.score).padStart(5);
+        const season = hasSeason ? String(seasonTotals[name] ?? '?').padStart(6) : '';
         if (bd) {
             const d = String(bd.driverPts).padStart(4);
             const c = String(bd.constructorPts).padStart(4);
             const w = String(bd.wildcardPts).padStart(4);
-            msg += `${rank}  ${name.padEnd(maxName)}  ${total}  ${d}  ${c}  ${w}`;
+            msg += hasSeason
+                ? `${rank}  ${name.padEnd(maxName)}  ${roundScore}  ${season}  ${d}  ${c}  ${w}`
+                : `${rank}  ${name.padEnd(maxName)}  ${roundScore}  ${d}  ${c}  ${w}`;
         } else {
             let tag = !data.hadPrediction ? '(no sub)' : '';
-            msg += `${rank}  ${name.padEnd(maxName)}  ${total}  ${tag}`;
+            msg += hasSeason
+                ? `${rank}  ${name.padEnd(maxName)}  ${roundScore}  ${season}  ${tag}`
+                : `${rank}  ${name.padEnd(maxName)}  ${roundScore}  ${tag}`;
         }
         if (data.newJoinerPenalty !== undefined) msg += `  [NJ: ${data.newJoinerPenalty}]`;
         msg += '\n';
@@ -713,10 +721,10 @@ function buildDiscordBreakdown(raceName, roundLabel, sorted, scoreBreakdowns, ra
         sorted.forEach(([name]) => {
             const bd = scoreBreakdowns[name];
             if (!bd) return;
-            msg += `**${name}**\n`;
-            msg += `> ${bd.driverDetails.join(', ')}\n`;
-            msg += `> ${bd.teamDetails.join(', ')}\n`;
-            if (bd.wcDetails.length > 0) msg += `> ${bd.wcDetails.join(', ')}\n`;
+            msg += `**${name}** (Round: ${bd.total})\n`;
+            msg += `> Drivers (${bd.driverPts}): ${bd.driverDetails.join(', ')}\n`;
+            msg += `> Constructors (${bd.constructorPts}): ${bd.teamDetails.join(', ')}\n`;
+            if (bd.wcDetails.length > 0) msg += `> Wildcards (${bd.wildcardPts}): ${bd.wcDetails.join(', ')}\n`;
             msg += '\n';
         });
     }
@@ -1044,8 +1052,10 @@ async function performFinalization() {
         }
 
         // --- DISCORD SCORE BREAKDOWN ---
+        const seasonRows = await db.execute("SELECT name, total_score FROM f1_drivers WHERE has_participated = 1 AND name != 'admin' ORDER BY total_score DESC").then(r => r.rows);
+        const seasonTotals = {}; seasonRows.forEach(r => { seasonTotals[r.name] = r.total_score; });
         const sorted = Object.entries(finalScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
-        const breakdown = buildDiscordBreakdown(raceData.raceName, roundLabel, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, penalty, true);
+        const breakdown = buildDiscordBreakdown(raceData.raceName, roundLabel, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, penalty, true, seasonTotals);
         try {
             await sendDiscordNotification(breakdown);
         } catch (notifyError) {
@@ -1344,10 +1354,54 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
             throw writeError;
         }
 
-        // Send Discord
+        // Fetch updated season totals
+        const seasonRows = await db.execute("SELECT name, total_score FROM f1_drivers WHERE has_participated = 1 AND name != 'admin' ORDER BY total_score DESC").then(r => r.rows);
+        const seasonTotals = {};
+        seasonRows.forEach(r => { seasonTotals[r.name] = r.total_score; });
+
+        // Build detailed Discord message
         const sorted = Object.entries(playerScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
-        const breakdown = buildDiscordBreakdown(raceName, round, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, newPenalty, true);
-        await sendDiscordNotification(breakdown);
+        let msg = `**${raceName} (${round}) — RESCORED**\n`;
+        msg += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
+        if (sprintResults.length > 0) msg += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
+        msg += `No-sub penalty: ${newPenalty}\n\n`;
+
+        // Summary table with season totals
+        const maxName = Math.max(...sorted.map(([n]) => n.length), 6);
+        msg += '```\n';
+        msg += ` #  ${'Player'.padEnd(maxName)}  Round  Season    D    C    W\n`;
+        msg += ' ' + '-'.repeat(maxName + 40) + '\n';
+        sorted.forEach(([name, data], i) => {
+            const bd = scoreBreakdowns[name];
+            const rank = String(i + 1).padStart(2);
+            const roundScore = String(data.score).padStart(5);
+            const season = String(seasonTotals[name] ?? '?').padStart(6);
+            if (bd) {
+                const d = String(bd.driverPts).padStart(4);
+                const c = String(bd.constructorPts).padStart(4);
+                const w = String(bd.wildcardPts).padStart(4);
+                msg += `${rank}  ${name.padEnd(maxName)}  ${roundScore}  ${season}  ${d}  ${c}  ${w}`;
+            } else {
+                let tag = !data.hadPrediction ? '(no sub)' : '';
+                msg += `${rank}  ${name.padEnd(maxName)}  ${roundScore}  ${season}  ${tag}`;
+            }
+            if (data.newJoinerPenalty !== undefined) msg += `  [NJ: ${data.newJoinerPenalty}]`;
+            msg += '\n';
+        });
+        msg += '```\n';
+
+        // Per-player detailed breakdown
+        sorted.forEach(([name]) => {
+            const bd = scoreBreakdowns[name];
+            if (!bd) return;
+            msg += `**${name}** (Round: ${bd.total})\n`;
+            msg += `> Drivers (${bd.driverPts}): ${bd.driverDetails.join(', ')}\n`;
+            msg += `> Constructors (${bd.constructorPts}): ${bd.teamDetails.join(', ')}\n`;
+            if (bd.wcDetails.length > 0) msg += `> Wildcards (${bd.wildcardPts}): ${bd.wcDetails.join(', ')}\n`;
+            msg += '\n';
+        });
+
+        await sendDiscordNotification(msg);
         console.log(`[RESCORE] Discord sent for ${round}`);
     } catch (e) { console.error(`[RESCORE] Error:`, e.message); }
 });
@@ -1443,8 +1497,10 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
             if (playerScores[name]) playerScores[name].newJoinerPenalty = pen.value;
         }
 
+        const seasonRows = await db.execute("SELECT name, total_score FROM f1_drivers WHERE has_participated = 1 AND name != 'admin' ORDER BY total_score DESC").then(r => r.rows);
+        const seasonTotals = {}; seasonRows.forEach(r => { seasonTotals[r.name] = r.total_score; });
         const sorted = Object.entries(playerScores).sort((a, b) => b[1].score - a[1].score);
-        const breakdown = buildDiscordBreakdown(raceName, round, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, undefined, !!results);
+        const breakdown = buildDiscordBreakdown(raceName, round, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, undefined, !!results, seasonTotals);
 
         await sendDiscordNotification(breakdown);
         console.log(`[RESEND] Discord notification sent for ${round}`);
