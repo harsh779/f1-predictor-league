@@ -1134,12 +1134,60 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         const { round } = req.body;
         if (!round) return res.status(400).json({ success: false, message: "Missing 'round' (e.g. R2)" });
 
+        const roundNum = parseInt(round.replace('R', ''));
         const rows = await db.execute({ sql: "SELECT * FROM f1_round_history WHERE round = ? ORDER BY id ASC", args: [round] }).then(r => r.rows);
         if (rows.length === 0) return res.status(404).json({ success: false, message: `No history found for ${round}` });
 
         const raceName = rows[0].race_name;
         const playerScores = {};
         const penalties = {};
+        const scoreBreakdowns = {};
+
+        // Fetch actual race results for recalculation
+        let results = null, sprintResults = [], gridMap = {};
+        try {
+            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${roundNum}`, { timeout: 15000 }).then(r => r.data);
+            const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
+            if (raceSes?.results?.length) {
+                const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+                const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+                const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
+                if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
+                results = raceSes.results.map(r => {
+                    const d = dMap[String(r.driver_number)] || {};
+                    const parts = (d.name || '').split(' ');
+                    return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                });
+                const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+                if (sprintSes?.results) {
+                    sprintResults = sprintSes.results.map(r => {
+                        const d = dMap[String(r.driver_number)] || {};
+                        const parts = (d.name || '').split(' ');
+                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                    });
+                }
+            }
+        } catch (e) { console.log('[RESEND] Own API failed, trying Ergast:', e.message); }
+
+        if (!results) {
+            try {
+                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/results.json`, { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races);
+                if (races?.length) { results = races[0].Results; }
+                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/sprint.json`, { timeout: 15000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
+                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+            } catch (_) { }
+        }
+
+        // Build actual positions if results available
+        let actualDriverPositions = {}, actualCRanges = {}, raceLosers = [], sprintGainers = [], sprintLosers = [];
+        if (results) {
+            results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); let pos = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W' || r.status.startsWith('Retired') || r.status.startsWith('Collision')) pos = 22; actualDriverPositions[name] = pos; });
+            const constructorSums = {}; results.forEach(r => { const c = normalizeConstructor(r.Constructor.name); let pos = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W') pos = 22; constructorSums[c] = (constructorSums[c] || 0) + pos; });
+            const sumGroups = {}; for (const [c, sum] of Object.entries(constructorSums)) { if (!sumGroups[sum]) sumGroups[sum] = []; sumGroups[sum].push(c); }
+            let currentRank = 1; Object.keys(sumGroups).map(Number).sort((a, b) => a - b).forEach(sum => { const teams = sumGroups[sum]; teams.forEach(team => { actualCRanges[team] = { min: currentRank, max: currentRank + teams.length - 1 }; }); currentRank += teams.length; });
+            let maxRaceDrop = -999; results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const drop = finish - grid; if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; } else if (drop === maxRaceDrop) raceLosers.push(name); } });
+            let maxSprintGain = -999, maxSprintDrop = -999; sprintResults.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const gain = grid - finish; const drop = finish - grid; if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; } else if (gain === maxSprintGain) sprintGainers.push(name); if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; } else if (drop === maxSprintDrop) sprintLosers.push(name); } });
+        }
 
         for (const row of rows) {
             const pred = JSON.parse(row.prediction || '{}');
@@ -1149,18 +1197,36 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                 playerScores[row.user_name] = { score: row.score, hadPrediction: false };
             } else {
                 playerScores[row.user_name] = { score: row.score, hadPrediction: true };
+                // Recalculate D/C/W breakdown from stored prediction + actual results
+                if (results && !pred.backfill) {
+                    let driverPts = 0, constructorPts = 0, wildcardPts = 0;
+                    [{ p: pred.p1, r: 1 }, { p: pred.p2, r: 2 }, { p: pred.p3, r: 3 }, { p: pred.p10, r: 10 }, { p: pred.p11, r: 11 }, { p: pred.p21, r: 21 }, { p: pred.p22, r: 22 }].forEach(({ p, r }) => {
+                        if (!p) return; let act = actualDriverPositions[normalizeStr(p)]; if (!act) act = 22; const diff = Math.abs(r - act); if (diff === 0) driverPts += 2; else driverPts -= diff;
+                    });
+                    [{ p: pred.c1, r: 1 }, { p: pred.c2, r: 2 }, { p: pred.c5, r: 5 }, { p: pred.c6, r: 6 }, { p: pred.c11, r: 11 }].forEach(({ p, r }) => {
+                        if (!p) return; const range = actualCRanges[normalizeConstructor(p)]; if (!range) return; let diff = 0; if (r >= range.min && r <= range.max) diff = 0; else if (r < range.min) diff = range.min - r; else diff = r - range.max; if (diff === 0) constructorPts += 2; else constructorPts -= diff;
+                    });
+                    if (pred.w_race_loser && raceLosers.includes(normalizeStr(pred.w_race_loser))) wildcardPts += 5;
+                    if (pred.w_sprint_gainer && sprintGainers.includes(normalizeStr(pred.w_sprint_gainer))) wildcardPts += 5;
+                    if (pred.w_sprint_loser && sprintLosers.includes(normalizeStr(pred.w_sprint_loser))) wildcardPts += 5;
+                    scoreBreakdowns[row.user_name] = { driverPts, constructorPts, wildcardPts };
+                }
             }
         }
 
-        // Merge new joiner penalties
         for (const [name, pen] of Object.entries(penalties)) {
             if (playerScores[name]) playerScores[name].newJoinerPenalty = pen.value;
         }
 
         const sorted = Object.entries(playerScores).sort((a, b) => b[1].score - a[1].score);
-        let breakdown = `**${raceName} (${round}) — Score Breakdown (resend)**\n\n`;
+        let breakdown = `**${raceName} (${round}) — Score Breakdown**\n`;
+        if (raceLosers.length > 0) breakdown += `Race Loser: ${raceLosers.join(', ')}\n`;
+        if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
+        breakdown += '\n';
         sorted.forEach(([name, data], i) => {
+            const bd = scoreBreakdowns[name];
             let line = `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**`;
+            if (bd) line += `  [D: ${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts} | C: ${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts} | W: ${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}]`;
             if (!data.hadPrediction) line += ' (no sub)';
             if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
             breakdown += line + '\n';
@@ -1186,7 +1252,7 @@ app.get('/api/season-leaderboard', async (req, res) => {
 
 app.get('/api/round-scores', async (req, res) => {
     try {
-        const rows = await db.execute("SELECT round, race_name, user_name, score FROM f1_round_history ORDER BY id ASC").then(r => r.rows);
+        const rows = await db.execute("SELECT round, race_name, user_name, prediction, score FROM f1_round_history ORDER BY id ASC").then(r => r.rows);
         res.json(rows);
     } catch (e) { res.json([]); }
 });
