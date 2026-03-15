@@ -285,6 +285,104 @@
             font-variant-numeric: tabular-nums lining-nums;
         }
 
+        /* --- Driver Stats Modal --- */
+        .ds-header {
+            position: relative;
+            padding: 28px 24px 20px;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 3px solid var(--red);
+        }
+        .ds-headshot {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            flex-shrink: 0;
+        }
+        .ds-header-info { flex: 1; min-width: 0; }
+        .ds-number {
+            font-family: var(--font-numeric);
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .ds-name {
+            margin: 2px 0 4px;
+            font-size: 1.5rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #fff;
+            line-height: 1.2;
+        }
+        .ds-team {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .ds-body { padding: 20px 24px 24px; }
+        .ds-meta {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 18px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .ds-meta span { display: flex; flex-direction: column; gap: 2px; }
+        .ds-meta .ds-meta-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+        .ds-meta .ds-meta-val { color: var(--text-main); font-weight: 800; font-size: 0.95rem; }
+        .ds-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .ds-stat {
+            background: var(--surface-inner);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+        .ds-stat-val {
+            font-family: var(--font-numeric);
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: var(--text-main);
+            line-height: 1;
+        }
+        .ds-stat-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-top: 5px;
+        }
+        .ds-stat.ds-champ { border-color: var(--gold); background: rgba(197,155,39,0.06); }
+        .ds-stat.ds-champ .ds-stat-val { color: var(--gold); }
+        .ds-rookie {
+            margin-top: 15px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(0,153,64,0.08);
+            border: 1px solid rgba(0,153,64,0.22);
+            color: #007a34;
+            font-weight: 800;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+        }
+        .driver-link { cursor: pointer; text-decoration: none; }
+        .driver-link:hover { text-decoration: underline; color: var(--red) !important; }
+
         /* News Widget */
         .news-item { display: flex; gap: 15px; border-bottom: 1px solid var(--border); padding: 15px 0; align-items: center;}
         .news-item:last-child { border-bottom: none; padding-bottom: 0; }
@@ -355,6 +453,8 @@
         .modal-grid-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-color: var(--text-main); }
         .modal-grid-btn.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(100%); transform: none; box-shadow: none; border-color: var(--border); }
         .modal-grid-btn .num { background: var(--team-color); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 4px; font-weight: 900; font-size: 0.9rem; }
+        .selector-info-btn { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-inner); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.72rem; font-weight: 900; font-style: italic; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; font-family: Georgia, serif; }
+        .selector-info-btn:hover { background: var(--red); color: #fff; border-color: var(--red); }
 
         .hidden { display:none !important; }
         .sprint-badge { background: var(--red); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; font-weight: 900; letter-spacing: 1px; vertical-align: middle; }
@@ -665,6 +765,27 @@
 
         <div id="dd-radio" class="dd-panel">
             <div id="dd-radio-content" style="color:var(--text-muted);font-size:0.85rem;">Loading team radio...</div>
+        </div>
+    </div>
+</div>
+
+<div id="driver-stats-modal" class="telem-overlay hidden" onclick="if(event.target===this)closeDriverStats()">
+    <div class="telem-card" style="max-width:420px; padding:0; overflow:hidden;">
+        <div id="ds-header" class="ds-header">
+            <button class="close-btn" onclick="closeDriverStats()" style="position:absolute;top:14px;right:14px;color:#fff;z-index:2;">&times;</button>
+            <img id="ds-headshot" class="ds-headshot" src="" alt="">
+            <div class="ds-header-info">
+                <span id="ds-number" class="ds-number"></span>
+                <h3 id="ds-name" class="ds-name"></h3>
+                <span id="ds-team" class="ds-team"></span>
+            </div>
+        </div>
+        <div class="ds-body">
+            <div id="ds-meta" class="ds-meta"></div>
+            <div id="ds-stats-grid" class="ds-stats-grid">
+                <div class="skeleton" style="width:100%;height:60px;"></div>
+            </div>
+            <div id="ds-rookie-badge" class="ds-rookie hidden">ROOKIE SEASON</div>
         </div>
     </div>
 </div>
@@ -1227,16 +1348,22 @@
             btn.style.setProperty('--team-color', item.color);
             
             let numHtml = item.num ? `<span class="num">${item.num}</span>` : '';
-            btn.innerHTML = `<span>${item.name}</span> ${numHtml}`;
-            
-            if (!isDisabled) {
-                btn.onclick = () => {
-                    const inputField = document.getElementById(currentInputId);
-                    inputField.value = item.name;
-                    inputField.setAttribute('value', item.name); 
-                    closeSelectorModal();
-                };
-            }
+            const hasInfo = (type === 'driver' || type === 'wildcard') && item.num;
+            if (hasInfo) btn.innerHTML = `<span>${item.name}</span> ${numHtml}<span class="selector-info-btn" title="View career stats">i</span>`;
+            else btn.innerHTML = `<span>${item.name}</span> ${numHtml}`;
+
+            btn.onclick = (e) => {
+                if (e.target.classList.contains('selector-info-btn')) {
+                    e.stopPropagation();
+                    openDriverStats(item.name);
+                    return;
+                }
+                if (isDisabled) return;
+                const inputField = document.getElementById(currentInputId);
+                inputField.value = item.name;
+                inputField.setAttribute('value', item.name);
+                closeSelectorModal();
+            };
             grid.appendChild(btn);
         });
         
@@ -1751,6 +1878,72 @@
         document.getElementById('telem-modal').classList.add('hidden');
         if (telemSSE) { telemSSE.close(); telemSSE = null; }
         ddDriverNum = null;
+    }
+
+    async function openDriverStats(driverName) {
+        const modal = document.getElementById('driver-stats-modal');
+        const headerEl = document.getElementById('ds-header');
+        const nameEl = document.getElementById('ds-name');
+        const numEl = document.getElementById('ds-number');
+        const teamEl = document.getElementById('ds-team');
+        const headshotEl = document.getElementById('ds-headshot');
+        const metaEl = document.getElementById('ds-meta');
+        const gridEl = document.getElementById('ds-stats-grid');
+        const rookieEl = document.getElementById('ds-rookie-badge');
+
+        nameEl.textContent = driverName;
+        numEl.textContent = '';
+        teamEl.textContent = 'Loading...';
+        teamEl.style.color = 'rgba(255,255,255,0.6)';
+        headshotEl.src = '';
+        metaEl.innerHTML = '';
+        gridEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);">Loading career stats...</div>';
+        rookieEl.classList.add('hidden');
+        headerEl.style.borderBottomColor = 'var(--red)';
+        modal.classList.remove('hidden');
+
+        try {
+            const s = await fetch('/api/driver-stats/' + encodeURIComponent(driverName) + '?t=' + Date.now()).then(r => r.json());
+            if (s.error) throw new Error(s.error);
+
+            nameEl.textContent = s.name;
+            numEl.textContent = s.number ? '#' + s.number : '';
+            teamEl.textContent = s.team || '';
+            const tc = s.teamColour ? '#' + s.teamColour.replace('#','') : 'var(--red)';
+            teamEl.style.color = tc;
+            headerEl.style.borderBottomColor = tc;
+            if (s.headshot) { headshotEl.src = s.headshot; headshotEl.style.display = ''; }
+            else { headshotEl.style.display = 'none'; }
+
+            let metaHtml = '';
+            if (s.nationality) metaHtml += `<span><span class="ds-meta-label">Nationality</span><span class="ds-meta-val">${escapeHtml(s.nationality)}</span></span>`;
+            if (s.dateOfBirth) {
+                const age = Math.floor((Date.now() - new Date(s.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                metaHtml += `<span><span class="ds-meta-label">Age</span><span class="ds-meta-val">${age}</span></span>`;
+            }
+            if (s.totalRaces) metaHtml += `<span><span class="ds-meta-label">Races</span><span class="ds-meta-val">${s.totalRaces}</span></span>`;
+            metaEl.innerHTML = metaHtml;
+
+            if (s.rookie) {
+                gridEl.innerHTML = '';
+                rookieEl.classList.remove('hidden');
+            } else {
+                rookieEl.classList.add('hidden');
+                gridEl.innerHTML = `
+                    <div class="ds-stat ${s.championships > 0 ? 'ds-champ' : ''}"><div class="ds-stat-val">${s.championships}</div><div class="ds-stat-label">Championships</div></div>
+                    <div class="ds-stat"><div class="ds-stat-val">${s.wins}</div><div class="ds-stat-label">Wins</div></div>
+                    <div class="ds-stat"><div class="ds-stat-val">${s.podiums}</div><div class="ds-stat-label">Podiums</div></div>
+                    <div class="ds-stat"><div class="ds-stat-val">${s.poles}</div><div class="ds-stat-label">Poles</div></div>
+                    <div class="ds-stat" style="grid-column: span 2;"><div class="ds-stat-val">${s.totalRaces}</div><div class="ds-stat-label">Career Races</div></div>
+                `;
+            }
+        } catch(e) {
+            gridEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);">Stats unavailable</div>';
+        }
+    }
+
+    function closeDriverStats() {
+        document.getElementById('driver-stats-modal').classList.add('hidden');
     }
 
     function updateTelemUI(t) {
@@ -2904,9 +3097,9 @@
                         <div class="live-card-section">
                             <strong class="live-card-title">Drivers</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">P1:</span> <b>${p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b>${p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b>${p3}</b><br>
-                                <span style="color:var(--text-muted)">P10:</span> <b>${p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b>${p11}</b><br>
-                                <span style="color:var(--text-muted)">P21:</span> <b>${p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b>${p22}</b>
+                                <span style="color:var(--text-muted)">P1:</span> <b class="driver-link" onclick="openDriverStats('${p1}')">${p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b class="driver-link" onclick="openDriverStats('${p2}')">${p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b class="driver-link" onclick="openDriverStats('${p3}')">${p3}</b><br>
+                                <span style="color:var(--text-muted)">P10:</span> <b class="driver-link" onclick="openDriverStats('${p10}')">${p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b class="driver-link" onclick="openDriverStats('${p11}')">${p11}</b><br>
+                                <span style="color:var(--text-muted)">P21:</span> <b class="driver-link" onclick="openDriverStats('${p21}')">${p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b class="driver-link" onclick="openDriverStats('${p22}')">${p22}</b>
                             </div>
                         </div>
 
@@ -2922,8 +3115,8 @@
                         <div class="live-card-section">
                             <strong class="live-card-title" style="color:var(--gold); border-bottom-color: rgba(197, 155, 39, 0.3);">Wildcards</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">Race Loser:</span> <b style="color:var(--red)">${raceLoser}</b>
-                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b style="color:#009940">${sprintGainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b style="color:var(--red)">${sprintLoser}</b>` : ''}
+                                <span style="color:var(--text-muted)">Race Loser:</span> <b class="driver-link" style="color:var(--red)" onclick="openDriverStats('${raceLoser}')">${raceLoser}</b>
+                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b class="driver-link" style="color:#009940" onclick="openDriverStats('${sprintGainer}')">${sprintGainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b class="driver-link" style="color:var(--red)" onclick="openDriverStats('${sprintLoser}')">${sprintLoser}</b>` : ''}
                             </div>
                         </div>
 
@@ -3012,7 +3205,7 @@
                 const tc = teamColorMap[(s.team || '').toLowerCase()] || (s.team_colour ? '#' + s.team_colour.replace('#','') : 'var(--border)');
                 return `<tr>
                     <td style="text-align:center;font-weight:900;color:${posColor};">${s.position}</td>
-                    <td style="font-weight:700;"><span style="display:inline-block;width:4px;height:16px;background:${tc};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${s.name}</td>
+                    <td style="font-weight:700;"><span style="display:inline-block;width:4px;height:16px;background:${tc};border-radius:2px;margin-right:8px;vertical-align:middle;"></span><span class="driver-link" onclick="openDriverStats('${escapeHtml(formatDisplayName(s.name))}')">${escapeHtml(formatDisplayName(s.name))}</span></td>
                     <td style="color:var(--text-muted);font-size:0.9rem;">${s.team || ''}</td>
                     <td style="text-align:right;font-weight:900;font-size:1.1rem;">${s.points}</td>
                     <td style="text-align:center;font-weight:700;">${s.wins || 0}</td>

@@ -1233,6 +1233,121 @@ app.get('/api/calendar', async (_req, res) => {
     }
 });
 
+// --- Driver Career Stats ---
+const DRIVER_ID_MAP = {
+    'Max Verstappen': 'max_verstappen', 'Isack Hadjar': 'hadjar',
+    'Lando Norris': 'norris', 'Oscar Piastri': 'piastri',
+    'Charles Leclerc': 'leclerc', 'Lewis Hamilton': 'hamilton',
+    'George Russell': 'russell', 'Kimi Antonelli': 'antonelli',
+    'Fernando Alonso': 'alonso', 'Lance Stroll': 'stroll',
+    'Carlos Sainz': 'sainz', 'Alexander Albon': 'albon',
+    'Pierre Gasly': 'gasly', 'Franco Colapinto': 'colapinto',
+    'Liam Lawson': 'lawson', 'Arvid Lindblad': 'lindblad',
+    'Esteban Ocon': 'ocon', 'Oliver Bearman': 'bearman',
+    'Nico Hulkenberg': 'hulkenberg', 'Gabriel Bortoleto': 'bortoleto',
+    'Sergio Perez': 'perez', 'Valtteri Bottas': 'bottas'
+};
+const driverStatsCache = {};
+const DRIVER_STATS_TTL = 24 * 60 * 60 * 1000;
+let driverHeadshotCache = null;
+let driverHeadshotCacheTime = 0;
+
+async function fetchDriverHeadshots() {
+    if (driverHeadshotCache && Date.now() - driverHeadshotCacheTime < 6 * 60 * 60 * 1000) return driverHeadshotCache;
+    try {
+        const list = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+        const map = {};
+        list.forEach(d => { if (d.name) map[d.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')] = d; });
+        driverHeadshotCache = map;
+        driverHeadshotCacheTime = Date.now();
+        return map;
+    } catch { return driverHeadshotCache || {}; }
+}
+
+app.get('/api/driver-stats/:name', async (req, res) => {
+    const name = decodeURIComponent(req.params.name).trim();
+    const cached = driverStatsCache[name];
+    if (cached && Date.now() - cached.fetchedAt < DRIVER_STATS_TTL) return res.json(cached.data);
+
+    const ergastId = DRIVER_ID_MAP[name];
+    const ERGAST = 'https://api.jolpi.ca/ergast/f1';
+
+    const ergastCount = async (path) => {
+        try {
+            const r = await axios.get(`${ERGAST}${path}`, { timeout: 10000 });
+            return parseInt(r.data?.MRData?.total || '0');
+        } catch { return 0; }
+    };
+    const ergastDriverInfo = async (id) => {
+        try {
+            const r = await axios.get(`${ERGAST}/drivers/${id}.json`, { timeout: 10000 });
+            return r.data?.MRData?.DriverTable?.Drivers?.[0] || null;
+        } catch { return null; }
+    };
+    const ergastChampionships = async (id) => {
+        try {
+            const r = await axios.get(`${ERGAST}/drivers/${id}/driverStandings/1.json?limit=100`, { timeout: 10000 });
+            return parseInt(r.data?.MRData?.total || '0');
+        } catch { return 0; }
+    };
+    const ergastTotalRaces = async (id) => {
+        try {
+            const r = await axios.get(`${ERGAST}/drivers/${id}/results.json?limit=1`, { timeout: 10000 });
+            return parseInt(r.data?.MRData?.total || '0');
+        } catch { return 0; }
+    };
+
+    try {
+        const headshots = await fetchDriverHeadshots();
+        const headshotEntry = headshots[name] || Object.values(headshots).find(d => d.name && d.name.toLowerCase().includes(name.split(' ').pop().toLowerCase()));
+
+        let stats;
+        if (ergastId) {
+            const [wins, poles, info, championships, totalRaces] = await Promise.all([
+                ergastCount(`/drivers/${ergastId}/results/1.json?limit=1`),
+                ergastCount(`/drivers/${ergastId}/qualifying/1.json?limit=1`),
+                ergastDriverInfo(ergastId),
+                ergastChampionships(ergastId),
+                ergastTotalRaces(ergastId)
+            ]);
+
+            // Count podiums: need separate calls for P1, P2, P3
+            const [p2, p3] = await Promise.all([
+                ergastCount(`/drivers/${ergastId}/results/2.json?limit=1`),
+                ergastCount(`/drivers/${ergastId}/results/3.json?limit=1`)
+            ]);
+
+            stats = {
+                name,
+                number: headshotEntry?.driver_number || info?.permanentNumber || null,
+                team: headshotEntry?.team || null,
+                teamColour: headshotEntry?.team_colour || null,
+                headshot: headshotEntry?.headshot_url || null,
+                nationality: info?.nationality || null,
+                dateOfBirth: info?.dateOfBirth || null,
+                championships, wins, podiums: wins + p2 + p3, poles, totalRaces,
+                wikiUrl: info?.url || null
+            };
+        } else {
+            stats = {
+                name,
+                number: headshotEntry?.driver_number || null,
+                team: headshotEntry?.team || null,
+                teamColour: headshotEntry?.team_colour || null,
+                headshot: headshotEntry?.headshot_url || null,
+                nationality: null, dateOfBirth: null,
+                championships: 0, wins: 0, podiums: 0, poles: 0, totalRaces: 0,
+                rookie: true, wikiUrl: null
+            };
+        }
+
+        driverStatsCache[name] = { data: stats, fetchedAt: Date.now() };
+        res.json(stats);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch driver stats', detail: e.message });
+    }
+});
+
 // --- F1 Live Timing Widget Proxy (backed by direct F1 SignalR WebSocket feed) ---
 let widgetCache = null;
 let widgetCacheTime = 0;
