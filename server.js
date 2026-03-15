@@ -1145,6 +1145,15 @@ app.post('/api/finalize', authenticateToken, requireAdmin, async (req, res) => {
     res.status(result.success ? 200 : 400).json(result);
 });
 
+app.post('/api/test-discord', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const webhook = process.env.DISCORD_WEBHOOK;
+        if (!webhook) return res.json({ success: false, message: 'DISCORD_WEBHOOK not set' });
+        await sendDiscordNotification('Test message — webhook is working.');
+        res.json({ success: true, message: 'Test sent' });
+    } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
 app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { round } = req.body;
