@@ -247,8 +247,137 @@ const f1Calendar2026 = [
 const SEASON_CALENDAR_CACHE_KEY = 'season_calendar_2026';
 const SEASON_CALENDAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 let seasonCalendarCache = { data: null, fetchedAt: 0 };
+const UNAVAILABLE_2026_RACES = ['Bahrain Grand Prix', 'Saudi Arabian Grand Prix'];
 
-const CANCELLED_RACES = ['Bahrain Grand Prix', 'Saudi Arabian Grand Prix'];
+const OFFICIAL_2026_CALENDAR_PLAN = [
+    { round: 1, name: 'Australian Grand Prix', hasSprint: false },
+    { round: 2, name: 'Chinese Grand Prix', hasSprint: true },
+    { round: 3, name: 'Japanese Grand Prix', hasSprint: false },
+    { round: 4, name: 'Bahrain Grand Prix', hasSprint: false },
+    { round: 5, name: 'Saudi Arabian Grand Prix', hasSprint: false },
+    { round: 6, name: 'Miami Grand Prix', hasSprint: true },
+    { round: 7, name: 'Canadian Grand Prix', hasSprint: true },
+    { round: 8, name: 'Monaco Grand Prix', hasSprint: false },
+    { round: 9, name: 'Spanish Grand Prix', hasSprint: false },
+    { round: 10, name: 'Austrian Grand Prix', hasSprint: false },
+    { round: 11, name: 'British Grand Prix', hasSprint: true },
+    { round: 12, name: 'Belgian Grand Prix', hasSprint: false },
+    { round: 13, name: 'Hungarian Grand Prix', hasSprint: false },
+    { round: 14, name: 'Dutch Grand Prix', hasSprint: true },
+    { round: 15, name: 'Italian Grand Prix', hasSprint: false },
+    { round: 16, name: 'Madrid Grand Prix', hasSprint: false },
+    { round: 17, name: 'Azerbaijan Grand Prix', hasSprint: false },
+    { round: 18, name: 'Singapore Grand Prix', hasSprint: true },
+    { round: 19, name: 'United States Grand Prix', hasSprint: false },
+    { round: 20, name: 'Mexico City Grand Prix', hasSprint: false },
+    { round: 21, name: 'Sao Paulo Grand Prix', hasSprint: false },
+    { round: 22, name: 'Las Vegas Grand Prix', hasSprint: false },
+    { round: 23, name: 'Qatar Grand Prix', hasSprint: false },
+    { round: 24, name: 'Abu Dhabi Grand Prix', hasSprint: false }
+];
+
+const OFFICIAL_2026_FALLBACK_EXTRAS = [
+    {
+        round: 4,
+        name: 'Bahrain Grand Prix',
+        hasSprint: false,
+        date: '2026-04-12T20:30:00+05:30',
+        circuit: 'Bahrain International Circuit',
+        country: 'Bahrain',
+        city: 'Sakhir',
+        lat: 26.0325,
+        lon: 50.5106,
+        trackDetails: { length: '5.412 km', laps: 57, corners: 15, firstGP: 2004, record: '1:31.447' },
+        sessions: {
+            fp1: '2026-04-10T17:00:00+05:30',
+            fp2: '2026-04-10T20:30:00+05:30',
+            fp3: '2026-04-11T17:30:00+05:30',
+            quali: '2026-04-11T20:30:00+05:30',
+            race: '2026-04-12T20:30:00+05:30'
+        }
+    },
+    {
+        round: 5,
+        name: 'Saudi Arabian Grand Prix',
+        hasSprint: false,
+        date: '2026-04-19T22:30:00+05:30',
+        circuit: 'Jeddah Corniche Circuit',
+        country: 'Saudi Arabia',
+        city: 'Jeddah',
+        lat: 21.6319,
+        lon: 39.1044,
+        trackDetails: { length: '6.174 km', laps: 50, corners: 27, firstGP: 2021, record: '1:30.734' },
+        sessions: {
+            fp1: '2026-04-17T19:00:00+05:30',
+            fp2: '2026-04-17T22:30:00+05:30',
+            fp3: '2026-04-18T19:00:00+05:30',
+            quali: '2026-04-18T22:30:00+05:30',
+            race: '2026-04-19T22:30:00+05:30'
+        }
+    }
+];
+
+function normalizeRaceName(name = '') {
+    const raw = String(name || '').trim().toLowerCase();
+    const aliases = {
+        'sao paulo grand prix': 'saopaulograndprix',
+        'são paulo grand prix': 'saopaulograndprix',
+        'sÃ£o paulo grand prix': 'saopaulograndprix'
+    };
+    if (aliases[raw]) return aliases[raw];
+    return raw
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+const OFFICIAL_2026_FALLBACK_MAP = new Map(
+    [...f1Calendar2026, ...OFFICIAL_2026_FALLBACK_EXTRAS].map(r => [normalizeRaceName(r.name), r])
+);
+
+function buildOfficialCalendar(sourceCalendar = []) {
+    const sourceMap = new Map(
+        (Array.isArray(sourceCalendar) ? sourceCalendar : []).map(r => [normalizeRaceName(r.name), r])
+    );
+
+    const visibleCalendar = OFFICIAL_2026_CALENDAR_PLAN.filter(
+        planRace => !UNAVAILABLE_2026_RACES.includes(planRace.name)
+    );
+
+    return visibleCalendar.map((planRace, index) => {
+        const key = normalizeRaceName(planRace.name);
+        const fallback = OFFICIAL_2026_FALLBACK_MAP.get(key);
+        const source = sourceMap.get(key);
+        const sessions = { ...(fallback?.sessions || {}), ...(source?.sessions || {}) };
+        const trackDetails = source?.trackDetails || fallback?.trackDetails;
+        const race = {
+            ...(fallback || {}),
+            ...(source || {}),
+            round: index + 1,
+            officialRound: planRace.round,
+            apiRound: source ? Number(source.apiRound ?? source.round ?? 0) || null : null,
+            name: planRace.name,
+            hasSprint: planRace.hasSprint,
+            date: sessions.race || source?.date || fallback?.date || null,
+            sessions,
+            trackDetails
+        };
+        return race.name && race.sessions?.race ? race : null;
+    }).filter(Boolean);
+}
+
+function getTimingApiRound(race) {
+    return Number(race?.apiRound || race?.officialRound || race?.round || 0) || null;
+}
+
+async function resolveCalendarRace(roundNum, raceName = null) {
+    const seasonCalendar = await getSeasonCalendar();
+    if (raceName) {
+        const byName = seasonCalendar.find(r => normalizeRaceName(r.name) === normalizeRaceName(raceName));
+        if (byName) return byName;
+    }
+    return seasonCalendar.find(r => Number(r.round) === Number(roundNum)) || null;
+}
 
 function normalizeCalendarEntry(entry) {
     if (!entry || !entry.round) return null;
@@ -320,39 +449,33 @@ async function fetchSeasonCalendarFromApi() {
     const normalized = Array.isArray(remote) ? remote.map(normalizeCalendarEntry).filter(Boolean) : [];
     normalized.sort((a, b) => a.round - b.round);
     if (!isValidSeasonCalendar(normalized)) throw new Error('Calendar API returned invalid data');
-    seasonCalendarCache = { data: normalized, fetchedAt: Date.now() };
-    await persistSeasonCalendar(normalized);
-    return normalized;
-}
-
-function filterCancelledRaces(calendar) {
-    if (!CANCELLED_RACES.length) return calendar;
-    return calendar
-        .filter(r => !CANCELLED_RACES.includes(r.name))
-        .map((r, i) => ({ ...r, round: i + 1 }));
+    const merged = buildOfficialCalendar(normalized);
+    seasonCalendarCache = { data: merged, fetchedAt: Date.now() };
+    await persistSeasonCalendar(merged);
+    return merged;
 }
 
 async function getSeasonCalendar(options = {}) {
     const { forceRefresh = false } = options;
     if (!forceRefresh && seasonCalendarCache.data && (Date.now() - seasonCalendarCache.fetchedAt) < SEASON_CALENDAR_CACHE_TTL_MS) {
-        return filterCancelledRaces(seasonCalendarCache.data);
+        return seasonCalendarCache.data;
     }
 
     try {
-        return filterCancelledRaces(await fetchSeasonCalendarFromApi());
+        return await fetchSeasonCalendarFromApi();
     } catch (e) {
         console.warn('[CAL] Live season calendar unavailable:', e.message);
     }
 
-    if (seasonCalendarCache.data) return filterCancelledRaces(seasonCalendarCache.data);
+    if (seasonCalendarCache.data) return seasonCalendarCache.data;
 
     const persisted = await loadPersistedSeasonCalendar();
     if (persisted) {
-        seasonCalendarCache = { data: persisted, fetchedAt: Date.now() };
-        return filterCancelledRaces(persisted);
+        seasonCalendarCache = { data: buildOfficialCalendar(persisted), fetchedAt: Date.now() };
+        return seasonCalendarCache.data;
     }
 
-    return f1Calendar2026;
+    return buildOfficialCalendar(f1Calendar2026);
 }
 
 function findUpcomingRace(calendar, now = new Date()) {
@@ -804,7 +927,8 @@ async function performFinalization() {
         const latestCalRace = findLatestCompletedRace(seasonCalendar, _now);
         if (latestCalRace) {
             try {
-                const roundData = await axios.get(`${F1_TIMING_API}/results/round/${latestCalRace.round}`, { timeout: 15000 }).then(r => r.data);
+                const apiRound = getTimingApiRound(latestCalRace);
+                const roundData = await axios.get(`${F1_TIMING_API}/results/round/${apiRound}`, { timeout: 15000 }).then(r => r.data);
                 const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
                 if (raceSes?.results?.length) {
                     const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
@@ -818,7 +942,7 @@ async function performFinalization() {
                     // Ergast qualifying fallback if own API qualifying not available
                     if (Object.keys(gridMap).length === 0) {
                         try {
-                            const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${latestCalRace.round}/qualifying.json`, { timeout: 10000 }).then(r => r.data.MRData.RaceTable.Races);
+                            const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 10000 }).then(r => r.data.MRData.RaceTable.Races);
                             if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
                             console.log(`[FINALIZE] Ergast qualifying fallback: ${Object.keys(gridMap).length} drivers`);
                         } catch (e) { console.log('[FINALIZE] Ergast qualifying fallback failed:', e.message); }
@@ -1256,11 +1380,13 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
         if (rows.length === 0) { console.log(`[RESCORE] No history for ${round}`); return; }
 
         const raceName = rows[0].race_name;
+        const calendarRace = await resolveCalendarRace(roundNum, raceName);
+        const apiRound = getTimingApiRound(calendarRace) || roundNum;
 
         // Fetch race data (same logic as resend-discord)
         let results = null, sprintResults = [], gridMap = {};
         try {
-            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${roundNum}`, { timeout: 8000 }).then(r => r.data);
+            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${apiRound}`, { timeout: 8000 }).then(r => r.data);
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
                 const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 8000 }).then(r => r.data);
@@ -1268,7 +1394,7 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
                 if (Object.keys(gridMap).length === 0) {
-                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
                 }
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
@@ -1292,10 +1418,10 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
 
         if (!results) {
             try {
-                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
+                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
                 if (races?.length) { results = races[0].Results; }
-                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
-                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
+                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
             } catch (_) { }
         }
 
@@ -1426,6 +1552,8 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         if (rows.length === 0) { console.log(`[RESEND] No history for ${round}`); return; }
 
         const raceName = rows[0].race_name;
+        const calendarRace = await resolveCalendarRace(roundNum, raceName);
+        const apiRound = getTimingApiRound(calendarRace) || roundNum;
         const playerScores = {};
         const penalties = {};
         const scoreBreakdowns = {};
@@ -1434,7 +1562,7 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         let results = null, sprintResults = [], gridMap = {};
         try {
             console.log('[RESEND] Fetching from own API...');
-            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${roundNum}`, { timeout: 8000 }).then(r => r.data);
+            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${apiRound}`, { timeout: 8000 }).then(r => r.data);
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
                 const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 8000 }).then(r => r.data);
@@ -1442,7 +1570,7 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
                 if (Object.keys(gridMap).length === 0) {
-                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
                 }
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
@@ -1467,10 +1595,10 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         if (!results) {
             try {
                 console.log('[RESEND] Trying Ergast...');
-                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
+                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
                 if (races?.length) { results = races[0].Results; console.log(`[RESEND] Ergast: ${results.length} results`); }
-                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
-                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
+                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
             } catch (_) { console.log('[RESEND] Ergast also failed'); }
         }
 
