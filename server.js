@@ -804,10 +804,10 @@ async function performFinalization() {
 
         // --- SCORE CALCULATION ---
         const predictions = await db.execute("SELECT * FROM f1_predictions_v4").then(r => r.rows);
-        let scores = {}; let lowest = Infinity;
+        let scores = {}; let scoreBreakdowns = {}; let lowest = Infinity;
 
         predictions.forEach(p => {
-            let score = 0;
+            let driverPts = 0, constructorPts = 0, wildcardPts = 0;
 
             const driversToScore = [
                 { pred: p.p1, rank: 1 }, { pred: p.p2, rank: 2 }, { pred: p.p3, rank: 3 },
@@ -821,8 +821,8 @@ async function performFinalization() {
                 if (!act) act = 22; // Replacement defaults
 
                 const diff = Math.abs(item.rank - act);
-                if (diff === 0) score += 2;
-                else score -= diff;
+                if (diff === 0) driverPts += 2;
+                else driverPts -= diff;
             });
 
             const teamsToScore = [
@@ -840,15 +840,17 @@ async function performFinalization() {
                 else if (item.rank < range.min) diff = range.min - item.rank;
                 else diff = item.rank - range.max;
 
-                if (diff === 0) score += 2;
-                else score -= diff;
+                if (diff === 0) constructorPts += 2;
+                else constructorPts -= diff;
             });
 
-            if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) score += 5;
-            if (p.w_sprint_gainer && sprintGainers.includes(normalizeStr(p.w_sprint_gainer))) score += 5;
-            if (p.w_sprint_loser && sprintLosers.includes(normalizeStr(p.w_sprint_loser))) score += 5;
+            if (p.w_race_loser && raceLosers.includes(normalizeStr(p.w_race_loser))) wildcardPts += 5;
+            if (p.w_sprint_gainer && sprintGainers.includes(normalizeStr(p.w_sprint_gainer))) wildcardPts += 5;
+            if (p.w_sprint_loser && sprintLosers.includes(normalizeStr(p.w_sprint_loser))) wildcardPts += 5;
 
+            const score = driverPts + constructorPts + wildcardPts;
             scores[p.user_name] = score;
+            scoreBreakdowns[p.user_name] = { driverPts, constructorPts, wildcardPts };
             if (score < lowest) lowest = score;
         });
 
@@ -869,12 +871,12 @@ async function performFinalization() {
         const roundLabel = `R${raceData.round}`;
         const timestamp = new Date().toISOString();
 
-        await db.execute("BEGIN");
+        const tx = await db.transaction("write");
         try {
             for (const d of activeDrivers) {
                 const scoreDelta = finalScores[d.name]?.score ?? 0;
                 if (d.name !== 'admin') {
-                    await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [scoreDelta, d.name] });
+                    await tx.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [scoreDelta, d.name] });
                 }
             }
 
@@ -885,38 +887,38 @@ async function performFinalization() {
                 const establishedNames = Object.entries(finalScores).filter(([n, d]) => !d.isNewJoiner && n !== 'admin').map(([n]) => n);
                 let lowestStanding = 0;
                 if (establishedNames.length > 0) {
-                    const estRows = await db.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
+                    const estRows = await tx.execute({ sql: "SELECT MIN(total_score) as min_score FROM f1_drivers WHERE name IN (" + establishedNames.map(() => '?').join(',') + ")", args: establishedNames }).then(r => r.rows[0]);
                     lowestStanding = estRows?.min_score ?? 0;
                 }
                 const newJoinerPenalty = lowestStanding - 5;
 
                 for (const [name] of newJoiners) {
-                    await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [newJoinerPenalty, name] });
+                    await tx.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [newJoinerPenalty, name] });
                     finalScores[name].newJoinerPenalty = newJoinerPenalty;
                     console.log(`[FINALIZE] New joiner penalty of ${newJoinerPenalty} applied to ${name} (lowest standing: ${lowestStanding})`);
                 }
             }
 
             // --- SAVE ROUND HISTORY ---
-            await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+            await tx.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
             for (const p of predictions) {
                 const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
-                await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, timestamp] });
+                await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, timestamp] });
             }
             for (const [name, data] of Object.entries(finalScores)) {
                 if (!data.hadPrediction && name !== 'admin') {
-                    await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, timestamp] });
+                    await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"no submission"}', data.score, timestamp] });
                 }
                 if (data.newJoinerPenalty !== undefined && name !== 'admin') {
-                    await db.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"new joiner"}', data.newJoinerPenalty, timestamp] });
+                    await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, name, '{"penalty":"new joiner"}', data.newJoinerPenalty, timestamp] });
                 }
             }
             console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
 
-            await db.execute("DELETE FROM f1_predictions_v4");
-            await db.execute("COMMIT");
+            await tx.execute("DELETE FROM f1_predictions_v4");
+            await tx.commit();
         } catch (writeError) {
-            try { await db.execute("ROLLBACK"); } catch (_) { }
+            try { await tx.rollback(); } catch (_) { }
             throw writeError;
         }
 
@@ -927,9 +929,12 @@ async function performFinalization() {
         if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
         breakdown += `No-submission penalty: ${penalty}\n\n`;
         sorted.forEach(([name, data], i) => {
-            let tag = data.hadPrediction ? '' : ' (no sub)';
-            if (data.newJoinerPenalty !== undefined) tag += ` (new joiner: ${data.newJoinerPenalty})`;
-            breakdown += `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**${tag}\n`;
+            const bd = scoreBreakdowns[name];
+            let line = `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**`;
+            if (bd) line += `  [D: ${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts} | C: ${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts} | W: ${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}]`;
+            if (!data.hadPrediction) line += ' (no sub)';
+            if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
+            breakdown += line + '\n';
         });
         try {
             await sendDiscordNotification(breakdown);
@@ -1101,6 +1106,48 @@ app.post('/predict', authenticateToken, async (req, res) => {
 app.post('/api/finalize', authenticateToken, requireAdmin, async (req, res) => {
     const result = await performFinalization();
     res.status(result.success ? 200 : 400).json(result);
+});
+
+app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { round } = req.body;
+        if (!round) return res.status(400).json({ success: false, message: "Missing 'round' (e.g. R2)" });
+
+        const rows = await db.execute({ sql: "SELECT * FROM f1_round_history WHERE round = ? ORDER BY id ASC", args: [round] }).then(r => r.rows);
+        if (rows.length === 0) return res.status(404).json({ success: false, message: `No history found for ${round}` });
+
+        const raceName = rows[0].race_name;
+        const playerScores = {};
+        const penalties = {};
+
+        for (const row of rows) {
+            const pred = JSON.parse(row.prediction || '{}');
+            if (pred.penalty === 'new joiner') {
+                penalties[row.user_name] = { type: 'new joiner', value: row.score };
+            } else if (pred.penalty === 'no submission') {
+                playerScores[row.user_name] = { score: row.score, hadPrediction: false };
+            } else {
+                playerScores[row.user_name] = { score: row.score, hadPrediction: true };
+            }
+        }
+
+        // Merge new joiner penalties
+        for (const [name, pen] of Object.entries(penalties)) {
+            if (playerScores[name]) playerScores[name].newJoinerPenalty = pen.value;
+        }
+
+        const sorted = Object.entries(playerScores).sort((a, b) => b[1].score - a[1].score);
+        let breakdown = `**${raceName} (${round}) — Score Breakdown (resend)**\n\n`;
+        sorted.forEach(([name, data], i) => {
+            let line = `${i + 1}. ${name}: **${data.score >= 0 ? '+' : ''}${data.score}**`;
+            if (!data.hadPrediction) line += ' (no sub)';
+            if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
+            breakdown += line + '\n';
+        });
+
+        await sendDiscordNotification(breakdown);
+        res.json({ success: true, message: `Discord notification resent for ${round}` });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.get('/api/predictions', authenticateToken, async (req, res) => {
