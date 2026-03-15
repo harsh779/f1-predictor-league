@@ -1155,26 +1155,30 @@ app.post('/api/test-discord', authenticateToken, requireAdmin, async (req, res) 
 });
 
 app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { round } = req.body;
-        if (!round) return res.status(400).json({ success: false, message: "Missing 'round' (e.g. R2)" });
+    const { round } = req.body;
+    if (!round) return res.status(400).json({ success: false, message: "Missing 'round' (e.g. R2)" });
 
+    // Respond immediately, do heavy work in background
+    res.json({ success: true, message: `Processing ${round} — Discord message will arrive shortly.` });
+
+    try {
         const roundNum = parseInt(round.replace('R', ''));
         const rows = await db.execute({ sql: "SELECT * FROM f1_round_history WHERE round = ? ORDER BY id ASC", args: [round] }).then(r => r.rows);
-        if (rows.length === 0) return res.status(404).json({ success: false, message: `No history found for ${round}` });
+        if (rows.length === 0) { console.log(`[RESEND] No history for ${round}`); return; }
 
         const raceName = rows[0].race_name;
         const playerScores = {};
         const penalties = {};
         const scoreBreakdowns = {};
 
-        // Fetch actual race results for recalculation
+        // Fetch actual race results (shorter timeouts)
         let results = null, sprintResults = [], gridMap = {};
         try {
-            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${roundNum}`, { timeout: 15000 }).then(r => r.data);
+            console.log('[RESEND] Fetching from own API...');
+            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${roundNum}`, { timeout: 8000 }).then(r => r.data);
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
-                const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+                const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 8000 }).then(r => r.data);
                 const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
@@ -1191,16 +1195,18 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                         return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                     });
                 }
+                console.log(`[RESEND] Own API: ${results.length} race results`);
             }
-        } catch (e) { console.log('[RESEND] Own API failed, trying Ergast:', e.message); }
+        } catch (e) { console.log('[RESEND] Own API failed:', e.message); }
 
         if (!results) {
             try {
-                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/results.json`, { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races);
-                if (races?.length) { results = races[0].Results; }
-                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/sprint.json`, { timeout: 15000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
-                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
-            } catch (_) { }
+                console.log('[RESEND] Trying Ergast...');
+                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
+                if (races?.length) { results = races[0].Results; console.log(`[RESEND] Ergast: ${results.length} results`); }
+                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
+                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+            } catch (_) { console.log('[RESEND] Ergast also failed'); }
         }
 
         // Build actual positions if results available
@@ -1252,9 +1258,11 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
             breakdown += '\n';
         });
 
+        if (!results) breakdown += `(Race results unavailable — detailed breakdown omitted)\n`;
+
         await sendDiscordNotification(breakdown);
-        res.json({ success: true, message: `Discord notification resent for ${round}` });
-    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+        console.log(`[RESEND] Discord notification sent for ${round}`);
+    } catch (e) { console.error(`[RESEND] Background error for ${round}:`, e.message); }
 });
 
 app.get('/api/predictions', authenticateToken, async (req, res) => {
