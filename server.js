@@ -248,6 +248,8 @@ const SEASON_CALENDAR_CACHE_KEY = 'season_calendar_2026';
 const SEASON_CALENDAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 let seasonCalendarCache = { data: null, fetchedAt: 0 };
 
+const CANCELLED_RACES = ['Bahrain Grand Prix', 'Saudi Arabian Grand Prix'];
+
 function normalizeCalendarEntry(entry) {
     if (!entry || !entry.round) return null;
     const sessions = entry.all_sessions || entry.sessions || {};
@@ -323,24 +325,31 @@ async function fetchSeasonCalendarFromApi() {
     return normalized;
 }
 
+function filterCancelledRaces(calendar) {
+    if (!CANCELLED_RACES.length) return calendar;
+    return calendar
+        .filter(r => !CANCELLED_RACES.includes(r.name))
+        .map((r, i) => ({ ...r, round: i + 1 }));
+}
+
 async function getSeasonCalendar(options = {}) {
     const { forceRefresh = false } = options;
     if (!forceRefresh && seasonCalendarCache.data && (Date.now() - seasonCalendarCache.fetchedAt) < SEASON_CALENDAR_CACHE_TTL_MS) {
-        return seasonCalendarCache.data;
+        return filterCancelledRaces(seasonCalendarCache.data);
     }
 
     try {
-        return await fetchSeasonCalendarFromApi();
+        return filterCancelledRaces(await fetchSeasonCalendarFromApi());
     } catch (e) {
         console.warn('[CAL] Live season calendar unavailable:', e.message);
     }
 
-    if (seasonCalendarCache.data) return seasonCalendarCache.data;
+    if (seasonCalendarCache.data) return filterCancelledRaces(seasonCalendarCache.data);
 
     const persisted = await loadPersistedSeasonCalendar();
     if (persisted) {
         seasonCalendarCache = { data: persisted, fetchedAt: Date.now() };
-        return persisted;
+        return filterCancelledRaces(persisted);
     }
 
     return f1Calendar2026;
