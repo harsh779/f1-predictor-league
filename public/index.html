@@ -121,6 +121,7 @@
             #grid-container { grid-template-columns: 1fr !important; }
             input.selector-input { padding: 12px 35px 12px 12px !important; font-size: 1rem !important; }
             #h-header { font-size: 1.8rem !important; }
+            #h-circuit-svg { display: none !important; }
             .section-title { font-size: 1.4rem; border-width: 1px; padding-bottom: 8px;}
             th, td { padding: 10px 8px !important; font-size: 0.9rem !important; }
             .auth-card { padding: 35px 25px; }
@@ -584,14 +585,18 @@
 
 <main>
     <div id="home" class="tab active">
-        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between;">
-            <div style="flex: 1; min-width: 250px;">
-                <p id="h-round" style="color: var(--red); font-weight: 900; font-size: 1.1rem; text-transform: uppercase; margin: 0 0 5px 0; letter-spacing: 2px;">Loading Telemetry...</p>
+        <div style="background: linear-gradient(135deg, var(--surface) 0%, var(--bg-light) 100%); padding: 30px; border-radius: 12px; border: 1px solid var(--border); border-left: 6px solid var(--red); margin-bottom: 25px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 25px; justify-content: space-between; position: relative; overflow: hidden;">
+            <div id="h-circuit-svg" style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); opacity: 0; width: 180px; height: 150px; pointer-events: none; transition: opacity 0.5s ease;"></div>
+            <div style="flex: 1; min-width: 250px; z-index: 1;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                    <img id="h-flag" style="width: 36px; height: 24px; border-radius: 3px; object-fit: cover; box-shadow: 0 1px 4px rgba(0,0,0,0.25); display: none;" alt="" />
+                    <p id="h-round" style="color: var(--red); font-weight: 900; font-size: 1.1rem; text-transform: uppercase; margin: 0; letter-spacing: 2px;">Loading Telemetry...</p>
+                </div>
                 <h2 id="h-header" style="margin: 0 0 10px 0; font-size: 2.5rem; font-weight: 900; text-transform: uppercase;"><div class="skeleton" style="width: 60%; height: 40px;"></div></h2>
                 <div id="h-deadline" style="margin: 15px 0 0 0; font-size: 1.1rem;"><div class="skeleton" style="width: 50%; height: 20px; margin-top: 10px;"></div></div>
             </div>
-            
-            <div style="display: flex; align-items: center;">
+
+            <div style="display: flex; align-items: center; z-index: 1;">
                 <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 20px 40px; font-size: 1.3rem;">Lock Strategy</button>
             </div>
         </div>
@@ -977,6 +982,42 @@
         { name: "Audi", color: "#F50537", drivers: [{name: "Nico Hulkenberg", num: 27}, {name: "Gabriel Bortoleto", num: 5}] },
         { name: "Cadillac", color: "#909090", drivers: [{name: "Sergio Perez", num: 11}, {name: "Valtteri Bottas", num: 77}] }
     ];
+
+    const countryFlagCodes = {
+        'Australia': 'au', 'China': 'cn', 'Japan': 'jp', 'Bahrain': 'bh',
+        'Saudi Arabia': 'sa', 'United States': 'us', 'USA': 'us', 'Canada': 'ca',
+        'Monaco': 'mc', 'Spain': 'es', 'Austria': 'at', 'Great Britain': 'gb',
+        'Belgium': 'be', 'Hungary': 'hu', 'Netherlands': 'nl', 'Italy': 'it',
+        'Azerbaijan': 'az', 'Singapore': 'sg', 'Mexico': 'mx', 'Brazil': 'br',
+        'Qatar': 'qa', 'Abu Dhabi': 'ae'
+    };
+
+    const circuitPaths = {
+        'Albert Park Circuit': 'M30,10 Q20,10 18,18 L12,40 Q10,48 14,54 L22,62 Q26,66 30,68 L50,78 Q58,82 64,78 L78,62 Q84,56 82,48 L76,30 Q74,22 68,18 L50,12 Q40,10 30,10 Z',
+        'Shanghai International Circuit': 'M20,25 L20,40 Q20,50 28,55 L40,60 Q45,62 45,68 L45,80 Q45,85 50,85 L60,85 Q65,85 68,80 L72,65 Q75,58 72,52 L65,45 Q60,40 55,38 L50,36 Q45,34 45,28 L48,20 Q50,15 55,15 L75,18 Q80,18 82,22 L82,35 Q82,40 78,42',
+        'Suzuka International Racing Course': 'M25,50 Q20,35 25,22 Q30,12 42,10 L55,10 Q65,10 70,18 L75,30 Q78,40 72,48 L60,55 Q50,58 45,62 L38,70 Q32,78 38,84 L55,90 Q65,90 72,82 L78,70 Q82,60 78,50',
+        'Bahrain International Circuit': 'M35,15 L25,15 Q18,15 18,22 L18,45 Q18,50 22,52 L30,56 Q35,58 35,65 L35,78 Q35,85 42,85 L58,85 Q65,85 65,78 L65,55 Q65,48 60,45 L50,40 Q45,38 45,32 L48,22 Q50,15 55,15 L65,15 Q72,15 72,22 L72,35',
+        'Jeddah Corniche Circuit': 'M20,90 L15,60 Q12,45 15,30 L20,18 Q25,10 35,10 L65,10 Q72,10 75,15 L80,25 Q82,32 78,38 L70,48 Q65,52 65,58 L68,70 Q70,78 65,82 L50,88 Q42,90 35,88 L25,85',
+        'Miami International Autodrome': 'M20,20 L70,20 Q80,20 80,30 L80,50 Q80,55 75,58 L55,65 Q48,68 48,75 L50,82 Q52,88 45,88 L25,85 Q18,82 18,75 L18,30 Q18,20 25,20',
+        'Circuit Gilles-Villeneuve': 'M15,50 L15,30 Q15,20 25,20 L75,20 Q85,20 85,30 L85,45 Q85,52 80,55 L55,65 Q48,68 42,65 L30,55 Q25,52 25,58 L28,72 Q30,80 38,82 L70,82 Q80,82 82,75',
+        'Circuit de Monaco': 'M25,20 L60,15 Q68,14 72,20 L78,35 Q80,42 75,48 L60,58 Q52,62 48,68 L42,80 Q38,88 30,85 L22,75 Q18,68 20,60 L25,48 Q28,40 25,35 L22,28 Q20,22 25,20',
+        'Circuit de Barcelona-Catalunya': 'M20,25 L55,15 Q65,12 72,18 L80,30 Q85,38 80,45 L68,55 Q62,58 60,65 L58,75 Q55,82 48,82 L30,80 Q22,78 20,70 L18,55 Q16,45 20,38 L25,32',
+        'Red Bull Ring': 'M20,70 L20,30 Q20,18 32,15 L60,15 Q72,15 78,25 L82,40 Q85,50 78,58 L60,72 Q50,78 38,78 L25,75',
+        'Silverstone Circuit': 'M30,15 L55,10 Q65,8 72,15 L82,30 Q88,40 82,50 L70,62 Q62,68 55,65 L42,58 Q35,55 30,60 L22,72 Q18,80 22,85 L40,88 Q50,90 58,85 L72,75 Q78,70 75,62',
+        'Circuit de Spa-Francorchamps': 'M15,70 L18,50 Q20,40 28,35 L42,28 Q48,26 52,30 L58,42 Q62,50 68,48 L78,40 Q85,35 85,28 L82,18 Q78,12 70,12 L55,15 Q48,18 45,25',
+        'Hungaroring': 'M25,20 L50,15 Q60,14 65,20 L72,32 Q76,40 72,48 L62,60 Q55,66 48,65 L38,60 Q30,56 28,62 L28,75 Q28,82 35,85 L55,85 Q65,85 70,78 L72,68',
+        'Circuit Zandvoort': 'M25,25 Q18,30 18,40 L20,55 Q22,65 30,70 L50,78 Q60,80 68,74 L78,60 Q84,50 80,40 L70,28 Q62,20 50,18 L35,20 Q28,22 25,25',
+        'Monza Circuit': 'M25,85 L20,50 Q18,35 22,25 L30,15 Q38,8 48,10 L62,15 Q70,18 75,28 L80,45 Q82,55 78,65 L68,78 Q60,85 50,82 L35,75 Q28,70 30,60',
+        'IFEMA Madrid': 'M20,20 L65,15 Q75,14 80,22 L85,38 Q88,48 82,55 L68,65 Q60,70 55,75 L48,82 Q40,88 32,82 L22,68 Q15,58 18,48 L22,35',
+        'Baku City Circuit': 'M20,85 L15,45 Q12,30 18,20 L30,12 Q40,8 50,12 L65,20 Q72,25 75,35 L78,55 Q80,65 75,72 L60,82 Q50,88 40,85 L28,78',
+        'Marina Bay Street Circuit': 'M22,25 L55,18 Q65,16 70,22 L78,35 Q82,42 78,50 L65,60 Q58,65 55,72 L52,82 Q48,88 40,88 L28,82 Q20,78 18,68 L18,45 Q18,35 22,28',
+        'Circuit of the Americas': 'M20,45 L22,25 Q25,15 35,12 L55,10 Q65,10 70,18 L78,32 Q82,42 78,52 L65,62 Q58,65 52,62 L42,55 Q35,52 32,58 L30,72 Q28,82 35,88 L60,88 Q70,88 75,80',
+        'Autódromo Hermanos Rodríguez': 'M20,25 L60,20 Q70,18 75,25 L80,40 Q82,50 78,58 L65,68 Q58,72 50,72 L35,70 Q25,68 22,60 L18,45 Q16,35 20,28',
+        'Interlagos Circuit': 'M70,25 L45,15 Q35,12 28,18 L18,32 Q12,42 15,52 L25,65 Q32,75 42,78 L60,80 Q72,80 78,72 L82,58 Q85,48 80,38 L72,28',
+        'Las Vegas Strip Circuit': 'M25,85 L20,40 Q18,25 25,18 L45,12 Q55,10 62,15 L72,25 Q78,32 78,42 L75,60 Q72,70 65,75 L50,82 Q42,85 35,82',
+        'Lusail International Circuit': 'M22,22 Q18,30 20,40 L25,55 Q28,65 38,70 L55,75 Q65,78 72,70 L80,55 Q85,42 80,30 L70,20 Q60,14 48,15 L32,18',
+        'Yas Marina Circuit': 'M25,20 L55,15 Q65,14 72,20 L80,32 Q85,42 82,52 L72,65 Q65,72 55,72 L40,68 Q30,65 25,58 L20,45 Q18,35 20,28'
+    };
 
     const detailedTeams = teamsData.map(t => ({ name: t.name, color: t.color }));
     detailedTeams.sort((a, b) => a.name.localeCompare(b.name));
@@ -2531,6 +2572,23 @@
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
             document.getElementById('h-round').innerText = `Round ${r.round} of ${r.totalRounds || 24}`;
             document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
+
+            const flagCode = countryFlagCodes[r.country];
+            const flagEl = document.getElementById('h-flag');
+            if (flagCode) {
+                flagEl.src = `https://flagcdn.com/w80/${flagCode}.png`;
+                flagEl.alt = r.country;
+                flagEl.style.display = 'block';
+                flagEl.onerror = () => { flagEl.style.display = 'none'; };
+            }
+
+            const circuitPath = circuitPaths[r.circuit];
+            const circuitEl = document.getElementById('h-circuit-svg');
+            if (circuitPath) {
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                circuitEl.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" stroke="${isDark ? 'rgba(225,6,0,0.12)' : 'rgba(225,6,0,0.1)'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${circuitPath}"/></svg>`;
+                circuitEl.style.opacity = '1';
+            }
             const formatSessionTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
             const nextSessionMarkup = r.nextSession?.time ? `
                 <span class="lock-note">Next session: <strong style="color:var(--text-main);">${r.nextSession.label}</strong> <strong class="numeric-ui" style="color:var(--text-main);">${formatSessionTime(r.nextSession.time)}</strong></span>
