@@ -187,6 +187,32 @@ async function setupDatabase() {
             console.log("[DB] Moved Paritosh new joiner penalty from R2 to R1");
         }
 
+        // One-time fix: Adithya +5 for Sprint Gainer (Liam Lawson) — was missed due to missing Sprint Qualifying grid
+        const aFix = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'fix_adithya_r2_sg'", args: [] });
+        if (!aFix.rows[0]) {
+            await db.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + 5 WHERE name = 'Adithya Haniyamballi'", args: [] });
+            await db.execute({ sql: "UPDATE f1_round_history SET score = 0 WHERE round = 'R2' AND user_name = 'Adithya Haniyamballi' AND prediction NOT LIKE '%penalty%'", args: [] });
+            await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('fix_adithya_r2_sg', 'done')", args: [] });
+            console.log("[DB] Fixed Adithya R2 score: -5 -> 0 (Sprint Gainer +5 for Liam Lawson)");
+
+            // Send apology + corrected scores to Discord (deferred to allow API to wake up)
+            setTimeout(async () => {
+                try {
+                    let apology = `**Scoring Correction — Chinese Grand Prix (R2)**\n\n`;
+                    apology += `Apologies everyone — Sprint Gainer and Sprint Loser wildcards were not scored in R2 due to a bug where Sprint Qualifying grid data was missing.\n\n`;
+                    apology += `**Corrected wildcards:**\n`;
+                    apology += `Sprint Gainer: **Liam Lawson** (SQ P13 → Sprint P7, gained 6 positions)\n`;
+                    apology += `Sprint Loser: **Nico Hulkenberg** (SQ P11 → Sprint DNF, dropped 11 positions)\n\n`;
+                    apology += `**Score changes:**\n`;
+                    apology += `Adithya Haniyamballi: -5 → **0** (+5 for correctly predicting Liam Lawson as Sprint Gainer)\n`;
+                    apology += `No other scores affected — no one predicted Nico Hulkenberg as Sprint Loser.\n\n`;
+                    apology += `The bug has been fixed. Sprint wildcards will be scored correctly from the next sprint race onward.\n`;
+                    await sendDiscordNotification(apology);
+                    console.log('[DB] Sent R2 correction apology to Discord');
+                } catch (e) { console.error('[DB] Failed to send apology:', e.message); }
+            }, 15 * 1000);
+        }
+
         console.log("Database synced.");
     } catch (e) { console.error("DB Error:", e); }
 }
@@ -790,12 +816,21 @@ async function performFinalization() {
 
                     const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
                     if (sprintSes?.results) {
+                        // Sprint grid comes from Sprint Qualifying, not regular Qualifying
+                        const sprintGridMap = {};
+                        const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
+                        if (sqSes?.results) sqSes.results.forEach(r => {
+                            const d = dMap[String(r.driver_number)];
+                            if (d) sprintGridMap[normalizeStr(d.name)] = r.position;
+                        });
+                        console.log(`[FINALIZE] Sprint Qualifying grid: ${Object.keys(sprintGridMap).length} drivers`);
+
                         sprintResults = sprintSes.results.map(r => {
                             const d = dMap[String(r.driver_number)] || {};
                             const parts = (d.name || '').split(' ');
                             return {
                                 position: String(r.position), positionText: r.retired ? 'R' : String(r.position),
-                                grid: String(gridMap[normalizeStr(d.name || '')] || 0),
+                                grid: String(sprintGridMap[normalizeStr(d.name || '')] || gridMap[normalizeStr(d.name || '')] || 0),
                                 status: r.retired ? 'Retired' : 'Finished',
                                 Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
                                 Constructor: { name: d.team || '' }
@@ -1219,10 +1254,13 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                 });
                 const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
                 if (sprintSes?.results) {
+                    const sprintGridMap = {};
+                    const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
+                    if (sqSes?.results) sqSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) sprintGridMap[normalizeStr(d.name)] = r.position; });
                     sprintResults = sprintSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
-                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(sprintGridMap[normalizeStr(d.name || '')] || gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                     });
                 }
                 console.log(`[RESEND] Own API: ${results.length} race results`);
