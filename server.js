@@ -1227,6 +1227,131 @@ app.post('/api/test-discord', authenticateToken, requireAdmin, async (req, res) 
     } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
+app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
+    const { round } = req.body;
+    if (!round) return res.status(400).json({ success: false, message: "Missing 'round' (e.g. R2)" });
+
+    res.json({ success: true, message: `Re-scoring ${round} — Discord will update shortly.` });
+
+    try {
+        const roundNum = parseInt(round.replace('R', ''));
+        const rows = await db.execute({ sql: "SELECT * FROM f1_round_history WHERE round = ? ORDER BY id ASC", args: [round] }).then(r => r.rows);
+        if (rows.length === 0) { console.log(`[RESCORE] No history for ${round}`); return; }
+
+        const raceName = rows[0].race_name;
+
+        // Fetch race data (same logic as resend-discord)
+        let results = null, sprintResults = [], gridMap = {};
+        try {
+            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${roundNum}`, { timeout: 8000 }).then(r => r.data);
+            const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
+            if (raceSes?.results?.length) {
+                const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 8000 }).then(r => r.data);
+                const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+                const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
+                if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
+                if (Object.keys(gridMap).length === 0) {
+                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+                }
+                results = raceSes.results.map(r => {
+                    const d = dMap[String(r.driver_number)] || {};
+                    const parts = (d.name || '').split(' ');
+                    return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                });
+                const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+                if (sprintSes?.results) {
+                    const sprintGridMap = {};
+                    const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
+                    if (sqSes?.results) sqSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) sprintGridMap[normalizeStr(d.name)] = r.position; });
+                    sprintResults = sprintSes.results.map(r => {
+                        const d = dMap[String(r.driver_number)] || {};
+                        const parts = (d.name || '').split(' ');
+                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(sprintGridMap[normalizeStr(d.name || '')] || gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                    });
+                }
+                console.log(`[RESCORE] Own API: ${results.length} race results`);
+            }
+        } catch (e) { console.log('[RESCORE] Own API failed:', e.message); }
+
+        if (!results) {
+            try {
+                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
+                if (races?.length) { results = races[0].Results; }
+                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
+                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+            } catch (_) { }
+        }
+
+        if (!results) { console.log(`[RESCORE] No race data found for ${round}`); return; }
+
+        // Build actual positions
+        let actualDriverPositions = {}, actualCRanges = {}, raceLosers = [], sprintGainers = [], sprintLosers = [];
+        results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); let pos = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W' || r.status.startsWith('Retired') || r.status.startsWith('Collision')) pos = 22; actualDriverPositions[name] = pos; });
+        const constructorSums = {}; results.forEach(r => { const c = normalizeConstructor(r.Constructor.name); let pos = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W') pos = 22; constructorSums[c] = (constructorSums[c] || 0) + pos; });
+        const sumGroups = {}; for (const [c, sum] of Object.entries(constructorSums)) { if (!sumGroups[sum]) sumGroups[sum] = []; sumGroups[sum].push(c); }
+        let currentRank = 1; Object.keys(sumGroups).map(Number).sort((a, b) => a - b).forEach(sum => { const teams = sumGroups[sum]; teams.forEach(team => { actualCRanges[team] = { min: currentRank, max: currentRank + teams.length - 1 }; }); currentRank += teams.length; });
+
+        let maxRaceDrop = -999; results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const drop = finish - grid; if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; } else if (drop === maxRaceDrop) raceLosers.push(name); } });
+        let maxSprintGain = -999, maxSprintDrop = -999; sprintResults.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const gain = grid - finish; const drop = finish - grid; if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; } else if (gain === maxSprintGain) sprintGainers.push(name); if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; } else if (drop === maxSprintDrop) sprintLosers.push(name); } });
+
+        console.log(`[RESCORE] Race Loser(s): ${raceLosers.join(', ') || 'none'} | Sprint Gainer(s): ${sprintGainers.join(', ') || 'none'} | Sprint Loser(s): ${sprintLosers.join(', ') || 'none'}`);
+
+        // Re-score each player
+        const playerScores = {};
+        const scoreBreakdowns = {};
+        let newLowest = Infinity;
+
+        for (const row of rows) {
+            const pred = JSON.parse(row.prediction || '{}');
+            if (pred.penalty) continue; // skip penalty/no-sub entries for now
+
+            const detail = calcDetailedBreakdown(pred, actualDriverPositions, actualCRanges, raceLosers, sprintGainers, sprintLosers);
+            const newScore = detail.total;
+            const oldScore = row.score;
+            const scoreDiff = newScore - oldScore;
+
+            playerScores[row.user_name] = { score: newScore, oldScore, scoreDiff, hadPrediction: true };
+            scoreBreakdowns[row.user_name] = detail;
+            if (newScore < newLowest) newLowest = newScore;
+        }
+
+        // Recalculate no-submission penalty
+        const newPenalty = (newLowest === Infinity ? 0 : newLowest) - 5;
+        for (const row of rows) {
+            const pred = JSON.parse(row.prediction || '{}');
+            if (pred.penalty === 'no submission') {
+                const oldScore = row.score;
+                playerScores[row.user_name] = { score: newPenalty, oldScore, scoreDiff: newPenalty - oldScore, hadPrediction: false };
+            }
+            if (pred.penalty === 'new joiner') {
+                if (playerScores[row.user_name]) playerScores[row.user_name].newJoinerPenalty = row.score;
+            }
+        }
+
+        // Update DB
+        const tx = await db.transaction("write");
+        try {
+            for (const [name, data] of Object.entries(playerScores)) {
+                if (data.scoreDiff !== 0) {
+                    await tx.execute({ sql: "UPDATE f1_drivers SET total_score = total_score + ? WHERE name = ?", args: [data.scoreDiff, name] });
+                }
+                await tx.execute({ sql: "UPDATE f1_round_history SET score = ? WHERE round = ? AND user_name = ? AND prediction NOT LIKE '%new joiner%'", args: [data.score, round, name] });
+            }
+            await tx.commit();
+            console.log(`[RESCORE] DB updated for ${round}`);
+        } catch (writeError) {
+            try { await tx.rollback(); } catch (_) { }
+            throw writeError;
+        }
+
+        // Send Discord
+        const sorted = Object.entries(playerScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
+        const breakdown = buildDiscordBreakdown(raceName, round, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, newPenalty, true);
+        await sendDiscordNotification(breakdown);
+        console.log(`[RESCORE] Discord sent for ${round}`);
+    } catch (e) { console.error(`[RESCORE] Error:`, e.message); }
+});
+
 app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res) => {
     const { round } = req.body;
     if (!round) return res.status(400).json({ success: false, message: "Missing 'round' (e.g. R2)" });
