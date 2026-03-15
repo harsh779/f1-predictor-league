@@ -45,7 +45,7 @@ Three sub-tabs:
 - **Constructors** — Live F1 Constructors' Championship
 
 ### Calendar
-- Full 2026 season schedule with all 24 rounds
+- Full 2026 season schedule with all 22 rounds
 - Session times for FP1, FP2, FP3, Qualifying, Sprint Qualifying, Sprint, and Race
 - Sprint weekend detection and labelling
 - Countdown to next race with progress bar

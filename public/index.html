@@ -2529,7 +2529,7 @@
     async function loadHomeData() {
         try {
             const r = await fetch('/api/next-race?t=' + new Date().getTime()).then(res=>res.json());
-            document.getElementById('h-round').innerText = `Round ${r.round} of ${r.totalRounds || 24}`;
+            document.getElementById('h-round').innerText = `Round ${r.round} of ${r.totalRounds || 22}`;
             document.getElementById('h-header').innerText = `${r.circuit}, ${r.country}`;
             const formatSessionTime = (iso) => iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBC';
             const nextSessionMarkup = r.nextSession?.time ? `
