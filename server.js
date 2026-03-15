@@ -800,6 +800,14 @@ async function performFinalization() {
                         const d = dMap[String(r.driver_number)];
                         if (d) gridMap[normalizeStr(d.name)] = r.position;
                     });
+                    // Ergast qualifying fallback if own API qualifying not available
+                    if (Object.keys(gridMap).length === 0) {
+                        try {
+                            const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${latestCalRace.round}/qualifying.json`, { timeout: 10000 }).then(r => r.data.MRData.RaceTable.Races);
+                            if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
+                            console.log(`[FINALIZE] Ergast qualifying fallback: ${Object.keys(gridMap).length} drivers`);
+                        } catch (e) { console.log('[FINALIZE] Ergast qualifying fallback failed:', e.message); }
+                    }
 
                     results = raceSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
@@ -1247,6 +1255,9 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                 const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
+                if (Object.keys(gridMap).length === 0) {
+                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${roundNum}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
+                }
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
                     const parts = (d.name || '').split(' ');
@@ -1559,10 +1570,9 @@ setTimeout(checkAndFinalize, 10 * 1000);
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v7.7';
+const APP_VERSION = 'v7.8';
 const APP_CHANGELOG = [
-    'Fixed driver names in Past Sessions — all 22 drivers now show correctly',
-    'Updated 2026 driver numbers and team colors to match official grid',
+    'Fixed Race Loser wildcard showing N/A — Ergast qualifying fallback when own API qualifying data is missing',
 ];
 async function notifyDeployUpdate() {
     try {
