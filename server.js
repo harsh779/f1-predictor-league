@@ -652,6 +652,52 @@ async function sendDiscordNotification(msg) {
     }
 }
 
+function buildDiscordBreakdown(raceName, roundLabel, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, penalty, hasResults) {
+    let msg = `**${raceName} (${roundLabel}) — Score Breakdown**\n`;
+    msg += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
+    if (sprintResults.length > 0) msg += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
+    if (penalty !== undefined) msg += `No-sub penalty: ${penalty}\n`;
+    msg += '\n';
+
+    // Summary table
+    const maxName = Math.max(...sorted.map(([n]) => n.length), 6);
+    msg += '```\n';
+    msg += ` #  ${'Player'.padEnd(maxName)}  Total    D    C    W\n`;
+    msg += ' ' + '-'.repeat(maxName + 30) + '\n';
+    sorted.forEach(([name, data], i) => {
+        const bd = scoreBreakdowns[name];
+        const rank = String(i + 1).padStart(2);
+        const total = String(data.score).padStart(5);
+        if (bd) {
+            const d = String(bd.driverPts).padStart(4);
+            const c = String(bd.constructorPts).padStart(4);
+            const w = String(bd.wildcardPts).padStart(4);
+            msg += `${rank}  ${name.padEnd(maxName)}  ${total}  ${d}  ${c}  ${w}`;
+        } else {
+            let tag = !data.hadPrediction ? '(no sub)' : '';
+            msg += `${rank}  ${name.padEnd(maxName)}  ${total}  ${tag}`;
+        }
+        if (data.newJoinerPenalty !== undefined) msg += `  [NJ: ${data.newJoinerPenalty}]`;
+        msg += '\n';
+    });
+    msg += '```\n';
+
+    // Detailed per-player breakdown
+    if (hasResults) {
+        sorted.forEach(([name]) => {
+            const bd = scoreBreakdowns[name];
+            if (!bd) return;
+            msg += `**${name}**\n`;
+            msg += `> ${bd.driverDetails.join(', ')}\n`;
+            msg += `> ${bd.teamDetails.join(', ')}\n`;
+            if (bd.wcDetails.length > 0) msg += `> ${bd.wcDetails.join(', ')}\n`;
+            msg += '\n';
+        });
+    }
+
+    return msg;
+}
+
 function calcDetailedBreakdown(p, actualDriverPositions, actualCRanges, raceLosers, sprintGainers, sprintLosers) {
     let driverPts = 0, constructorPts = 0, wildcardPts = 0;
     const driverDetails = []; const teamDetails = []; const wcDetails = [];
@@ -956,23 +1002,7 @@ async function performFinalization() {
 
         // --- DISCORD SCORE BREAKDOWN ---
         const sorted = Object.entries(finalScores).filter(([n]) => n !== 'admin').sort((a, b) => b[1].score - a[1].score);
-        let breakdown = `**${raceData.raceName} (${roundLabel}) — Score Breakdown**\n`;
-        breakdown += `Race Loser: ${raceLosers.join(', ') || 'N/A'}\n`;
-        if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
-        breakdown += `No-submission penalty: ${penalty}\n\n`;
-        sorted.forEach(([name, data], i) => {
-            const bd = scoreBreakdowns[name];
-            let line = `**${i + 1}. ${name}: ${data.score >= 0 ? '+' : ''}${data.score}**`;
-            if (!data.hadPrediction) line += ' (no sub)';
-            if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
-            breakdown += line + '\n';
-            if (bd) {
-                breakdown += `Drivers (${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts}): ${bd.driverDetails.join(', ')}\n`;
-                breakdown += `Teams (${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts}): ${bd.teamDetails.join(', ')}\n`;
-                if (bd.wcDetails.length > 0) breakdown += `Wildcards (${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}): ${bd.wcDetails.join(', ')}\n`;
-            }
-            breakdown += '\n';
-        });
+        const breakdown = buildDiscordBreakdown(raceData.raceName, roundLabel, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, penalty, true);
         try {
             await sendDiscordNotification(breakdown);
         } catch (notifyError) {
@@ -1240,25 +1270,7 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         }
 
         const sorted = Object.entries(playerScores).sort((a, b) => b[1].score - a[1].score);
-        let breakdown = `**${raceName} (${round}) — Score Breakdown**\n`;
-        if (raceLosers.length > 0) breakdown += `Race Loser: ${raceLosers.join(', ')}\n`;
-        if (sprintResults.length > 0) breakdown += `Sprint Gainer: ${sprintGainers.join(', ') || 'N/A'} | Sprint Loser: ${sprintLosers.join(', ') || 'N/A'}\n`;
-        breakdown += '\n';
-        sorted.forEach(([name, data], i) => {
-            const bd = scoreBreakdowns[name];
-            let line = `**${i + 1}. ${name}: ${data.score >= 0 ? '+' : ''}${data.score}**`;
-            if (!data.hadPrediction) line += ' (no sub)';
-            if (data.newJoinerPenalty !== undefined) line += ` (new joiner: ${data.newJoinerPenalty})`;
-            breakdown += line + '\n';
-            if (bd) {
-                breakdown += `Drivers (${bd.driverPts >= 0 ? '+' : ''}${bd.driverPts}): ${bd.driverDetails.join(', ')}\n`;
-                breakdown += `Teams (${bd.constructorPts >= 0 ? '+' : ''}${bd.constructorPts}): ${bd.teamDetails.join(', ')}\n`;
-                if (bd.wcDetails.length > 0) breakdown += `Wildcards (${bd.wildcardPts >= 0 ? '+' : ''}${bd.wildcardPts}): ${bd.wcDetails.join(', ')}\n`;
-            }
-            breakdown += '\n';
-        });
-
-        if (!results) breakdown += `(Race results unavailable — detailed breakdown omitted)\n`;
+        const breakdown = buildDiscordBreakdown(raceName, round, sorted, scoreBreakdowns, raceLosers, sprintResults, sprintGainers, sprintLosers, undefined, !!results);
 
         await sendDiscordNotification(breakdown);
         console.log(`[RESEND] Discord notification sent for ${round}`);
