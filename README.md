@@ -102,12 +102,13 @@ Three sub-tabs:
 | `PORT` | Server port (default: 3000) |
 | `APP_URL` | Public URL of the app |
 | `JWT_SECRET` | Secret key for JWT signing |
-| `TURSO_DATABASE_URL` | Turso database connection URL |
+| `TURSO_DATABASE_URL` | Turso database connection URL. If unset, the app falls back to a local `local-preview.db` file |
 | `TURSO_AUTH_TOKEN` | Turso auth token |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `DISCORD_WEBHOOK` | Discord webhook URL for notifications |
 | `F1_TIMING_API` | URL of the F1 Live Timing API |
+| `F1_TIMING_API_KEY` | API key for the F1 Live Timing API, if that service has auth enabled |
 | `API_SPORTS_KEY` | API-Sports key (optional, for weather fallback) |
 
 ---
@@ -122,6 +123,43 @@ node server.js
 ```
 
 Create a `.env` file with the variables listed above before starting.
+
+---
+
+## Testing
+
+Run the full local verification pass:
+
+```bash
+npm test
+```
+
+Useful individual commands:
+
+```bash
+npm run test:syntax
+npm run test:smoke
+npm run test:all
+```
+
+`npm run test:smoke` starts the app on a local test port, validates the core public route contracts, and confirms that upstream-backed endpoints either return data or fail cleanly with JSON errors. It also verifies that protected routes reject unauthenticated access with `401`.
+
+If your environment blocks child-process spawning, start the app separately and point the smoke test at it:
+
+```bash
+SMOKE_BASE_URL=http://127.0.0.1:3000 npm run test:smoke
+```
+
+### Manual Smoke Checklist
+
+After `npm test` passes, do one browser pass covering:
+
+1. Open the app and confirm the home page renders without console/network errors.
+2. Check the next race card shows the lock state, lock time, and next session correctly.
+3. Log in and verify prediction submission, edit, and lockout behavior.
+4. Open the live timing tab and confirm timing, race control, pits, weather, and team radio panels populate or show clear unavailable states.
+5. Open past results and confirm the session cards and result-detail modal render correctly, including `DNF` vs `OUT`.
+6. If Discord is configured, verify reminder and lockout notifications against a test round or controlled schedule.
 
 ---
 

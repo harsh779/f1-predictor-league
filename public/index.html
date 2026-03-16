@@ -1555,7 +1555,7 @@
         sseConnected = false;
     }
 
-    async function loadTimingTab() {
+    async function loadTimingTabLegacy() {
         const body    = document.getElementById('timing-body');
         const cards   = document.getElementById('timing-cards');
         const status  = document.getElementById('timing-status');
@@ -1724,7 +1724,7 @@
         }
     }
 
-    function updateTrackBanner(ts) {
+    function updateTrackBannerLegacy(ts) {
         const banner = document.getElementById('track-banner');
         if (!ts || !ts.Message) { banner.className = ''; banner.style.display = 'none'; return; }
         const msg = ts.Message;
@@ -1738,7 +1738,7 @@
         banner.id = 'track-banner';
     }
 
-    async function updateLiveWeatherStrip() {
+    async function updateLiveWeatherStripLegacy() {
         const strip = document.getElementById('live-weather-strip');
         try {
             const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
@@ -1755,12 +1755,14 @@
         } catch(e) { strip.style.display = 'none'; }
     }
 
-    async function loadRaceControl() {
+    async function loadRaceControlLegacy() {
         const feed = document.getElementById('rc-feed');
         try {
-            const msgs = await fetch('/api/live/race-control?t=' + Date.now()).then(r => r.json());
+            const response = await fetch('/api/live/race-control?t=' + Date.now());
+            const msgs = await response.json();
+            if (!response.ok) throw new Error(msgs?.error || 'Race control unavailable');
             if (!Array.isArray(msgs) || !msgs.length) return;
-            feed.innerHTML = msgs.slice(0, 30).map(m => {
+            feed.innerHTML = filterRaceControlMessages(msgs).map(m => {
                 let color = 'var(--text-muted)';
                 if (m.Category === 'Flag') {
                     if (m.Message?.includes('RED')) color = '#e10600';
@@ -1776,7 +1778,7 @@
         } catch(e) {}
     }
 
-    async function loadPitData() {
+    async function loadPitDataLegacy() {
         const feed = document.getElementById('pit-feed');
         try {
             const d = await fetch('/api/live/pits?t=' + Date.now()).then(r => r.json());
@@ -1795,7 +1797,7 @@
         } catch(e) {}
     }
 
-    async function loadTeamRadio() {
+    async function loadTeamRadioLegacy1() {
         const feed = document.getElementById('radio-feed');
         try {
             const d = await fetch('/api/live/team-radio?t=' + Date.now()).then(r => r.json());
@@ -1848,7 +1850,7 @@
         document.querySelector(`.dd-tab[onclick="switchDD('${panel}')"]`).classList.add('active-dd');
     }
 
-    function openTelemModal(num, name, color) {
+    function openTelemModalLegacy(num, name, color) {
         ddDriverNum = num;
         document.getElementById('telem-driver-name').innerHTML = `<span style="display:inline-block;width:4px;height:20px;background:${color};border-radius:2px;margin-right:8px;vertical-align:middle;"></span>${name}`;
         document.getElementById('telem-modal').classList.remove('hidden');
@@ -1863,6 +1865,7 @@
         telemSSE.onerror = () => {
             if (telemSSE) { telemSSE.close(); telemSSE = null; }
             fetch(`/api/live/telemetry/${num}?t=${Date.now()}`).then(r => r.json()).then(d => {
+                if (d?.telemetry) return updateTelemUI(d.telemetry);
                 const drivers = d.drivers || [];
                 const dr = drivers.find(x => String(x.driver_number) === String(num));
                 if (dr?.telemetry) updateTelemUI(dr.telemetry);
@@ -2043,7 +2046,7 @@
         } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Pit strategy data unavailable</div>'; }
     }
 
-    async function loadDDRadio(num) {
+    async function loadDDRadioLegacy1(num) {
         const el = document.getElementById('dd-radio-content');
         el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
         try {
@@ -2064,7 +2067,7 @@
     }
 
     // ── Past Results ──────────────────────────────────────────────
-    async function loadPastResults() {
+    async function loadPastResultsLegacy() {
         const el = document.getElementById('past-results-list');
         try {
             const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
@@ -2085,13 +2088,13 @@
         } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Could not load past results.</div>'; }
     }
 
-    function formatSessionTypeLabel(sessionType) {
+    function formatSessionTypeLabelLegacy(sessionType) {
         const label = String(sessionType || '').replace(/_/g, ' ').trim();
         if (!label) return 'Session';
         return label.replace(/\b\w/g, m => m.toUpperCase());
     }
 
-    function getSessionSortOrder(sessionType) {
+    function getSessionSortOrderLegacy(sessionType) {
         const key = String(sessionType || '').toLowerCase().replace(/\s+/g, '_');
         const order = {
             fp1: 1, first_practice: 1,
@@ -2106,7 +2109,7 @@
     }
 
     // Override the flat list with grouped race-weekend cards while keeping the detail modal.
-    async function loadPastResults() {
+    async function loadPastResultsGroupedLegacy() {
         const el = document.getElementById('past-results-list');
         try {
             const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
@@ -2161,7 +2164,7 @@
         }
     }
 
-    async function openResultDetail(filename) {
+    async function openResultDetailLegacy(filename) {
         document.getElementById('result-detail-modal').classList.remove('hidden');
         const body = document.getElementById('result-detail-body');
         body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Loading...</div>';
@@ -2178,7 +2181,7 @@
             teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
             if (d.drivers) {
                 Object.entries(d.drivers).forEach(([num, info]) => {
-                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || numMap[num]?.color || 'var(--border)' };
+                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || info.team_colour || numMap[num]?.color || 'var(--border)' };
                 });
             }
 
@@ -2198,7 +2201,7 @@
                     const info = numMap[String(r.driver_number)] || {};
                     const dName = info.name || '#' + r.driver_number;
                     const tc = info.color || 'var(--border)';
-                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DSQ</span>' : '';
+                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">OUT</span>' : '';
                     const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
                     const stints = (r.stints || []).map(s => {
                         const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
@@ -2223,7 +2226,7 @@
     }
 
     // Safer overrides for dynamic API-driven views.
-    async function updateLiveWeatherStrip() {
+    async function updateLiveWeatherStripLegacy2() {
         const strip = document.getElementById('live-weather-strip');
         try {
             const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
@@ -2262,7 +2265,9 @@
                     <span style="color:${color};font-weight:900;">${escapeHtml(lap)}</span> <span style="color:var(--text-main);">${escapeHtml(m.Message || '')}</span>
                 </div>`;
             }).join('');
-        } catch (e) {}
+        } catch (e) {
+            feed.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Race control unavailable</div>';
+        }
     }
 
     async function loadPitData() {
@@ -2288,7 +2293,9 @@
     async function loadTeamRadio() {
         const feed = document.getElementById('radio-feed');
         try {
-            const d = await fetch('/api/live/team-radio?t=' + Date.now()).then(r => r.json());
+            const response = await fetch('/api/live/team-radio?t=' + Date.now());
+            const d = await response.json();
+            if (!response.ok) throw new Error(d?.error || 'Team radio unavailable');
             const msgs = d.messages || [];
             if (!msgs.length) { feed.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No radio messages yet</div>'; return; }
             feed.innerHTML = msgs.slice(0, 20).map(m => {
@@ -2305,7 +2312,9 @@
                     ${m.audio_url ? `<button onclick='playRadio(this, ${jsArg(m.audio_url)})' style="background:var(--nav-bg);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.7rem;">&#9654;</button>` : ''}
                 </div>`;
             }).join('');
-        } catch (e) {}
+        } catch (e) {
+            feed.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Team radio unavailable</div>';
+        }
     }
 
     function openTelemModal(num, name, color) {
@@ -2321,6 +2330,7 @@
         telemSSE.onerror = () => {
             if (telemSSE) { telemSSE.close(); telemSSE = null; }
             fetch(`/api/live/telemetry/${encodeURIComponent(num)}?t=${Date.now()}`).then(r => r.json()).then(d => {
+                if (d?.telemetry) return updateTelemUI(d.telemetry);
                 const drivers = d.drivers || [];
                 const dr = drivers.find(x => String(x.driver_number) === String(num));
                 if (dr?.telemetry) updateTelemUI(dr.telemetry);
@@ -2335,7 +2345,9 @@
         const el = document.getElementById('dd-radio-content');
         el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
         try {
-            const d = await fetch(`/api/live/team-radio/${encodeURIComponent(num)}?t=${Date.now()}`).then(r => r.json());
+            const response = await fetch(`/api/live/team-radio/${encodeURIComponent(num)}?t=${Date.now()}`);
+            const d = await response.json();
+            if (!response.ok) throw new Error(d?.error || 'Team radio unavailable');
             const msgs = d.messages || [];
             if (!msgs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No radio messages yet</div>'; return; }
             el.innerHTML = `<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px;">${msgs.length} message${msgs.length !== 1 ? 's' : ''}</div>` +
@@ -2351,7 +2363,7 @@
         } catch(e) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Team radio unavailable</div>'; }
     }
 
-    async function loadPastResults() {
+    async function loadPastResultsWeekendLegacy() {
         const el = document.getElementById('past-results-list');
         try {
             const results = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
@@ -2406,7 +2418,7 @@
         }
     }
 
-    async function openResultDetail(filename) {
+    async function openResultDetailLegacy2(filename) {
         document.getElementById('result-detail-modal').classList.remove('hidden');
         const body = document.getElementById('result-detail-body');
         body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Loading...</div>';
@@ -2422,7 +2434,7 @@
             teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
             if (d.drivers) {
                 Object.entries(d.drivers).forEach(([num, info]) => {
-                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || numMap[num]?.color || 'var(--border)' };
+                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || info.team_colour || numMap[num]?.color || 'var(--border)' };
                 });
             }
 
@@ -2443,7 +2455,7 @@
                     const info = numMap[String(r.driver_number)] || {};
                     const dName = escapeHtml(info.name || '#' + r.driver_number);
                     const tc = info.color || 'var(--border)';
-                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DSQ</span>' : '';
+                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">OUT</span>' : '';
                     const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
                     const stints = (r.stints || []).map(s => {
                         const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
@@ -2526,6 +2538,38 @@
             session?.Phase
         ].filter(Boolean).join(' ').toLowerCase();
         return /(finalised|finalized|finished|ended|complete|completed|inactive|over)/.test(descriptor);
+    }
+
+    function parseApiTimestamp(value, assumeUtc = false) {
+        if (!value || typeof value !== 'string') return null;
+        const normalized = assumeUtc && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? `${value}Z` : value;
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function getSessionStartTimestamp(session) {
+        if (!session?.StartDate) return null;
+        if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(session.StartDate) && session.GmtOffset) {
+            const offset = String(session.GmtOffset).match(/^([+-]?)(\d{2}):(\d{2})(?::\d{2})?$/);
+            if (offset) {
+                const sign = offset[1] === '-' ? '-' : '+';
+                return parseApiTimestamp(`${session.StartDate}${sign}${offset[2]}:${offset[3]}`);
+            }
+        }
+        return parseApiTimestamp(session.StartDate);
+    }
+
+    function filterRaceControlMessages(messages) {
+        if (!Array.isArray(messages) || !messages.length) return [];
+        if (!window.__liveSessionStartAt) return messages.slice(0, 30);
+
+        const cutoff = window.__liveSessionStartAt.getTime() - (10 * 60 * 1000);
+        const filtered = messages.filter(msg => {
+            const timestamp = parseApiTimestamp(msg?.Utc || msg?.timestamp, true);
+            return !timestamp || timestamp.getTime() >= cutoff;
+        });
+
+        return (filtered.length ? filtered : messages).slice(0, 30);
     }
 
     function updateTrackBanner(ts, session) {
@@ -2645,7 +2689,7 @@
             teamsData.forEach(t => t.drivers.forEach(dr => { numMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
             if (d.drivers) {
                 Object.entries(d.drivers).forEach(([num, info]) => {
-                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || numMap[num]?.color || 'var(--border)' };
+                    numMap[String(num)] = { name: info.name || info.acronym || '#' + num, team: info.team || numMap[num]?.team, color: info.team_color || info.team_colour || numMap[num]?.color || 'var(--border)' };
                 });
             }
 
@@ -2666,7 +2710,7 @@
                     const info = numMap[String(r.driver_number)] || {};
                     const dName = escapeHtml(info.name || '#' + r.driver_number);
                     const tc = info.color || 'var(--border)';
-                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DSQ</span>' : '';
+                    const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">OUT</span>' : '';
                     const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
                     const stints = (r.stints || []).map(s => {
                         const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
@@ -2707,6 +2751,7 @@
             const connected = d.status?.connected;
             const trackMsg = d.status?.track_status?.Message || '';
             liveSessionFinished = isSessionFinished(session);
+            window.__liveSessionStartAt = getSessionStartTimestamp(session);
 
             const toSecs = (t) => {
                 if (!t) return null;
@@ -2856,6 +2901,7 @@
             cards.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);">Awaiting live timing data...</div>`;
             if (status) status.innerHTML = '';
             liveSessionFinished = false;
+            window.__liveSessionStartAt = null;
             document.getElementById('track-banner').className = '';
             document.getElementById('track-banner').style.display = 'none';
             document.getElementById('live-weather-strip').style.display = 'none';

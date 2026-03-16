@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --check server.js && node --check public/sw.js"
+    "test": "node --check server.js && node --check public/sw.js",
+    "test:syntax": "node --check server.js && node --check public/sw.js",
+    "test:smoke": "node scripts/smoke.js",
+    "test:all": "node --check server.js && node --check public/sw.js && node scripts/smoke.js"
   },
   "keywords": [],
   "author": "",

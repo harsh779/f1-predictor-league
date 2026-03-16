@@ -10,8 +10,28 @@ const port = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026';
 const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.onrender.com';
+const F1_TIMING_API_KEY = process.env.F1_TIMING_API_KEY || '';
 const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(',').map(x => x.trim()).filter(Boolean));
 const SESSION_COOKIE_NAME = 'f1_session';
+const DEFAULT_LOCAL_DB_URL = `file:${path.resolve(__dirname, 'local-preview.db').replace(/\\/g, '/')}`;
+
+function buildF1TimingApiUrl(apiPath = '') {
+    const base = F1_TIMING_API.replace(/\/+$/, '');
+    return `${base}${String(apiPath).startsWith('/') ? '' : '/'}${apiPath}`;
+}
+
+function buildF1TimingApiConfig(config = {}) {
+    const mergedHeaders = { ...(config.headers || {}) };
+    if (F1_TIMING_API_KEY) mergedHeaders['x-api-key'] = F1_TIMING_API_KEY;
+    return {
+        ...config,
+        headers: mergedHeaders
+    };
+}
+
+async function f1TimingApiGet(apiPath, config = {}) {
+    return axios.get(buildF1TimingApiUrl(apiPath), buildF1TimingApiConfig(config)).then(r => r.data);
+}
 
 app.use(express.json());
 
@@ -122,7 +142,16 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false }));
 
-const db = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
+function getDatabaseConfig() {
+    const url = process.env.TURSO_DATABASE_URL || DEFAULT_LOCAL_DB_URL;
+    if (url === DEFAULT_LOCAL_DB_URL) {
+        console.log(`TURSO_DATABASE_URL not set. Using local database at ${DEFAULT_LOCAL_DB_URL}`);
+        return { url };
+    }
+    return { url, authToken: process.env.TURSO_AUTH_TOKEN };
+}
+
+const db = createClient(getDatabaseConfig());
 
 // --- 1. DATABASE SETUP ---
 async function setupDatabase() {
@@ -445,7 +474,7 @@ async function loadPersistedSeasonCalendar() {
 }
 
 async function fetchSeasonCalendarFromApi() {
-    const remote = await axios.get(`${F1_TIMING_API}/calendar`, { timeout: 10000 }).then(r => r.data);
+    const remote = await f1TimingApiGet('/calendar', { timeout: 10000 });
     const normalized = Array.isArray(remote) ? remote.map(normalizeCalendarEntry).filter(Boolean) : [];
     normalized.sort((a, b) => a.round - b.round);
     if (!isValidSeasonCalendar(normalized)) throw new Error('Calendar API returned invalid data');
@@ -516,6 +545,37 @@ async function findStrategyRace(calendar, now = new Date()) {
     return current;
 }
 
+function getPredictionLockSession(race) {
+    if (!race?.sessions) return null;
+    const usesSprintQuali = race.hasSprint && race.sessions.sprintQuali;
+    const time = usesSprintQuali ? race.sessions.sprintQuali : race.sessions.quali;
+    if (!time) return null;
+    return {
+        key: usesSprintQuali ? 'sprintQuali' : 'quali',
+        label: usesSprintQuali ? 'Sprint Qualifying' : 'Qualifying',
+        time,
+        startsAt: new Date(time)
+    };
+}
+
+function getPredictionLockInfo(race) {
+    const session = getPredictionLockSession(race);
+    if (!session || Number.isNaN(session.startsAt.getTime())) return null;
+    const lockTime = new Date(session.startsAt);
+    lockTime.setMinutes(lockTime.getMinutes() - 1);
+    return { ...session, lockTime };
+}
+
+function getRaceNotificationScope(race, lockInfo) {
+    const year = lockInfo?.startsAt?.getUTCFullYear?.() || 'unknown';
+    return `${year}_r${Number(race?.round || 0)}`;
+}
+
+function formatDiscordTimestamp(date, style = 'F') {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'TBC';
+    return `<t:${Math.floor(date.getTime() / 1000)}:${style}>`;
+}
+
 function getWeekendSessionTimeline(race) {
     if (!race?.sessions) return [];
     const entries = [
@@ -569,7 +629,7 @@ function normalizeWeatherPayload(raw) {
 function toAbsoluteApiUrl(url) {
     if (!url || typeof url !== 'string') return null;
     if (/^https?:\/\//i.test(url)) return url;
-    return `${F1_TIMING_API}${url.startsWith('/') ? '' : '/'}${url}`;
+    return buildF1TimingApiUrl(url);
 }
 
 function normalizeRadioMessage(raw) {
@@ -633,11 +693,9 @@ async function shouldRevealPredictionsTo(user) {
     const seasonCalendar = await getSeasonCalendar();
     const currentRace = await findStrategyRace(seasonCalendar, now);
     if (!currentRace) return true;
-    const lockSes = currentRace.hasSprint && currentRace.sessions.sprintQuali ? currentRace.sessions.sprintQuali : currentRace.sessions.quali;
-    if (!lockSes) return false;
-    const lockTime = new Date(lockSes);
-    lockTime.setMinutes(lockTime.getMinutes() - 1);
-    return now > lockTime;
+    const lockInfo = getPredictionLockInfo(currentRace);
+    if (!lockInfo) return false;
+    return now > lockInfo.lockTime;
 }
 
 function validateUniqueSelection(values) {
@@ -862,6 +920,126 @@ function buildDiscordBreakdown(raceName, roundLabel, sorted, scoreBreakdowns, ra
     return msg;
 }
 
+async function getMetaValue(key) {
+    return db.execute({ sql: "SELECT value FROM f1_meta WHERE key = ?", args: [key] }).then(r => r.rows[0]?.value || null);
+}
+
+async function setMetaValue(key, value) {
+    return db.execute({
+        sql: "INSERT INTO f1_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        args: [key, value]
+    });
+}
+
+async function sendDiscordNotificationChecked(msg) {
+    const url = process.env.DISCORD_WEBHOOK;
+    if (!url) {
+        console.warn('[DISCORD] No DISCORD_WEBHOOK env var set - skipping notification');
+        return false;
+    }
+
+    const fullMsg = `F1 Steward: ${msg}`;
+    const chunks = [];
+    if (fullMsg.length <= 2000) chunks.push(fullMsg);
+    else {
+        for (let i = 0; i < fullMsg.length; i += 2000) {
+            chunks.push(fullMsg.slice(i, i + 2000));
+        }
+    }
+
+    let allSent = true;
+    for (const chunk of chunks) {
+        try {
+            await axios.post(url, { content: chunk }, { timeout: 10000 });
+            console.log('[DISCORD] Message sent successfully');
+        } catch (e) {
+            allSent = false;
+            console.error(`[DISCORD] Webhook error: ${e.response?.status || 'NO_RESPONSE'} - ${e.response?.data ? JSON.stringify(e.response.data) : e.message}`);
+        }
+    }
+
+    return allSent;
+}
+
+const PREDICTION_REMINDER_WINDOWS = [
+    { key: '1h', label: '1 hour', ms: 1 * 60 * 60 * 1000 },
+    { key: '1d', label: '1 day', ms: 24 * 60 * 60 * 1000 },
+    { key: '3d', label: '3 days', ms: 3 * 24 * 60 * 60 * 1000 }
+];
+
+function buildPredictionReminderMessage(race, lockInfo, reminder) {
+    const roundLabel = `R${race.round}`;
+    const sessionLabel = lockInfo.label;
+    return [
+        `**Prediction Reminder - ${race.name} (${roundLabel})**`,
+        `${reminder.label} to go before ${sessionLabel} starts ${formatDiscordTimestamp(lockInfo.startsAt, 'R')} (${formatDiscordTimestamp(lockInfo.startsAt, 'F')}).`,
+        `Prediction lockout begins ${formatDiscordTimestamp(lockInfo.lockTime, 'R')} (${formatDiscordTimestamp(lockInfo.lockTime, 'F')}).`,
+        `Get your picks in before the window closes.`
+    ].join('\n');
+}
+
+function buildPredictionLockoutMessage(race, lockInfo) {
+    const roundLabel = `R${race.round}`;
+    return [
+        `**Prediction Lockout Started - ${race.name} (${roundLabel})**`,
+        `The prediction window is now closed for this race weekend.`,
+        `${lockInfo.label} starts ${formatDiscordTimestamp(lockInfo.startsAt, 'R')} (${formatDiscordTimestamp(lockInfo.startsAt, 'F')}).`
+    ].join('\n');
+}
+
+let predictionNotificationPending = false;
+async function checkPredictionNotifications() {
+    if (predictionNotificationPending) return;
+    predictionNotificationPending = true;
+
+    try {
+        const now = new Date();
+        const seasonCalendar = await getSeasonCalendar();
+        const race = await findStrategyRace(seasonCalendar, now);
+        if (!race) return;
+
+        const lockInfo = getPredictionLockInfo(race);
+        if (!lockInfo) return;
+
+        const scope = getRaceNotificationScope(race, lockInfo);
+
+        if (now >= lockInfo.lockTime) {
+            const lockoutKey = `discord_prediction_lockout_${scope}`;
+            if (await getMetaValue(lockoutKey)) return;
+
+            const sent = await sendDiscordNotificationChecked(buildPredictionLockoutMessage(race, lockInfo));
+            if (sent) {
+                await setMetaValue(lockoutKey, new Date().toISOString());
+                console.log(`[DISCORD] Sent prediction lockout notice for ${scope}`);
+            }
+            return;
+        }
+
+        for (let i = 0; i < PREDICTION_REMINDER_WINDOWS.length; i += 1) {
+            const reminder = PREDICTION_REMINDER_WINDOWS[i];
+            const reminderAt = new Date(lockInfo.startsAt.getTime() - reminder.ms);
+            if (now < reminderAt) continue;
+
+            const reminderKey = `discord_prediction_reminder_${scope}_${reminder.key}`;
+            if (await getMetaValue(reminderKey)) continue;
+
+            const sent = await sendDiscordNotificationChecked(buildPredictionReminderMessage(race, lockInfo, reminder));
+            if (sent) {
+                const sentAt = new Date().toISOString();
+                for (let j = i; j < PREDICTION_REMINDER_WINDOWS.length; j += 1) {
+                    await setMetaValue(`discord_prediction_reminder_${scope}_${PREDICTION_REMINDER_WINDOWS[j].key}`, sentAt);
+                }
+                console.log(`[DISCORD] Sent prediction reminder ${reminder.key} for ${scope}`);
+            }
+            return;
+        }
+    } catch (e) {
+        console.error('[DISCORD] Prediction notification check failed:', e.message);
+    } finally {
+        predictionNotificationPending = false;
+    }
+}
+
 function calcDetailedBreakdown(p, actualDriverPositions, actualCRanges, raceLosers, sprintGainers, sprintLosers) {
     let driverPts = 0, constructorPts = 0, wildcardPts = 0;
     const driverDetails = []; const teamDetails = []; const wcDetails = [];
@@ -928,10 +1106,10 @@ async function performFinalization() {
         if (latestCalRace) {
             try {
                 const apiRound = getTimingApiRound(latestCalRace);
-                const roundData = await axios.get(`${F1_TIMING_API}/results/round/${apiRound}`, { timeout: 15000 }).then(r => r.data);
+                const roundData = await f1TimingApiGet(`/results/round/${apiRound}`, { timeout: 15000 });
                 const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
                 if (raceSes?.results?.length) {
-                    const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+                    const driverList = await f1TimingApiGet('/drivers', { timeout: 10000 });
                     const dMap = {};
                     driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
                     const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
@@ -1204,15 +1382,14 @@ app.get('/api/next-race', async (req, res) => {
     const next = await findStrategyRace(seasonCalendar, now);
     if (!next) return res.status(404).json({ error: 'No race available' });
 
-    const lockSes = next.hasSprint && next.sessions.sprintQuali ? next.sessions.sprintQuali : next.sessions.quali;
-    const lt = new Date(lockSes);
-    lt.setMinutes(lt.getMinutes() - 1);
-    const isLocked = now > lt;
+    const lockInfo = getPredictionLockInfo(next);
+    if (!lockInfo) return res.status(500).json({ error: 'Prediction lock session unavailable' });
+    const isLocked = now > lockInfo.lockTime;
     const nextSession = findNextWeekendSession(next, now);
     const payload = {
         ...next,
         totalRounds: seasonCalendar.length,
-        lockTime: lt.toISOString(),
+        lockTime: lockInfo.lockTime.toISOString(),
         isLocked,
         lockStatus: isLocked ? 'locked' : 'open',
         nextSession: nextSession ? {
@@ -1265,7 +1442,7 @@ let driverHeadshotCacheTime = 0;
 async function fetchDriverHeadshots() {
     if (driverHeadshotCache && Date.now() - driverHeadshotCacheTime < 6 * 60 * 60 * 1000) return driverHeadshotCache;
     try {
-        const list = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 10000 }).then(r => r.data);
+        const list = await f1TimingApiGet('/drivers', { timeout: 10000 });
         const map = {};
         list.forEach(d => { if (d.name) map[d.name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')] = d; });
         driverHeadshotCache = map;
@@ -1310,7 +1487,7 @@ let widgetCacheTime = 0;
 app.get('/api/live-widget', async (_req, res) => {
     if (widgetCache && Date.now() - widgetCacheTime < 10000) return res.json(widgetCache);
     try {
-        const get = (path) => axios.get(`${F1_TIMING_API}${path}`, { timeout: 10000 }).then(r => r.data).catch(() => null);
+        const get = (path) => f1TimingApiGet(path, { timeout: 10000 }).catch(() => null);
         const [timing, status] = await Promise.all([get('/timing'), get('/status')]);
         if (!timing?.drivers?.length) return res.status(503).json({ error: 'No live timing data' });
         widgetCache = { timing, status };
@@ -1397,10 +1574,9 @@ app.post('/predict', authenticateToken, async (req, res) => {
     const currentRace = await findStrategyRace(seasonCalendar, now);
     if (!currentRace) return res.status(403).json({ success: false, message: "Season Over" });
 
-    const lockSes = currentRace.hasSprint && currentRace.sessions.sprintQuali ? currentRace.sessions.sprintQuali : currentRace.sessions.quali;
-    const lockTime = new Date(lockSes);
-    lockTime.setMinutes(lockTime.getMinutes() - 1);
-    if (now > lockTime) {
+    const lockInfo = getPredictionLockInfo(currentRace);
+    if (!lockInfo) return res.status(503).json({ success: false, message: "Prediction lock timing unavailable right now." });
+    if (now > lockInfo.lockTime) {
         return res.status(403).json({ success: false, message: "Parc Fermé: Predictions are officially locked for this session!" });
     }
 
@@ -1457,10 +1633,10 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
         // Fetch race data (same logic as resend-discord)
         let results = null, sprintResults = [], gridMap = {};
         try {
-            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${apiRound}`, { timeout: 8000 }).then(r => r.data);
+            const roundData = await f1TimingApiGet(`/results/round/${apiRound}`, { timeout: 8000 });
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
-                const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 8000 }).then(r => r.data);
+                const driverList = await f1TimingApiGet('/drivers', { timeout: 8000 });
                 const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
@@ -1633,10 +1809,10 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
         let results = null, sprintResults = [], gridMap = {};
         try {
             console.log('[RESEND] Fetching from own API...');
-            const roundData = await axios.get(`${F1_TIMING_API}/results/round/${apiRound}`, { timeout: 8000 }).then(r => r.data);
+            const roundData = await f1TimingApiGet(`/results/round/${apiRound}`, { timeout: 8000 });
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
-                const driverList = await axios.get(`${F1_TIMING_API}/drivers`, { timeout: 8000 }).then(r => r.data);
+                const driverList = await f1TimingApiGet('/drivers', { timeout: 8000 });
                 const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
@@ -1773,9 +1949,12 @@ app.get('/api/admin/round-history', authenticateToken, requireAdmin, async (req,
 // --- 8b. LIVE API PROXY ROUTES ---
 const liveProxy = async (apiPath, res) => {
     try {
-        const r = await axios.get(`${F1_TIMING_API}${apiPath}`, { timeout: 10000 });
-        res.json(r.data);
+        const r = await axios.get(buildF1TimingApiUrl(apiPath), buildF1TimingApiConfig({ timeout: 10000 }));
+        res.status(r.status).json(r.data);
     } catch (e) {
+        if (e.response) {
+            return res.status(e.response.status).json(e.response.data || { error: 'API request failed' });
+        }
         res.status(502).json({ error: 'API unavailable', detail: e.message });
     }
 };
@@ -1784,7 +1963,7 @@ app.get('/api/live/timing', (_, res) => liveProxy('/timing', res));
 app.get('/api/live/weather', async (_, res) => {
     // Prefer live timing weather whenever the upstream has a valid payload.
     try {
-        const live = await axios.get(`${F1_TIMING_API}/weather`, { timeout: 5000 }).then(r => r.data);
+        const live = await f1TimingApiGet('/weather', { timeout: 5000 });
         const normalizedLive = normalizeWeatherPayload({ ...live, source: 'live' });
         if (normalizedLive) return res.json(normalizedLive);
     } catch (e) { }
@@ -1817,9 +1996,12 @@ app.get('/api/live/race-control', (_, res) => liveProxy('/race-control', res));
 app.get('/api/live/pits', (_, res) => liveProxy('/pits', res));
 app.get('/api/live/team-radio', async (_, res) => {
     try {
-        const payload = await axios.get(`${F1_TIMING_API}/team-radio`, { timeout: 10000 }).then(r => r.data);
+        const payload = await f1TimingApiGet('/team-radio', { timeout: 10000 });
         res.json(normalizeTeamRadioPayload(payload));
     } catch (e) {
+        if (e.response) {
+            return res.status(e.response.status).json({ timestamp: null, session: null, total: 0, messages: [], error: e.response.data?.error || 'API request failed' });
+        }
         res.status(502).json({ timestamp: null, session: null, total: 0, messages: [], error: 'API unavailable', detail: e.message });
     }
 });
@@ -1834,13 +2016,16 @@ app.get('/api/live/results/:filename', (req, res) => liveProxy(`/results/${req.p
 app.get('/api/live/pits/:number', (req, res) => liveProxy(`/pits/${req.params.number}`, res));
 app.get('/api/live/team-radio/:number', async (req, res) => {
     try {
-        const payload = await axios.get(`${F1_TIMING_API}/team-radio/${encodeURIComponent(req.params.number)}`, { timeout: 10000 }).then(r => r.data);
+        const payload = await f1TimingApiGet(`/team-radio/${encodeURIComponent(req.params.number)}`, { timeout: 10000 });
         res.json(normalizeTeamRadioPayload(payload));
     } catch (e) {
         const upstreamStatus = e.response?.status;
         const upstreamError = e.response?.data?.error;
         if (upstreamStatus === 404 && typeof upstreamError === 'string' && upstreamError.toLowerCase().includes('no team radio')) {
             return res.json({ timestamp: null, session: null, total: 0, messages: [] });
+        }
+        if (e.response) {
+            return res.status(e.response.status).json({ timestamp: null, session: null, total: 0, messages: [], error: e.response.data?.error || 'API request failed' });
         }
         res.status(502).json({ timestamp: null, session: null, total: 0, messages: [], error: 'API unavailable', detail: e.message });
     }
@@ -1874,8 +2059,8 @@ app.get('/api/live/stream', (req, res) => {
         'X-Accel-Buffering': 'no'
     });
     const topic = req.query.topic || '';
-    const url = topic ? `${F1_TIMING_API}/stream?topic=${encodeURIComponent(topic)}` : `${F1_TIMING_API}/stream/timing`;
-    axios.get(url, { responseType: 'stream', timeout: 0, headers: { 'Accept': 'text/event-stream' } })
+    const url = topic ? buildF1TimingApiUrl(`/stream?topic=${encodeURIComponent(topic)}`) : buildF1TimingApiUrl('/stream/timing');
+    axios.get(url, buildF1TimingApiConfig({ responseType: 'stream', timeout: 0, headers: { 'Accept': 'text/event-stream' } }))
         .then(upstream => { upstream.data.pipe(res); req.on('close', () => upstream.data.destroy()); })
         .catch(e => { res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); });
 });
@@ -1888,7 +2073,7 @@ app.get('/api/live/telemetry/stream/:number', (req, res) => {
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no'
     });
-    axios.get(`${F1_TIMING_API}/telemetry/stream/${req.params.number}`, { responseType: 'stream', timeout: 0, headers: { 'Accept': 'text/event-stream' } })
+    axios.get(buildF1TimingApiUrl(`/telemetry/stream/${req.params.number}`), buildF1TimingApiConfig({ responseType: 'stream', timeout: 0, headers: { 'Accept': 'text/event-stream' } }))
         .then(upstream => { upstream.data.pipe(res); req.on('close', () => upstream.data.destroy()); })
         .catch(e => { res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); });
 });
@@ -1902,12 +2087,12 @@ let lastKnownFinalizedSession = null; // in-memory cache to avoid repeated DB hi
 async function checkAndFinalize() {
     // Keep both Render servers awake
     fetch(`${APP_URL}/api/next-race`).catch(() => { });
-    fetch(`${F1_TIMING_API}/status`).catch(() => { });
+    f1TimingApiGet('/status', { timeout: 5000 }).catch(() => { });
 
     if (finalizationPending) return;
 
     try {
-        const status = await axios.get(`${F1_TIMING_API}/status`, { timeout: 8000 }).then(r => r.data);
+        const status = await f1TimingApiGet('/status', { timeout: 8000 });
         const session = status?.session;
 
         if (!session || session.Type !== 'Race') return;
@@ -1953,6 +2138,10 @@ setInterval(checkAndFinalize, 6 * 60 * 1000);
 
 // Run once on startup (catches races finalized while server was cold)
 setTimeout(checkAndFinalize, 10 * 1000);
+
+// Check Discord reminders/lockout every minute.
+setInterval(checkPredictionNotifications, 60 * 1000);
+setTimeout(checkPredictionNotifications, 15 * 1000);
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

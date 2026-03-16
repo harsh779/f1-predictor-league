@@ -1,2 +1,9 @@
 node_modules/
 f1-league.db
+local-preview.db
+server-live.out
+server-live.err
+server-smoke.out
+server-smoke.err
+server.js.backup
+.claude/
