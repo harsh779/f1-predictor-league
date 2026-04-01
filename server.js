@@ -730,6 +730,58 @@ function validatePredictionPayload(payload) {
     return null;
 }
 
+async function ensureDriverRecord(executor, userName) {
+    const trimmed = String(userName || '').trim();
+    if (!trimmed) throw new Error('user_name is required');
+    const existing = await executor.execute({
+        sql: "SELECT id FROM f1_drivers WHERE name = ? LIMIT 1",
+        args: [trimmed]
+    }).then(r => r.rows[0] || null);
+
+    if (existing) {
+        await executor.execute({
+            sql: "UPDATE f1_drivers SET has_participated = 1 WHERE id = ?",
+            args: [existing.id]
+        });
+        return { created: false, userName: trimmed };
+    }
+
+    await executor.execute({
+        sql: "INSERT INTO f1_drivers (name, has_participated) VALUES (?, 1)",
+        args: [trimmed]
+    });
+    return { created: true, userName: trimmed };
+}
+
+async function upsertPredictionRecord(executor, userName, payload) {
+    await executor.execute({
+        sql: `INSERT INTO f1_predictions_v4 (user_name, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+            ON CONFLICT(user_name) DO UPDATE SET 
+            p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p10=excluded.p10, p11=excluded.p11, p21=excluded.p21, p22=excluded.p22, 
+            c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c11=excluded.c11, 
+            w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
+        args: [
+            userName,
+            payload.p1,
+            payload.p2,
+            payload.p3,
+            payload.p10,
+            payload.p11,
+            payload.p21,
+            payload.p22,
+            payload.c1,
+            payload.c2,
+            payload.c5,
+            payload.c6,
+            payload.c11,
+            payload.w_race_loser,
+            payload.w_sprint_gainer || null,
+            payload.w_sprint_loser || null
+        ]
+    });
+}
+
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
@@ -1586,16 +1638,7 @@ app.post('/predict', authenticateToken, async (req, res) => {
     }
 
     try {
-        await db.execute({
-            sql: `INSERT INTO f1_predictions_v4 (user_name, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-                ON CONFLICT(user_name) DO UPDATE SET 
-                p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p10=excluded.p10, p11=excluded.p11, p21=excluded.p21, p22=excluded.p22, 
-                c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c11=excluded.c11, 
-                w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
-            args: [userName, d.p1, d.p2, d.p3, d.p10, d.p11, d.p21, d.p22, d.c1, d.c2, d.c5, d.c6, d.c11, d.w_race_loser, d.w_sprint_gainer, d.w_sprint_loser]
-        });
-
+        await upsertPredictionRecord(db, userName, d);
         await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -1936,6 +1979,72 @@ app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, re
         await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [score, targetUser] });
         res.json({ success: true, user: targetUser, newScore: score });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async (req, res) => {
+    const submissions = Array.isArray(req.body?.submissions) ? req.body.submissions : null;
+    const clearExisting = !!req.body?.clearExisting;
+    if (!submissions || submissions.length === 0) {
+        return res.status(400).json({ success: false, message: 'submissions array required' });
+    }
+
+    const normalized = [];
+    for (let i = 0; i < submissions.length; i++) {
+        const raw = submissions[i] || {};
+        const userName = String(raw.user_name || raw.userName || '').trim();
+        if (!userName) {
+            return res.status(400).json({ success: false, message: `Entry ${i + 1}: user_name is required` });
+        }
+
+        const payload = {
+            p1: raw.p1,
+            p2: raw.p2,
+            p3: raw.p3,
+            p10: raw.p10,
+            p11: raw.p11,
+            p21: raw.p21,
+            p22: raw.p22,
+            c1: raw.c1,
+            c2: raw.c2,
+            c5: raw.c5,
+            c6: raw.c6,
+            c11: raw.c11,
+            w_race_loser: raw.w_race_loser,
+            w_sprint_gainer: raw.w_sprint_gainer,
+            w_sprint_loser: raw.w_sprint_loser
+        };
+
+        const validationError = validatePredictionPayload(payload);
+        if (validationError) {
+            return res.status(400).json({ success: false, message: `Entry ${i + 1} (${userName}): ${validationError}` });
+        }
+        normalized.push({ userName, payload });
+    }
+
+    const tx = await db.transaction("write");
+    try {
+        if (clearExisting) {
+            await tx.execute("DELETE FROM f1_predictions_v4");
+        }
+
+        let createdUsers = 0;
+        for (const entry of normalized) {
+            const ensured = await ensureDriverRecord(tx, entry.userName);
+            if (ensured.created) createdUsers += 1;
+            await upsertPredictionRecord(tx, entry.userName, entry.payload);
+        }
+
+        await tx.commit();
+        res.json({
+            success: true,
+            imported: normalized.length,
+            createdUsers,
+            clearedExisting: clearExisting
+        });
+    } catch (e) {
+        try { await tx.rollback(); } catch (_) { }
+        res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 

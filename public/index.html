@@ -963,6 +963,39 @@
         <div id="admin-panel" class="hidden" style="margin-top:40px; border:2px solid var(--red); padding:30px; background:rgba(225,6,0,0.05); border-radius:12px; text-align: center;">
             <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0; font-size: 1.5rem;">STEWARDS CONTROL</h3>
             <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">Finalize Race Weekend</button>
+            <div style="text-align:left; margin-bottom:30px; padding:20px; border:1px solid var(--border); border-radius:10px; background:var(--surface);">
+                <h4 style="margin:0 0 10px; color:var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px;">Manual Prediction Import</h4>
+                <p style="margin:0 0 12px; color:var(--text-muted); line-height:1.6;">
+                    Paste a JSON array of WhatsApp submissions here, import them into the backend, then finalize the round as normal.
+                </p>
+                <textarea id="admin-import-json" placeholder='[
+  {
+    "user_name": "Harsh",
+    "p1": "Lando Norris",
+    "p2": "Oscar Piastri",
+    "p3": "Max Verstappen",
+    "p10": "Fernando Alonso",
+    "p11": "Carlos Sainz",
+    "p21": "Lance Stroll",
+    "p22": "Oliver Bearman",
+    "c1": "McLaren",
+    "c2": "Ferrari",
+    "c5": "Williams",
+    "c6": "Aston Martin",
+    "c11": "Cadillac",
+    "w_race_loser": "Lance Stroll",
+    "w_sprint_gainer": "",
+    "w_sprint_loser": ""
+  }
+]' style="width:100%; min-height:220px; resize:vertical; border-radius:8px; border:1px solid var(--border); background:var(--surface-inner); color:var(--text-main); padding:14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:0.92rem; line-height:1.5;"></textarea>
+                <label style="display:flex; align-items:center; gap:10px; color:var(--text-muted); font-size:0.95rem; margin:14px 0;">
+                    <input type="checkbox" id="admin-import-clear" checked>
+                    Replace any existing current-round predictions before importing
+                </label>
+                <button onclick="importManualPredictions()" style="background:var(--gold); color:#111; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px;">
+                    Import Manual Predictions
+                </button>
+            </div>
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
             <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
                 </div>
@@ -3373,6 +3406,45 @@
         const d = await res.json();
         if(res.ok) { showToast('Finalization Complete!', 'success'); setTimeout(() => location.reload(), 2000); } 
         else { showToast('Error: ' + d.message, 'error'); }
+    }
+
+    async function importManualPredictions() {
+        const raw = document.getElementById('admin-import-json').value.trim();
+        const clearExisting = document.getElementById('admin-import-clear').checked;
+        if (!raw) {
+            showToast('Paste the JSON submissions first.', 'error');
+            return;
+        }
+
+        let submissions;
+        try {
+            submissions = JSON.parse(raw);
+        } catch (e) {
+            showToast('Invalid JSON. Fix the format and try again.', 'error');
+            return;
+        }
+
+        if (!Array.isArray(submissions) || submissions.length === 0) {
+            showToast('Provide a JSON array with at least one submission.', 'error');
+            return;
+        }
+
+        showToast('Importing manual predictions...', 'success');
+        const res = await authFetch('/api/admin/import-predictions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ submissions, clearExisting })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast('Import failed: ' + (data.message || 'Unknown error'), 'error');
+            return;
+        }
+
+        showToast(`Imported ${data.imported} predictions.`, 'success');
+        if (confirm('Predictions imported successfully. Finalize this race weekend now?')) {
+            finalize();
+        }
     }
     
     async function logout() {
