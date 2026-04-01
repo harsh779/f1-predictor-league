@@ -782,6 +782,20 @@ async function upsertPredictionRecord(executor, userName, payload) {
     });
 }
 
+async function recalculateDriverTotal(executor, userName) {
+    const row = await executor.execute({
+        sql: "SELECT COALESCE(SUM(score), 0) AS total FROM f1_round_history WHERE user_name = ?",
+        args: [userName]
+    }).then(r => r.rows[0] || { total: 0 });
+
+    await executor.execute({
+        sql: "UPDATE f1_drivers SET total_score = ?, has_participated = CASE WHEN ? != 0 THEN 1 ELSE has_participated END WHERE name = ?",
+        args: [Number(row.total || 0), Number(row.total || 0), userName]
+    });
+
+    return Number(row.total || 0);
+}
+
 async function replacePredictionsTable(executor, entries) {
     await executor.execute("DELETE FROM f1_predictions_v4");
     for (const entry of entries) {
@@ -2029,6 +2043,96 @@ app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, re
         await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [score, targetUser] });
         res.json({ success: true, user: targetUser, newScore: score });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/merge-driver', authenticateToken, requireAdmin, async (req, res) => {
+    const sourceName = String(req.body?.sourceName || '').trim();
+    const targetName = String(req.body?.targetName || '').trim();
+    if (!sourceName || !targetName) {
+        return res.status(400).json({ success: false, message: 'sourceName and targetName are required' });
+    }
+    if (sourceName === targetName) {
+        return res.status(400).json({ success: false, message: 'sourceName and targetName must be different records' });
+    }
+
+    const source = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? LIMIT 1", args: [sourceName] }).then(r => r.rows[0] || null);
+    const target = await db.execute({ sql: "SELECT * FROM f1_drivers WHERE name = ? LIMIT 1", args: [targetName] }).then(r => r.rows[0] || null);
+    if (!source || !target) {
+        return res.status(404).json({ success: false, message: 'Both source and target drivers must exist' });
+    }
+
+    const tx = await db.transaction("write");
+    try {
+        const sourcePrediction = await tx.execute({
+            sql: "SELECT * FROM f1_predictions_v4 WHERE user_name = ? LIMIT 1",
+            args: [sourceName]
+        }).then(r => r.rows[0] || null);
+        const targetPrediction = await tx.execute({
+            sql: "SELECT * FROM f1_predictions_v4 WHERE user_name = ? LIMIT 1",
+            args: [targetName]
+        }).then(r => r.rows[0] || null);
+
+        const actualRounds = await tx.execute({
+            sql: `SELECT DISTINCT round FROM f1_round_history 
+                  WHERE user_name = ? AND prediction NOT LIKE '%"penalty"%'`,
+            args: [sourceName]
+        }).then(r => r.rows.map(row => String(row.round)));
+
+        if (sourcePrediction && !targetPrediction) {
+            await tx.execute({
+                sql: "UPDATE f1_predictions_v4 SET user_name = ? WHERE user_name = ?",
+                args: [targetName, sourceName]
+            });
+        } else {
+            await tx.execute({
+                sql: "DELETE FROM f1_predictions_v4 WHERE user_name = ?",
+                args: [sourceName]
+            });
+        }
+
+        await tx.execute({
+            sql: `UPDATE f1_round_history
+                  SET user_name = ?
+                  WHERE user_name = ? AND prediction NOT LIKE '%"penalty"%'`,
+            args: [targetName, sourceName]
+        });
+
+        for (const round of actualRounds) {
+            await tx.execute({
+                sql: `DELETE FROM f1_round_history
+                      WHERE user_name = ? AND round = ? AND prediction = '{"penalty":"no submission"}'`,
+                args: [targetName, round]
+            });
+        }
+
+        await tx.execute({
+            sql: `DELETE FROM f1_round_history
+                  WHERE user_name = ? AND prediction LIKE '%"new joiner"%'`,
+            args: [sourceName]
+        });
+
+        await recalculateDriverTotal(tx, targetName);
+        await tx.execute({
+            sql: "DELETE FROM f1_drivers WHERE name = ?",
+            args: [sourceName]
+        });
+
+        await tx.commit();
+        const refreshed = await db.execute({
+            sql: "SELECT name, total_score, has_participated FROM f1_drivers WHERE name = ? LIMIT 1",
+            args: [targetName]
+        }).then(r => r.rows[0] || null);
+        return res.json({
+            success: true,
+            mergedFrom: sourceName,
+            mergedInto: targetName,
+            affectedRounds: actualRounds,
+            target: refreshed
+        });
+    } catch (e) {
+        try { await tx.rollback(); } catch (_) { }
+        return res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async (req, res) => {
