@@ -90,7 +90,7 @@ Three sub-tabs:
 - **Auth:** Google OAuth 2.0 + JWT (30-day sessions)
 - **Live Data:** [F1 Live Timing API](https://github.com/harsh779/f1-live-api) — SignalR WebSocket feed from F1
 - **Frontend:** Vanilla HTML/CSS/JS (single-page, no build step)
-- **Hosting:** Render (free tier)
+- **Hosting:** Render (web app) + Northflank (F1 live timing API)
 - **Notifications:** Discord webhooks
 
 ---
@@ -110,6 +110,29 @@ Three sub-tabs:
 | `F1_TIMING_API` | URL of the F1 Live Timing API |
 | `F1_TIMING_API_KEY` | API key for the F1 Live Timing API, if that service has auth enabled |
 | `API_SPORTS_KEY` | API-Sports key (optional, for weather fallback) |
+
+---
+
+## Production Hosting
+
+Current production is split across two hosts:
+
+- **Web app:** Render free web service
+- **Live timing API:** Northflank free service
+
+This split keeps the main app on a Google OAuth-compatible `onrender.com` domain while moving the always-on live API off Render's shared free-hours pool.
+
+Required production env values for this app:
+
+- `APP_URL=https://f1-predictor-league.onrender.com`
+- `F1_TIMING_API=https://p01--f1-live-api--qc9w4mr468wb.code.run`
+
+If you change the app host or domain, update Google OAuth:
+
+- Authorized JavaScript origin: `https://<your-app-domain>`
+- Authorized redirect URI: `https://<your-app-domain>/auth/google/callback`
+
+Do not point Google OAuth at Northflank's default `code.run` web app domain unless Google accepts it for your client configuration.
 
 ---
 
