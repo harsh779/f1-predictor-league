@@ -782,6 +782,56 @@ async function upsertPredictionRecord(executor, userName, payload) {
     });
 }
 
+async function replacePredictionsTable(executor, entries) {
+    await executor.execute("DELETE FROM f1_predictions_v4");
+    for (const entry of entries) {
+        await ensureDriverRecord(executor, entry.userName);
+        await upsertPredictionRecord(executor, entry.userName, entry.payload);
+    }
+}
+
+function normalizeImportSubmissions(rawSubmissions) {
+    const submissions = Array.isArray(rawSubmissions) ? rawSubmissions : null;
+    if (!submissions || submissions.length === 0) {
+        throw new Error('submissions array required');
+    }
+
+    const normalized = [];
+    for (let i = 0; i < submissions.length; i++) {
+        const raw = submissions[i] || {};
+        const userName = String(raw.user_name || raw.userName || '').trim();
+        if (!userName) {
+            throw new Error(`Entry ${i + 1}: user_name is required`);
+        }
+
+        const payload = {
+            p1: raw.p1,
+            p2: raw.p2,
+            p3: raw.p3,
+            p10: raw.p10,
+            p11: raw.p11,
+            p21: raw.p21,
+            p22: raw.p22,
+            c1: raw.c1,
+            c2: raw.c2,
+            c5: raw.c5,
+            c6: raw.c6,
+            c11: raw.c11,
+            w_race_loser: raw.w_race_loser,
+            w_sprint_gainer: raw.w_sprint_gainer,
+            w_sprint_loser: raw.w_sprint_loser
+        };
+
+        const validationError = validatePredictionPayload(payload);
+        if (validationError) {
+            throw new Error(`Entry ${i + 1} (${userName}): ${validationError}`);
+        }
+        normalized.push({ userName, payload });
+    }
+
+    return normalized;
+}
+
 // --- 3. HELPERS ---
 function normalizeStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : ""; }
 function normalizeConstructor(c) {
@@ -1982,43 +2032,12 @@ app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, re
 });
 
 app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async (req, res) => {
-    const submissions = Array.isArray(req.body?.submissions) ? req.body.submissions : null;
     const clearExisting = !!req.body?.clearExisting;
-    if (!submissions || submissions.length === 0) {
-        return res.status(400).json({ success: false, message: 'submissions array required' });
-    }
-
-    const normalized = [];
-    for (let i = 0; i < submissions.length; i++) {
-        const raw = submissions[i] || {};
-        const userName = String(raw.user_name || raw.userName || '').trim();
-        if (!userName) {
-            return res.status(400).json({ success: false, message: `Entry ${i + 1}: user_name is required` });
-        }
-
-        const payload = {
-            p1: raw.p1,
-            p2: raw.p2,
-            p3: raw.p3,
-            p10: raw.p10,
-            p11: raw.p11,
-            p21: raw.p21,
-            p22: raw.p22,
-            c1: raw.c1,
-            c2: raw.c2,
-            c5: raw.c5,
-            c6: raw.c6,
-            c11: raw.c11,
-            w_race_loser: raw.w_race_loser,
-            w_sprint_gainer: raw.w_sprint_gainer,
-            w_sprint_loser: raw.w_sprint_loser
-        };
-
-        const validationError = validatePredictionPayload(payload);
-        if (validationError) {
-            return res.status(400).json({ success: false, message: `Entry ${i + 1} (${userName}): ${validationError}` });
-        }
-        normalized.push({ userName, payload });
+    let normalized;
+    try {
+        normalized = normalizeImportSubmissions(req.body?.submissions);
+    } catch (e) {
+        return res.status(400).json({ success: false, message: e.message });
     }
 
     const tx = await db.transaction("write");
@@ -2044,6 +2063,90 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
     } catch (e) {
         try { await tx.rollback(); } catch (_) { }
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/admin/manual-finalize', authenticateToken, requireAdmin, async (req, res) => {
+    let normalized;
+    try {
+        normalized = normalizeImportSubmissions(req.body?.submissions);
+    } catch (e) {
+        return res.status(400).json({ success: false, message: e.message });
+    }
+
+    const backupRows = await db.execute("SELECT * FROM f1_predictions_v4 ORDER BY id ASC").then(r => r.rows);
+    const backupEntries = backupRows.map(row => ({
+        userName: row.user_name,
+        payload: {
+            p1: row.p1,
+            p2: row.p2,
+            p3: row.p3,
+            p10: row.p10,
+            p11: row.p11,
+            p21: row.p21,
+            p22: row.p22,
+            c1: row.c1,
+            c2: row.c2,
+            c5: row.c5,
+            c6: row.c6,
+            c11: row.c11,
+            w_race_loser: row.w_race_loser,
+            w_sprint_gainer: row.w_sprint_gainer,
+            w_sprint_loser: row.w_sprint_loser
+        }
+    }));
+
+    let staged = false;
+    try {
+        const stageTx = await db.transaction("write");
+        try {
+            await replacePredictionsTable(stageTx, normalized);
+            await stageTx.commit();
+            staged = true;
+        } catch (stageError) {
+            try { await stageTx.rollback(); } catch (_) { }
+            throw stageError;
+        }
+
+        const finalizeResult = await performFinalization();
+
+        const restoreTx = await db.transaction("write");
+        try {
+            if (backupEntries.length > 0) {
+                await replacePredictionsTable(restoreTx, backupEntries);
+            } else {
+                await restoreTx.execute("DELETE FROM f1_predictions_v4");
+            }
+            await restoreTx.commit();
+        } catch (restoreError) {
+            try { await restoreTx.rollback(); } catch (_) { }
+            return res.status(500).json({
+                success: false,
+                message: `Manual finalization completed with restore failure: ${restoreError.message}`,
+                finalizeResult
+            });
+        }
+
+        return res.json({
+            ...finalizeResult,
+            stagedImportCount: normalized.length,
+            restoredPredictionCount: backupEntries.length
+        });
+    } catch (e) {
+        if (staged) {
+            const restoreTx = await db.transaction("write");
+            try {
+                if (backupEntries.length > 0) {
+                    await replacePredictionsTable(restoreTx, backupEntries);
+                } else {
+                    await restoreTx.execute("DELETE FROM f1_predictions_v4");
+                }
+                await restoreTx.commit();
+            } catch (_) {
+                try { await restoreTx.rollback(); } catch (_) { }
+            }
+        }
+        return res.status(500).json({ success: false, message: e.message });
     }
 });
 

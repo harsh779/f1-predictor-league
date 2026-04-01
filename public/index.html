@@ -992,8 +992,11 @@
                     <input type="checkbox" id="admin-import-clear" checked>
                     Replace any existing current-round predictions before importing
                 </label>
-                <button onclick="importManualPredictions()" style="background:var(--gold); color:#111; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px;">
+                <button onclick="importManualPredictions()" style="background:var(--gold); color:#111; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px; margin-right:10px; margin-bottom:10px;">
                     Import Manual Predictions
+                </button>
+                <button onclick="manualFinalizePredictions()" style="background:var(--red); color:#fff; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">
+                    Import + Finalize Safely
                 </button>
             </div>
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
@@ -3445,6 +3448,46 @@
         if (confirm('Predictions imported successfully. Finalize this race weekend now?')) {
             finalize();
         }
+    }
+
+    async function manualFinalizePredictions() {
+        const raw = document.getElementById('admin-import-json').value.trim();
+        if (!raw) {
+            showToast('Paste the JSON submissions first.', 'error');
+            return;
+        }
+
+        let submissions;
+        try {
+            submissions = JSON.parse(raw);
+        } catch (e) {
+            showToast('Invalid JSON. Fix the format and try again.', 'error');
+            return;
+        }
+
+        if (!Array.isArray(submissions) || submissions.length === 0) {
+            showToast('Provide a JSON array with at least one submission.', 'error');
+            return;
+        }
+
+        if (!confirm('Safely import these manual submissions, finalize the completed round, and then restore any current next-round predictions?')) {
+            return;
+        }
+
+        showToast('Running safe manual finalization...', 'success');
+        const res = await authFetch('/api/admin/manual-finalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ submissions })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            showToast('Safe finalize failed: ' + (data.message || 'Unknown error'), 'error');
+            return;
+        }
+
+        showToast(`Round finalized. Restored ${data.restoredPredictionCount || 0} existing prediction(s).`, 'success');
+        setTimeout(() => location.reload(), 1500);
     }
     
     async function logout() {
