@@ -170,10 +170,12 @@ async function setupDatabase() {
         // 🚀 UPGRADED TO V4 FOR NEW SCORING RULES (P10, P11, C11)
         await db.execute(`CREATE TABLE IF NOT EXISTS f1_predictions_v4 (
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT UNIQUE, 
+        prediction_round TEXT,
         p1 TEXT, p2 TEXT, p3 TEXT, p10 TEXT, p11 TEXT, p21 TEXT, p22 TEXT, 
         c1 TEXT, c2 TEXT, c5 TEXT, c6 TEXT, c11 TEXT, 
         w_race_loser TEXT, w_sprint_gainer TEXT, w_sprint_loser TEXT
     )`);
+        try { await db.execute(`ALTER TABLE f1_predictions_v4 ADD COLUMN prediction_round TEXT`); } catch (e) { }
 
         await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip, is_admin) VALUES ('admin', 'admin_override', 1, 1) ON CONFLICT(name) DO NOTHING" });
         await db.execute("UPDATE f1_drivers SET is_admin = 1 WHERE auth_id = 'admin_override'");
@@ -775,16 +777,18 @@ async function ensureDriverRecord(executor, userName) {
     return { created: true, userName: trimmed };
 }
 
-async function upsertPredictionRecord(executor, userName, payload) {
+async function upsertPredictionRecord(executor, userName, payload, predictionRound = null) {
     await executor.execute({
-        sql: `INSERT INTO f1_predictions_v4 (user_name, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+        sql: `INSERT INTO f1_predictions_v4 (user_name, prediction_round, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
             ON CONFLICT(user_name) DO UPDATE SET 
+            prediction_round=excluded.prediction_round,
             p1=excluded.p1, p2=excluded.p2, p3=excluded.p3, p10=excluded.p10, p11=excluded.p11, p21=excluded.p21, p22=excluded.p22, 
             c1=excluded.c1, c2=excluded.c2, c5=excluded.c5, c6=excluded.c6, c11=excluded.c11, 
             w_race_loser=excluded.w_race_loser, w_sprint_gainer=excluded.w_sprint_gainer, w_sprint_loser=excluded.w_sprint_loser`,
         args: [
             userName,
+            predictionRound,
             payload.p1,
             payload.p2,
             payload.p3,
@@ -818,11 +822,11 @@ async function recalculateDriverTotal(executor, userName) {
     return Number(row.total || 0);
 }
 
-async function replacePredictionsTable(executor, entries) {
+async function replacePredictionsTable(executor, entries, predictionRound = null) {
     await executor.execute("DELETE FROM f1_predictions_v4");
     for (const entry of entries) {
         await ensureDriverRecord(executor, entry.userName);
-        await upsertPredictionRecord(executor, entry.userName, entry.payload);
+        await upsertPredictionRecord(executor, entry.userName, entry.payload, entry.predictionRound ?? predictionRound);
     }
 }
 
@@ -1336,7 +1340,10 @@ async function performFinalization() {
             return { success: false, message: "Already scored." };
         }
 
-        const check = await db.execute("SELECT count(*) as count FROM f1_predictions_v4");
+        const check = await db.execute({
+            sql: "SELECT count(*) as count FROM f1_predictions_v4 WHERE prediction_round = ?",
+            args: [roundCheck]
+        });
         if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
         console.log(`[FINALIZE] ${check.rows[0].count} predictions to score`);
 
@@ -1417,7 +1424,10 @@ async function performFinalization() {
         }
 
         // --- SCORE CALCULATION ---
-        const predictions = await db.execute("SELECT * FROM f1_predictions_v4").then(r => r.rows);
+        const predictions = await db.execute({
+            sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ?",
+            args: [roundLabel]
+        }).then(r => r.rows);
         let scores = {}; let scoreBreakdowns = {}; let lowest = Infinity;
 
         predictions.forEach(p => {
@@ -1725,7 +1735,7 @@ app.post('/predict', authenticateToken, async (req, res) => {
     }
 
     try {
-        await upsertPredictionRecord(db, userName, d);
+        await upsertPredictionRecord(db, userName, d, getRoundLabel(currentRace));
         await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -2022,14 +2032,20 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
 app.get('/api/predictions', authenticateToken, async (req, res) => {
     const seasonCalendar = await getSeasonCalendar();
     const currentRace = await findStrategyRace(seasonCalendar, new Date());
-    if (currentRace && await hasRoundBeenScored(currentRace)) {
+    const currentRound = getRoundLabel(currentRace);
+    if (currentRound && await hasRoundBeenScored(currentRound)) {
         return res.json([]);
     }
 
     if (!await shouldRevealPredictionsTo(req.user)) {
         return res.status(403).json({ error: 'Predictions unlock after strategy lockout.' });
     }
-    const r = await db.execute("SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name");
+    if (!currentRound) return res.json([]);
+
+    const r = await db.execute({
+        sql: "SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name WHERE p.prediction_round = ?",
+        args: [currentRound]
+    });
     res.json(r.rows);
 });
 
@@ -2166,6 +2182,9 @@ app.post('/api/admin/merge-driver', authenticateToken, requireAdmin, async (req,
 
 app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async (req, res) => {
     const clearExisting = !!req.body?.clearExisting;
+    const seasonCalendar = await getSeasonCalendar();
+    const currentRace = await findStrategyRace(seasonCalendar, new Date());
+    const predictionRound = getRoundLabel(currentRace);
     let normalized;
     try {
         normalized = normalizeImportSubmissions(req.body?.submissions);
@@ -2183,7 +2202,7 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
         for (const entry of normalized) {
             const ensured = await ensureDriverRecord(tx, entry.userName);
             if (ensured.created) createdUsers += 1;
-            await upsertPredictionRecord(tx, entry.userName, entry.payload);
+            await upsertPredictionRecord(tx, entry.userName, entry.payload, predictionRound);
         }
 
         await tx.commit();
@@ -2200,6 +2219,9 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
 });
 
 app.post('/api/admin/manual-finalize', authenticateToken, requireAdmin, async (req, res) => {
+    const seasonCalendar = await getSeasonCalendar();
+    const currentRace = await findStrategyRace(seasonCalendar, new Date());
+    const predictionRound = getRoundLabel(currentRace);
     let normalized;
     try {
         normalized = normalizeImportSubmissions(req.body?.submissions);
@@ -2210,6 +2232,7 @@ app.post('/api/admin/manual-finalize', authenticateToken, requireAdmin, async (r
     const backupRows = await db.execute("SELECT * FROM f1_predictions_v4 ORDER BY id ASC").then(r => r.rows);
     const backupEntries = backupRows.map(row => ({
         userName: row.user_name,
+        predictionRound: row.prediction_round,
         payload: {
             p1: row.p1,
             p2: row.p2,
@@ -2233,7 +2256,7 @@ app.post('/api/admin/manual-finalize', authenticateToken, requireAdmin, async (r
     try {
         const stageTx = await db.transaction("write");
         try {
-            await replacePredictionsTable(stageTx, normalized);
+            await replacePredictionsTable(stageTx, normalized, predictionRound);
             await stageTx.commit();
             staged = true;
         } catch (stageError) {
