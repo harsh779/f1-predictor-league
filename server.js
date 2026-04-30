@@ -545,6 +545,28 @@ async function findStrategyRace(calendar, now = new Date()) {
     return current;
 }
 
+function getRoundLabel(raceOrRound) {
+    const round = typeof raceOrRound === 'object' ? raceOrRound?.round : raceOrRound;
+    if (round == null || round === '') return null;
+    return String(round).startsWith('R') ? String(round) : `R${round}`;
+}
+
+async function hasRoundBeenScored(raceOrRound) {
+    const roundLabel = getRoundLabel(raceOrRound);
+    if (!roundLabel) return false;
+    try {
+        await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+        const result = await db.execute({
+            sql: "SELECT COUNT(*) AS count FROM f1_round_history WHERE round = ?",
+            args: [roundLabel]
+        });
+        return Number(result.rows[0]?.count || 0) > 0;
+    } catch (e) {
+        console.warn('[PREDICTIONS] Failed to inspect round history:', e.message);
+        return false;
+    }
+}
+
 function getPredictionLockSession(race) {
     if (!race?.sessions) return null;
     const usesSprintQuali = race.hasSprint && race.sessions.sprintQuali;
@@ -1310,6 +1332,7 @@ async function performFinalization() {
         const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
         if (alreadyScored.rows[0].count > 0) {
             console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
+            await db.execute("DELETE FROM f1_predictions_v4");
             return { success: false, message: "Already scored." };
         }
 
@@ -1997,6 +2020,12 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
 });
 
 app.get('/api/predictions', authenticateToken, async (req, res) => {
+    const seasonCalendar = await getSeasonCalendar();
+    const currentRace = await findStrategyRace(seasonCalendar, new Date());
+    if (currentRace && await hasRoundBeenScored(currentRace)) {
+        return res.json([]);
+    }
+
     if (!await shouldRevealPredictionsTo(req.user)) {
         return res.status(403).json({ error: 'Predictions unlock after strategy lockout.' });
     }
@@ -2269,7 +2298,11 @@ const liveProxy = async (apiPath, res) => {
         res.status(r.status).json(r.data);
     } catch (e) {
         if (e.response) {
-            return res.status(e.response.status).json(e.response.data || { error: 'API request failed' });
+            const upstreamBody = e.response.data;
+            if (upstreamBody && typeof upstreamBody === 'object') {
+                return res.status(e.response.status).json(upstreamBody.error ? upstreamBody : { ...upstreamBody, error: 'API request failed' });
+            }
+            return res.status(e.response.status).json({ error: upstreamBody || 'API request failed' });
         }
         res.status(502).json({ error: 'API unavailable', detail: e.message });
     }
