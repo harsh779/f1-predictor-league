@@ -140,6 +140,8 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use('/assets/drivers', express.static(path.join(__dirname, 'Drivers'), { etag: false, lastModified: false }));
+app.use('/assets/circuits', express.static(path.join(__dirname, 'Circuit Images'), { etag: false, lastModified: false }));
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, lastModified: false }));
 
 function getDatabaseConfig() {
@@ -650,17 +652,29 @@ function normalizeWeatherPayload(raw) {
     };
 }
 
+const F1_STATIC_BASE = 'https://livetiming.formula1.com/static/';
+
 function toAbsoluteApiUrl(url) {
     if (!url || typeof url !== 'string') return null;
     if (/^https?:\/\//i.test(url)) return url;
     return buildF1TimingApiUrl(url);
 }
 
+// Rewrite F1 static audio URLs to go through our proxy (avoids CORS block)
+function toProxiedAudioUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    if (url.startsWith(F1_STATIC_BASE)) {
+        const path = url.slice(F1_STATIC_BASE.length);
+        return `/api/live/radio-audio?path=${encodeURIComponent(path)}`;
+    }
+    return url;
+}
+
 function normalizeRadioMessage(raw) {
     if (!raw || typeof raw !== 'object') return null;
 
     const text = raw.message || raw.Message || raw.transcript || raw.Transcript || raw.caption || raw.Caption || raw.title || raw.Title || '';
-    const audioUrl = toAbsoluteApiUrl(raw.audio_url || raw.audioUrl || raw.url || raw.Url || raw.path || raw.Path || raw.recording_url || raw.recordingUrl);
+    const audioUrl = toProxiedAudioUrl(toAbsoluteApiUrl(raw.audio_url || raw.audioUrl || raw.url || raw.Url || raw.path || raw.Path || raw.recording_url || raw.recordingUrl));
     const timestamp = raw.timestamp || raw.Timestamp || raw.utc || raw.Utc || raw.time || raw.Time || null;
     const driverNumber = raw.driver_number || raw.driverNumber || raw.racing_number || raw.RacingNumber || raw.number || raw.Number || null;
     const name = raw.name || raw.driver_name || raw.driverName || raw.full_name || raw.FullName || raw.fullName || null;
@@ -922,6 +936,112 @@ function requireAdmin(req, res, next) {
     next();
 }
 
+async function ensureLocalPreviewData() {
+    const obsoletePreviewNames = [
+        'Apex Strategist',
+        'Pit Wall Wizard',
+        'Velocity Predictor',
+        'Redline Master',
+        'Grid Guru',
+        'Podium Picks',
+        'Backmarkers',
+        'Constructor Targets',
+        'Wildcards',
+        'Race Day Investor'
+    ];
+    const players = [
+        ['Chaitanya Agarwal', 'preview_chaitanya', -25, 0, 0, 'Lewis Hamilton', 'Mercedes'],
+        ['Adithya Haniyamballi', 'preview_adithya', -41, 0, 0, 'George Russell', 'Mercedes'],
+        ['Niranchan Ramamoorthy', 'preview_niranchan', -52, 0, 0, 'George Russell', 'Mercedes'],
+        ['Harsh khandelwal', 'admin_override', -61, 0, 1, 'George Russell', 'Mercedes'],
+        ['Vikalp Khandelwal', 'preview_vikalp', -116, 0, 0, 'Charles Leclerc', 'Mercedes'],
+        ['Paritosh Gohel', 'preview_paritosh', -137, 0, 0, 'Oscar Piastri', 'McLaren']
+    ];
+
+    await db.execute({
+        sql: `UPDATE f1_drivers
+              SET has_participated = 0, auth_id = NULL
+              WHERE name IN (${obsoletePreviewNames.map(() => '?').join(',')})
+                 OR auth_id LIKE 'preview_%'`,
+        args: obsoletePreviewNames
+    });
+
+    for (const p of players) {
+        await db.execute({
+            sql: `INSERT INTO f1_drivers (name, auth_id, total_score, has_participated, is_vip, is_admin, season_driver, season_constructor)
+                  VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+                  ON CONFLICT(name) DO UPDATE SET
+                    auth_id = CASE WHEN f1_drivers.auth_id IS NULL OR f1_drivers.auth_id LIKE 'preview_%' OR f1_drivers.auth_id = 'admin_override' THEN excluded.auth_id ELSE f1_drivers.auth_id END,
+                    total_score = CASE WHEN f1_drivers.total_score = 0 OR f1_drivers.auth_id LIKE 'preview_%' OR f1_drivers.auth_id = 'admin_override' THEN excluded.total_score ELSE f1_drivers.total_score END,
+                    has_participated = 1,
+                    is_vip = excluded.is_vip,
+                    is_admin = CASE WHEN excluded.is_admin = 1 THEN 1 ELSE f1_drivers.is_admin END,
+                    season_driver = COALESCE(f1_drivers.season_driver, excluded.season_driver),
+                    season_constructor = COALESCE(f1_drivers.season_constructor, excluded.season_constructor)`,
+            args: p
+        });
+    }
+
+    const historyCount = await db.execute({
+        sql: "SELECT COUNT(*) AS count FROM f1_round_history WHERE user_name IN (?, ?, ?, ?, ?, ?)",
+        args: players.map(p => p[0])
+    }).then(r => Number(r.rows[0]?.count || 0)).catch(() => 0);
+
+    if (historyCount < 18) {
+        await db.execute({
+            sql: `DELETE FROM f1_round_history
+                  WHERE user_name IN (${players.map(() => '?').join(',')})
+                     OR user_name IN (${obsoletePreviewNames.map(() => '?').join(',')})`,
+            args: [...players.map(p => p[0]), ...obsoletePreviewNames]
+        });
+
+        const historyRows = [
+            ['R1', 'Australian Grand Prix', 'Harsh khandelwal', '{"backfill":true}', -23],
+            ['R1', 'Australian Grand Prix', 'Chaitanya Agarwal', '{"backfill":true}', -11],
+            ['R1', 'Australian Grand Prix', 'Niranchan Ramamoorthy', '{"backfill":true}', -27],
+            ['R1', 'Australian Grand Prix', 'Adithya Haniyamballi', '{"backfill":true}', -32],
+            ['R1', 'Australian Grand Prix', 'Vikalp Khandelwal', '{"backfill":true}', -65],
+            ['R2', 'Chinese Grand Prix', 'Paritosh Gohel', '{"p1":"George Russell","p2":"Charles Leclerc","p3":"Kimi Antonelli","p10":"Pierre Gasly","p11":"Lance Stroll","p21":"Valtteri Bottas","p22":"Sergio Perez","c1":"Mercedes","c2":"Ferrari","c5":"McLaren","c6":"Haas","c11":"Cadillac","w_race_loser":"Sergio Perez","w_sprint_gainer":"Lewis Hamilton","w_sprint_loser":"Liam Lawson"}', -42],
+            ['R2', 'Chinese Grand Prix', 'Chaitanya Agarwal', '{"p1":"George Russell","p2":"Lewis Hamilton","p3":"Charles Leclerc","p10":"Nico Hulkenberg","p11":"Pierre Gasly","p21":"Fernando Alonso","p22":"Lance Stroll","c1":"Ferrari","c2":"Mercedes","c5":"Haas","c6":"Racing Bulls","c11":"Aston Martin","w_race_loser":"Sergio Perez","w_sprint_gainer":"Kimi Antonelli","w_sprint_loser":"Franco Colapinto"}', -7],
+            ['R2', 'Chinese Grand Prix', 'Harsh khandelwal', '{"p1":"George Russell","p2":"Kimi Antonelli","p3":"Lewis Hamilton","p10":"Liam Lawson","p11":"Carlos Sainz","p21":"Lance Stroll","p22":"Sergio Perez","c1":"Mercedes","c2":"Ferrari","c5":"Red Bull Racing","c6":"Racing Bulls","c11":"Aston Martin","w_race_loser":"Isack Hadjar","w_sprint_gainer":"Lewis Hamilton","w_sprint_loser":"Esteban Ocon"}', -10],
+            ['R2', 'Chinese Grand Prix', 'Adithya Haniyamballi', '{"p1":"George Russell","p2":"Lewis Hamilton","p3":"Kimi Antonelli","p10":"Esteban Ocon","p11":"Pierre Gasly","p21":"Fernando Alonso","p22":"Lance Stroll","c1":"Mercedes","c2":"Ferrari","c5":"Racing Bulls","c6":"Haas","c11":"Aston Martin","w_race_loser":"Fernando Alonso","w_sprint_gainer":"Liam Lawson","w_sprint_loser":"Lance Stroll"}', 0],
+            ['R2', 'Chinese Grand Prix', 'Niranchan Ramamoorthy', '{"p1":"George Russell","p2":"Kimi Antonelli","p3":"Max Verstappen","p10":"Isack Hadjar","p11":"Oliver Bearman","p21":"Lance Stroll","p22":"Fernando Alonso","c1":"Mercedes","c2":"Ferrari","c5":"Racing Bulls","c6":"Alpine","c11":"Aston Martin","w_race_loser":"Lando Norris","w_sprint_gainer":"Max Verstappen","w_sprint_loser":"Kimi Antonelli"}', -23],
+            ['R2', 'Chinese Grand Prix', 'Vikalp Khandelwal', '{"p1":"George Russell","p2":"Lando Norris","p3":"Kimi Antonelli","p10":"Isack Hadjar","p11":"Liam Lawson","p21":"Gabriel Bortoleto","p22":"Valtteri Bottas","c1":"Mercedes","c2":"Ferrari","c5":"Red Bull Racing","c6":"Haas","c11":"Cadillac","w_race_loser":"Carlos Sainz","w_sprint_gainer":"Carlos Sainz","w_sprint_loser":"Lewis Hamilton"}', -43],
+            ['R1', 'New Joiner Penalty', 'Paritosh Gohel', '{"penalty":"new joiner"}', -70],
+            ['R3', 'Japanese Grand Prix', 'Niranchan Ramamoorthy', '{"p1":"George Russell","p2":"Kimi Antonelli","p3":"Charles Leclerc","p10":"Isack Hadjar","p11":"Nico Hulkenberg","p21":"Fernando Alonso","p22":"Lance Stroll","c1":"Mercedes","c2":"Ferrari","c5":"Red Bull Racing","c6":"Audi","c11":"Aston Martin","w_race_loser":"Oscar Piastri","w_sprint_gainer":null,"w_sprint_loser":null}', -2],
+            ['R3', 'Japanese Grand Prix', 'Chaitanya Agarwal', '{"p1":"George Russell","p2":"Kimi Antonelli","p3":"Charles Leclerc","p10":"Arvid Lindblad","p11":"Liam Lawson","p21":"Fernando Alonso","p22":"Lance Stroll","c1":"Mercedes","c2":"Ferrari","c5":"Haas F1 Team","c6":"Racing Bulls","c11":"Aston Martin","w_race_loser":"Lando Norris","w_sprint_gainer":null,"w_sprint_loser":null}', -7],
+            ['R3', 'Japanese Grand Prix', 'Harsh khandelwal', '{"p1":"Kimi Antonelli","p2":"George Russell","p3":"Charles Leclerc","p10":"Oliver Bearman","p11":"Pierre Gasly","p21":"Nico Hulkenberg","p22":"Sergio Perez","c1":"Mercedes","c2":"Ferrari","c5":"Red Bull Racing","c6":"Racing Bulls","c11":"Cadillac","w_race_loser":"Lando Norris","w_sprint_gainer":null,"w_sprint_loser":null}', -28],
+            ['R3', 'Japanese Grand Prix', 'Adithya Haniyamballi', '{"p1":"George Russell","p2":"Kimi Antonelli","p3":"Lewis Hamilton","p10":"Pierre Gasly","p11":"Liam Lawson","p21":"Fernando Alonso","p22":"Lance Stroll","c1":"Mercedes","c2":"Ferrari","c5":"Racing Bulls","c6":"Alpine","c11":"Cadillac","w_race_loser":"Liam Lawson","w_sprint_gainer":null,"w_sprint_loser":null}', -9],
+            ['R3', 'Japanese Grand Prix', 'Vikalp Khandelwal', '{"p1":"George Russell","p2":"Kimi Antonelli","p3":"Lewis Hamilton","p10":"Liam Lawson","p11":"Arvid Lindblad","p21":"Fernando Alonso","p22":"Lance Stroll","c1":"Mercedes","c2":"Ferrari","c5":"Red Bull Racing","c6":"Racing Bulls","c11":"Aston Martin","w_race_loser":"Pierre Gasly","w_sprint_gainer":null,"w_sprint_loser":null}', -8],
+            ['R3', 'Japanese Grand Prix', 'Paritosh Gohel', '{"p1":"Kimi Antonelli","p2":"George Russell","p3":"Charles Leclerc","p10":"Oliver Bearman","p11":"Pierre Gasly","p21":"Nico Hulkenberg","p22":"Sergio Perez","c1":"Mercedes","c2":"Ferrari","c5":"Red Bull Racing","c6":"Racing Bulls","c11":"Aston Martin","w_race_loser":"Lando Norris","w_sprint_gainer":null,"w_sprint_loser":null}', -25]
+        ];
+
+        for (const row of historyRows) {
+            await db.execute({
+                sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score) VALUES (?, ?, ?, ?, ?)",
+                args: row
+            });
+        }
+    }
+
+    const predictionCount = await db.execute("SELECT COUNT(*) AS count FROM f1_predictions_v4").then(r => Number(r.rows[0]?.count || 0));
+    if (predictionCount === 0) {
+        const submissions = [
+            ['Harsh khandelwal', 'R4', 'Kimi Antonelli', 'George Russell', 'Charles Leclerc', 'Oliver Bearman', 'Pierre Gasly', 'Nico Hulkenberg', 'Sergio Perez', 'Mercedes', 'Ferrari', 'Red Bull Racing', 'Racing Bulls', 'Cadillac', 'Lando Norris', '', ''],
+            ['Chaitanya Agarwal', 'R4', 'George Russell', 'Kimi Antonelli', 'Charles Leclerc', 'Arvid Lindblad', 'Liam Lawson', 'Fernando Alonso', 'Lance Stroll', 'Mercedes', 'Ferrari', 'Haas F1 Team', 'Racing Bulls', 'Aston Martin', 'Lando Norris', '', ''],
+            ['Paritosh Gohel', 'R4', 'Kimi Antonelli', 'George Russell', 'Charles Leclerc', 'Oliver Bearman', 'Pierre Gasly', 'Nico Hulkenberg', 'Sergio Perez', 'Mercedes', 'Ferrari', 'Red Bull Racing', 'Racing Bulls', 'Aston Martin', 'Lando Norris', '', '']
+        ];
+        for (const row of submissions) {
+            await db.execute({
+                sql: `INSERT INTO f1_predictions_v4
+                    (user_name, prediction_round, p1, p2, p3, p10, p11, p21, p22, c1, c2, c5, c6, c11, w_race_loser, w_sprint_gainer, w_sprint_loser)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                args: row
+            });
+        }
+    }
+}
+
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
 app.get('/auth/google', (req, res) => {
     const state = jwt.sign({ type: 'oauth_state', nonce: crypto.randomUUID() }, JWT_SECRET, { expiresIn: '10m' });
@@ -987,6 +1107,23 @@ app.get('/auth/google/callback', async (req, res) => {
 app.post('/auth/logout', (_req, res) => {
     clearSessionCookie(res);
     res.json({ success: true });
+});
+
+app.get('/auth/local-dev', async (req, res) => {
+    const host = String(req.headers.host || '').toLowerCase();
+    const isLocalHost = host.startsWith('localhost:') || host.startsWith('127.0.0.1:') || host.startsWith('[::1]:');
+    if (process.env.ENABLE_LOCAL_AUTH !== '1' || process.env.NODE_ENV === 'production' || !isLocalHost) {
+        return res.status(404).send('Not found');
+    }
+
+    const authId = 'admin_override';
+    const localName = process.env.LOCAL_AUTH_NAME || 'Harsh khandelwal';
+    await ensureLocalPreviewData();
+    await db.execute({ sql: "UPDATE f1_drivers SET auth_id = NULL WHERE auth_id = ? AND name != ?", args: [authId, localName] });
+    await db.execute({ sql: "UPDATE f1_drivers SET auth_id = ?, is_admin = 1 WHERE name = ?", args: [authId, localName] });
+    const token = jwt.sign({ name: localName, auth_id: authId }, JWT_SECRET, { expiresIn: '12h' });
+    setSessionCookie(res, token);
+    res.redirect('/');
 });
 
 // --- 6. SCORING ENGINE (V4 NEW RULES) ---
@@ -2331,6 +2468,68 @@ const liveProxy = async (apiPath, res) => {
     }
 };
 
+const OFFICIAL_2026_GRID = [
+    { team: 'Red Bull Racing', drivers: ['Max Verstappen', 'Isack Hadjar'] },
+    { team: 'McLaren', drivers: ['Lando Norris', 'Oscar Piastri'] },
+    { team: 'Ferrari', drivers: ['Charles Leclerc', 'Lewis Hamilton'] },
+    { team: 'Mercedes', drivers: ['George Russell', 'Kimi Antonelli'] },
+    { team: 'Aston Martin', drivers: ['Fernando Alonso', 'Lance Stroll'] },
+    { team: 'Williams', drivers: ['Carlos Sainz', 'Alexander Albon'] },
+    { team: 'Alpine', drivers: ['Pierre Gasly', 'Franco Colapinto'] },
+    { team: 'Racing Bulls', drivers: ['Liam Lawson', 'Arvid Lindblad'] },
+    { team: 'Haas', drivers: ['Esteban Ocon', 'Oliver Bearman'] },
+    { team: 'Audi', drivers: ['Nico Hulkenberg', 'Gabriel Bortoleto'] },
+    { team: 'Cadillac', drivers: ['Sergio Perez', 'Valtteri Bottas'] }
+];
+
+const STATIC_DRIVER_STANDINGS = [
+    { position: 1, driver_number: '12', name: 'Kimi ANTONELLI', acronym: 'ANT', team: 'Mercedes', team_colour: '00D7B6', points: 47, wins: 1, podiums: 2 },
+    { position: 2, driver_number: '63', name: 'George RUSSELL', acronym: 'RUS', team: 'Mercedes', team_colour: '00D7B6', points: 45, wins: 2, podiums: 2 },
+    { position: 3, driver_number: '16', name: 'Charles LECLERC', acronym: 'LEC', team: 'Ferrari', team_colour: 'ED1131', points: 37, wins: 0, podiums: 3 },
+    { position: 4, driver_number: '44', name: 'Lewis HAMILTON', acronym: 'HAM', team: 'Ferrari', team_colour: 'ED1131', points: 26, wins: 0, podiums: 1 },
+    { position: 5, driver_number: '1', name: 'Lando NORRIS', acronym: 'NOR', team: 'McLaren', team_colour: 'F47600', points: 25, wins: 0, podiums: 0 },
+    { position: 6, driver_number: '81', name: 'Oscar PIASTRI', acronym: 'PIA', team: 'McLaren', team_colour: 'F47600', points: 21, wins: 0, podiums: 1 },
+    { position: 7, driver_number: '3', name: 'Max VERSTAPPEN', acronym: 'VER', team: 'Red Bull Racing', team_colour: '4781D7', points: 12, wins: 0, podiums: 0 },
+    { position: 8, driver_number: '10', name: 'Pierre GASLY', acronym: 'GAS', team: 'Alpine', team_colour: '00A1E8', points: 7, wins: 0, podiums: 0 },
+    { position: 9, driver_number: '87', name: 'Oliver BEARMAN', acronym: 'BEA', team: 'Haas F1 Team', team_colour: '9C9FA2', points: 7, wins: 0, podiums: 0 },
+    { position: 10, driver_number: '30', name: 'Liam LAWSON', acronym: 'LAW', team: 'Racing Bulls', team_colour: '6C98FF', points: 4, wins: 0, podiums: 0 },
+    { position: 11, driver_number: '41', name: 'Arvid LINDBLAD', acronym: 'LIN', team: 'Racing Bulls', team_colour: '6C98FF', points: 4, wins: 0, podiums: 0 },
+    { position: 12, driver_number: '5', name: 'Gabriel BORTOLETO', acronym: 'BOR', team: 'Audi', team_colour: 'F50537', points: 2, wins: 0, podiums: 0 },
+    { position: 13, driver_number: '31', name: 'Esteban OCON', acronym: 'OCO', team: 'Haas F1 Team', team_colour: '9C9FA2', points: 1, wins: 0, podiums: 0 },
+    { position: 14, driver_number: '6', name: 'Isack HADJAR', acronym: 'HAD', team: 'Red Bull Racing', team_colour: '4781D7', points: 0, wins: 0, podiums: 0 },
+    { position: 15, driver_number: '11', name: 'Sergio PEREZ', acronym: 'PER', team: 'Cadillac', team_colour: '909090', points: 0, wins: 0, podiums: 0 },
+    { position: 16, driver_number: '14', name: 'Fernando ALONSO', acronym: 'ALO', team: 'Aston Martin', team_colour: '229971', points: 0, wins: 0, podiums: 0 },
+    { position: 17, driver_number: '18', name: 'Lance STROLL', acronym: 'STR', team: 'Aston Martin', team_colour: '229971', points: 0, wins: 0, podiums: 0 },
+    { position: 18, driver_number: '23', name: 'Alexander ALBON', acronym: 'ALB', team: 'Williams', team_colour: '1868DB', points: 0, wins: 0, podiums: 0 },
+    { position: 19, driver_number: '27', name: 'Nico HULKENBERG', acronym: 'HUL', team: 'Audi', team_colour: 'F50537', points: 0, wins: 0, podiums: 0 },
+    { position: 20, driver_number: '43', name: 'Franco COLAPINTO', acronym: 'COL', team: 'Alpine', team_colour: '00A1E8', points: 0, wins: 0, podiums: 0 },
+    { position: 21, driver_number: '55', name: 'Carlos SAINZ', acronym: 'SAI', team: 'Williams', team_colour: '1868DB', points: 0, wins: 0, podiums: 0 },
+    { position: 22, driver_number: '77', name: 'Valtteri BOTTAS', acronym: 'BOT', team: 'Cadillac', team_colour: '909090', points: 0, wins: 0, podiums: 0 }
+];
+
+const STATIC_CONSTRUCTOR_STANDINGS = [
+    { position: 1, team: 'Mercedes', points: 92, wins: 3 },
+    { position: 2, team: 'Ferrari', points: 63, wins: 0 },
+    { position: 3, team: 'McLaren', points: 46, wins: 0 },
+    { position: 4, team: 'Red Bull Racing', points: 12, wins: 0 },
+    { position: 5, team: 'Racing Bulls', points: 8, wins: 0 },
+    { position: 6, team: 'Haas F1 Team', points: 8, wins: 0 },
+    { position: 7, team: 'Alpine', points: 7, wins: 0 },
+    { position: 8, team: 'Audi', points: 2, wins: 0 },
+    { position: 9, team: 'Williams', points: 0, wins: 0 },
+    { position: 10, team: 'Cadillac', points: 0, wins: 0 },
+    { position: 11, team: 'Aston Martin', points: 0, wins: 0 }
+];
+
+const liveProxyWithFallback = async (apiPath, res, fallback) => {
+    try {
+        const r = await axios.get(buildF1TimingApiUrl(apiPath), buildF1TimingApiConfig({ timeout: 10000 }));
+        res.status(r.status).json(r.data);
+    } catch (e) {
+        res.json({ standings: fallback, source: 'deployed-current-fallback', upstreamError: e.response?.status || e.message });
+    }
+};
+
 app.get('/api/live/timing', (_, res) => liveProxy('/timing', res));
 app.get('/api/live/weather', async (_, res) => {
     // Prefer live timing weather whenever the upstream has a valid payload.
@@ -2366,6 +2565,17 @@ app.get('/api/live/weather', async (_, res) => {
 app.get('/api/live/track', (_, res) => liveProxy('/track', res));
 app.get('/api/live/race-control', (_, res) => liveProxy('/race-control', res));
 app.get('/api/live/pits', (_, res) => liveProxy('/pits', res));
+app.get('/api/live/radio-audio', async (req, res) => {
+    const path = req.query.path;
+    if (!path || path.includes('..') || /^\//.test(path)) return res.status(400).end();
+    try {
+        const upstream = await axios.get(`${F1_STATIC_BASE}${path}`, { responseType: 'stream', timeout: 15000 });
+        res.setHeader('Content-Type', upstream.headers['content-type'] || 'audio/mpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        upstream.data.pipe(res);
+    } catch (e) { res.status(502).end(); }
+});
+
 app.get('/api/live/team-radio', async (_, res) => {
     try {
         const payload = await f1TimingApiGet('/team-radio', { timeout: 10000 });
@@ -2379,8 +2589,44 @@ app.get('/api/live/team-radio', async (_, res) => {
 });
 app.get('/api/live/telemetry', (_, res) => liveProxy('/telemetry', res));
 app.get('/api/live/telemetry/:number', (req, res) => liveProxy(`/telemetry/${req.params.number}`, res));
-app.get('/api/standings/drivers', (_, res) => liveProxy('/standings/drivers', res));
-app.get('/api/standings/constructors', (_, res) => liveProxy('/standings/constructors', res));
+app.get('/api/standings/drivers', (_, res) => liveProxyWithFallback('/standings/drivers', res, STATIC_DRIVER_STANDINGS));
+app.get('/api/standings/constructors', (_, res) => liveProxyWithFallback('/standings/constructors', res, STATIC_CONSTRUCTOR_STANDINGS));
+app.get('/api/last-race-results', async (_req, res) => {
+    try {
+        const historyRows = await db.execute(`
+            SELECT round, race_name, user_name, prediction, score
+            FROM f1_round_history
+            WHERE race_name IS NOT NULL
+              AND race_name != 'New Joiner Penalty'
+            ORDER BY CAST(REPLACE(round, 'R', '') AS INTEGER) DESC, id ASC
+        `).then(r => r.rows || []);
+
+        const latestHistory = historyRows[0];
+        if (latestHistory) {
+            const latestRound = latestHistory.round;
+            const latestRaceName = latestHistory.race_name;
+            const roundRows = historyRows.filter(row => row.round === latestRound && row.race_name === latestRaceName);
+            return res.json({
+                race: {
+                    round: Number(String(latestRound).replace(/^R/i, '')) || latestRound,
+                    name: latestRaceName
+                },
+                roundScores: roundRows,
+                source: 'round-history'
+            });
+        }
+
+        try {
+            const results = await f1TimingApiGet('/results', { timeout: 7000 });
+            const resultList = Array.isArray(results) ? results : [];
+            const match = resultList.find(r => /race/i.test(String(r.session_name || r.session_type || r.filename || '')));
+            if (match) return res.json({ race: { round: match.round, name: match.meeting, circuit: match.circuit }, sessions: [match], source: 'live-archive' });
+        } catch (_) { }
+        res.json({ race: null, roundScores: [], sessions: [], source: 'none' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.get('/api/live/status', (_, res) => liveProxy('/status', res));
 app.get('/api/live/calendar-current', (_, res) => liveProxy('/calendar/current', res));
 app.get('/api/live/results', (_, res) => liveProxy('/results', res));
@@ -2514,6 +2760,12 @@ setTimeout(checkAndFinalize, 10 * 1000);
 // Check Discord reminders/lockout every minute.
 setInterval(checkPredictionNotifications, 60 * 1000);
 setTimeout(checkPredictionNotifications, 15 * 1000);
+
+if (process.env.ENABLE_LOCAL_AUTH === '1' && process.env.NODE_ENV !== 'production') {
+    setTimeout(() => {
+        ensureLocalPreviewData().catch(e => console.error('[LOCAL PREVIEW] Failed to sync preview data:', e.message));
+    }, 1000);
+}
 
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
