@@ -2524,7 +2524,14 @@ const STATIC_CONSTRUCTOR_STANDINGS = [
 const liveProxyWithFallback = async (apiPath, res, fallback) => {
     try {
         const r = await axios.get(buildF1TimingApiUrl(apiPath), buildF1TimingApiConfig({ timeout: 10000 }));
-        res.status(r.status).json(r.data);
+        const data = r.data;
+        if (data && Array.isArray(data.standings) && data.standings.length > 0) {
+            return res.status(r.status).json(data);
+        }
+        if (Array.isArray(data) && data.length > 0) {
+            return res.json({ standings: data, source: 'live' });
+        }
+        res.json({ standings: fallback, source: 'deployed-current-fallback' });
     } catch (e) {
         res.json({ standings: fallback, source: 'deployed-current-fallback', upstreamError: e.response?.status || e.message });
     }
