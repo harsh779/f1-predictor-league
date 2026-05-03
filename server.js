@@ -181,10 +181,6 @@ async function setupDatabase() {
 
         await db.execute({ sql: "INSERT INTO f1_drivers (name, auth_id, is_vip, is_admin) VALUES ('admin', 'admin_override', 1, 1) ON CONFLICT(name) DO NOTHING" });
         await db.execute("UPDATE f1_drivers SET is_admin = 1 WHERE auth_id = 'admin_override'");
-        const existingGoogleAdmins = await db.execute("SELECT COUNT(*) AS count FROM f1_drivers WHERE is_admin = 1 AND auth_id LIKE 'google_%'").then(r => Number(r.rows[0]?.count || 0));
-        if (existingGoogleAdmins === 0) {
-            await db.execute("UPDATE f1_drivers SET is_admin = 1 WHERE lower(name) LIKE '%harsh%' AND auth_id LIKE 'google_%'");
-        }
         if (configuredAdminAuthIds.size > 0) {
             await db.execute({ sql: `UPDATE f1_drivers SET is_admin = 1 WHERE auth_id IN (${Array.from(configuredAdminAuthIds).map(() => '?').join(',')})`, args: Array.from(configuredAdminAuthIds) });
         }
@@ -919,7 +915,7 @@ async function authenticateToken(req, res, next) {
     if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
 
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
         const authId = decoded.auth_id || decoded.id;
         const dbUser = await findUserByAuthId(authId);
         if (!dbUser) return res.status(403).json({ error: "Access Denied: Unknown User" });
@@ -1058,7 +1054,7 @@ app.get('/auth/google', (req, res) => {
 app.get('/auth/google/callback', async (req, res) => {
     try {
         const { code, state } = req.query;
-        const verifiedState = jwt.verify(String(state || ''), JWT_SECRET);
+        const verifiedState = jwt.verify(String(state || ''), JWT_SECRET, { algorithms: ['HS256'] });
         if (verifiedState?.type !== 'oauth_state') throw new Error('Invalid OAuth state');
         const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
             client_id: process.env.GOOGLE_CLIENT_ID,
@@ -1851,7 +1847,6 @@ app.post('/api/season-picks', authenticateToken, async (req, res) => {
 app.get('/api/me', authenticateToken, async (req, res) => {
     res.json({
         name: req.user.name,
-        auth_id: req.user.auth_id,
         isAdmin: req.user.isAdmin
     });
 });
@@ -2265,11 +2260,11 @@ app.get('/api/predictions', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-    const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+    const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
     res.json(r.rows);
 });
 
-app.get('/api/round-scores', async (req, res) => {
+app.get('/api/round-scores', authenticateToken, async (req, res) => {
     try {
         const rows = await db.execute("SELECT round, race_name, user_name, prediction, score FROM f1_round_history ORDER BY id ASC").then(r => r.rows);
         res.json(rows);
@@ -2299,9 +2294,13 @@ app.post('/api/admin/reset-user', authenticateToken, requireAdmin, async (req, r
 app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, res) => {
     const { targetUser, score } = req.body;
     if (!targetUser || score === undefined) return res.status(400).json({ error: 'targetUser and score required' });
+    const safeScore = parseInt(score, 10);
+    if (isNaN(safeScore) || safeScore < -1000 || safeScore > 10000) {
+        return res.status(400).json({ error: 'score must be an integer between -1000 and 10000' });
+    }
     try {
-        await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [score, targetUser] });
-        res.json({ success: true, user: targetUser, newScore: score });
+        await db.execute({ sql: "UPDATE f1_drivers SET total_score = ? WHERE name = ?", args: [safeScore, targetUser] });
+        res.json({ success: true, user: targetUser, newScore: safeScore });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2650,10 +2649,14 @@ app.get('/api/live/track', (_, res) => liveProxy('/track', res));
 app.get('/api/live/race-control', (_, res) => liveProxy('/race-control', res));
 app.get('/api/live/pits', (_, res) => liveProxy('/pits', res));
 app.get('/api/live/radio-audio', async (req, res) => {
-    const path = req.query.path;
-    if (!path || path.includes('..') || /^\//.test(path)) return res.status(400).end();
+    const audioPath = req.query.path;
+    // Allowlist: must start with a 4-digit year prefix and end with a known audio extension
+    const AUDIO_PATH_RE = /^20\d{2}\/[\w\-./]+\.(mp3|aac|m4a|ogg)$/i;
+    if (!audioPath || !AUDIO_PATH_RE.test(audioPath) || audioPath.includes('..')) {
+        return res.status(400).end();
+    }
     try {
-        const upstream = await axios.get(`${F1_STATIC_BASE}${path}`, { responseType: 'stream', timeout: 15000 });
+        const upstream = await axios.get(`${F1_STATIC_BASE}${audioPath}`, { responseType: 'stream', timeout: 15000 });
         res.setHeader('Content-Type', upstream.headers['content-type'] || 'audio/mpeg');
         res.setHeader('Cache-Control', 'public, max-age=86400');
         upstream.data.pipe(res);
@@ -2672,7 +2675,10 @@ app.get('/api/live/team-radio', async (_, res) => {
     }
 });
 app.get('/api/live/telemetry', (_, res) => liveProxy('/telemetry', res));
-app.get('/api/live/telemetry/:number', (req, res) => liveProxy(`/telemetry/${req.params.number}`, res));
+app.get('/api/live/telemetry/:number', (req, res) => {
+    if (!/^\d{1,3}$/.test(req.params.number)) return res.status(400).json({ error: 'Invalid driver number' });
+    liveProxy(`/telemetry/${req.params.number}`, res);
+});
 app.get('/api/standings/drivers', (_, res) => liveProxyWithFallback('/standings/drivers', res, STATIC_DRIVER_STANDINGS));
 app.get('/api/standings/constructors', (_, res) => liveProxyWithFallback('/standings/constructors', res, STATIC_CONSTRUCTOR_STANDINGS));
 app.get('/api/last-race-results', async (_req, res) => {
@@ -2714,9 +2720,17 @@ app.get('/api/last-race-results', async (_req, res) => {
 app.get('/api/live/status', (_, res) => liveProxy('/status', res));
 app.get('/api/live/calendar-current', (_, res) => liveProxy('/calendar/current', res));
 app.get('/api/live/results', (_, res) => liveProxy('/results', res));
-app.get('/api/live/results/:filename', (req, res) => liveProxy(`/results/${req.params.filename}`, res));
-app.get('/api/live/pits/:number', (req, res) => liveProxy(`/pits/${req.params.number}`, res));
+app.get('/api/live/results/:filename', (req, res) => {
+    const RESULT_FILENAME_RE = /^\d{4}_R\d{2}_[\w]+\.json$/;
+    if (!RESULT_FILENAME_RE.test(req.params.filename)) return res.status(400).json({ error: 'Invalid filename' });
+    liveProxy(`/results/${req.params.filename}`, res);
+});
+app.get('/api/live/pits/:number', (req, res) => {
+    if (!/^\d{1,3}$/.test(req.params.number)) return res.status(400).json({ error: 'Invalid driver number' });
+    liveProxy(`/pits/${req.params.number}`, res);
+});
 app.get('/api/live/team-radio/:number', async (req, res) => {
+    if (!/^\d{1,3}$/.test(req.params.number)) return res.status(400).json({ error: 'Invalid driver number' });
     try {
         const payload = await f1TimingApiGet(`/team-radio/${encodeURIComponent(req.params.number)}`, { timeout: 10000 });
         res.json(normalizeTeamRadioPayload(payload));
@@ -2732,7 +2746,10 @@ app.get('/api/live/team-radio/:number', async (req, res) => {
         res.status(502).json({ timestamp: null, session: null, total: 0, messages: [], error: 'API unavailable', detail: e.message });
     }
 });
-app.get('/api/live/timing/:number', (req, res) => liveProxy(`/timing/${req.params.number}`, res));
+app.get('/api/live/timing/:number', (req, res) => {
+    if (!/^\d{1,3}$/.test(req.params.number)) return res.status(400).json({ error: 'Invalid driver number' });
+    liveProxy(`/timing/${req.params.number}`, res);
+});
 
 app.get('/api/paddock-news', async (_, res) => {
     try {

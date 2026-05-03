@@ -1439,24 +1439,6 @@
     async function fetchWeather() {
         try {
             const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
-            if (!w || !w.AirTemp) throw new Error('No weather data');
-            const rain = parseFloat(w.Rainfall) > 0;
-            const isForecast = w.source === 'open-meteo';
-            const label = isForecast ? 'Forecast' : 'Live';
-            document.getElementById('weather-widget').innerHTML = `
-                <div style="font-size:2rem; font-weight:900; margin-bottom: 5px;">${w.AirTemp}°C <span style="font-size:1rem; font-weight:700; color:var(--text-muted);">${rain ? 'Rain' : 'Dry'}</span></div>
-                <div style="color:var(--text-muted); font-size:0.95rem; font-weight: 700;">Track: ${w.TrackTemp}°C | Wind: ${w.WindSpeed} km/h | Humidity: ${w.Humidity}%</div>
-                <div style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; opacity:0.7;">${label}</div>
-            `;
-        } catch(e) {
-            document.getElementById('weather-widget').innerHTML = "<span style='color:var(--text-muted);'>Track conditions temporarily unavailable.</span>";
-        }
-    }
-
-    // Override the original weather widget renderer with a source-agnostic version.
-    async function fetchWeather() {
-        try {
-            const w = await fetch('/api/live/weather?t=' + Date.now()).then(r => r.json());
             if (!w || (w.AirTemp == null && w.TrackTemp == null)) throw new Error('No weather data');
             const airTemp = Number(w.AirTemp ?? w.TrackTemp);
             const trackTemp = Number(w.TrackTemp ?? w.AirTemp);

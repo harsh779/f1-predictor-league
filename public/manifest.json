@@ -3,8 +3,8 @@
   "short_name": "F1 Strategy",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f5f7",
-  "theme_color": "#e10600",
+  "background_color": "#05070a",
+  "theme_color": "#ef1b1b",
   "icons": [
     {
       "src": "/icon.svg",

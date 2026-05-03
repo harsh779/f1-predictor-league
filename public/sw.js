@@ -1,4 +1,4 @@
-const CACHE_NAME = 'f1-strategy-v8.0';
+const CACHE_NAME = 'f1-strategy-v9.1';
 const CORE_ASSETS = ['/', '/index.html', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', function(event) {
