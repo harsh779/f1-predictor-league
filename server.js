@@ -4,11 +4,14 @@ const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-const JWT_SECRET = process.env.JWT_SECRET || 'f1_super_secret_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production'
+    ? (console.error('[FATAL] JWT_SECRET env var not set in production'), process.exit(1), '')
+    : 'local_dev_only_secret_do_not_use_in_prod');
 const F1_TIMING_API = process.env.F1_TIMING_API || 'https://f1-live-api.onrender.com';
 const F1_TIMING_API_KEY = process.env.F1_TIMING_API_KEY || '';
 const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(',').map(x => x.trim()).filter(Boolean));
@@ -34,6 +37,14 @@ async function f1TimingApiGet(apiPath, config = {}) {
 }
 
 app.use(express.json());
+
+// ── Rate limiters ─────────────────────────────────────────────────────────────
+const authLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'Too many requests, slow down.' } });
+const predictLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'Too many requests, slow down.' } });
+const adminLimiter = rateLimit({ windowMs: 60_000, max: 20, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'Too many requests, slow down.' } });
 
 function parseCookies(req) {
     const header = req.headers.cookie || '';
@@ -1045,13 +1056,13 @@ async function ensureLocalPreviewData() {
 }
 
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
-app.get('/auth/google', (req, res) => {
+app.get('/auth/google', authLimiter, (req, res) => {
     const state = jwt.sign({ type: 'oauth_state', nonce: crypto.randomUUID() }, JWT_SECRET, { expiresIn: '10m' });
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APP_URL + '/auth/google/callback')}&response_type=code&scope=profile email&prompt=select_account&state=${encodeURIComponent(state)}`;
     res.redirect(url);
 });
 
-app.get('/auth/google/callback', async (req, res) => {
+app.get('/auth/google/callback', authLimiter, async (req, res) => {
     try {
         const { code, state } = req.query;
         const verifiedState = jwt.verify(String(state || ''), JWT_SECRET, { algorithms: ['HS256'] });
@@ -1852,7 +1863,7 @@ app.get('/api/me', authenticateToken, async (req, res) => {
 });
 
 // --- RACE PREDICTION SUBMIT ---
-app.post('/predict', authenticateToken, async (req, res) => {
+app.post('/predict', predictLimiter, authenticateToken, async (req, res) => {
     const d = req.body;
     const userName = req.user.name;
 
@@ -2215,6 +2226,9 @@ app.get('/api/draft-picks', authenticateToken, async (req, res) => {
         res.json({ ...JSON.parse(r.rows[0].picks), saved_at: r.rows[0].saved_at });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// Admin route rate limiter (applies to all /api/admin/* routes)
+app.use('/api/admin', adminLimiter);
 
 // ── Admin full data export ─────────────────────────────────────────────────────
 app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) => {
@@ -2770,7 +2784,7 @@ app.get('/api/paddock-news', async (_, res) => {
 });
 
 // SSE proxy: pipes live timing stream from own API to client
-app.get('/api/live/stream', (req, res) => {
+app.get('/api/live/stream', authenticateToken, (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

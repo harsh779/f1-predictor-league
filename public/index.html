@@ -1283,7 +1283,7 @@
     detailedDrivers.sort((a, b) => a.name.localeCompare(b.name));
 
     let f1_name = localStorage.getItem('f1_name');
-    let f1_is_admin = localStorage.getItem('f1_is_admin') === '1';
+    let f1_is_admin = false; // never persisted — re-fetched from server on each load
     let raceLock = null;
 
     function getAuthHeaders(extra = {}) {
@@ -1345,14 +1345,12 @@
             f1_name = me.name || f1_name;
             f1_is_admin = !!me.isAdmin;
             localStorage.setItem('f1_name', f1_name);
-            localStorage.setItem('f1_is_admin', f1_is_admin ? '1' : '0');
             document.getElementById('logged-in-name').innerText = f1_name;
             document.getElementById('user-menu').classList.remove('hidden');
             document.getElementById('auth').style.display = 'none';
             return true;
         } catch (e) {
             localStorage.removeItem('f1_name');
-            localStorage.removeItem('f1_is_admin');
             f1_name = null;
             f1_is_admin = false;
             return false;
@@ -3177,9 +3175,9 @@
                         <div class="live-card-section">
                             <strong class="live-card-title">Drivers</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">P1:</span> <b class="driver-link" onclick="openDriverStats('${p1}')">${p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b class="driver-link" onclick="openDriverStats('${p2}')">${p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b class="driver-link" onclick="openDriverStats('${p3}')">${p3}</b><br>
-                                <span style="color:var(--text-muted)">P10:</span> <b class="driver-link" onclick="openDriverStats('${p10}')">${p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b class="driver-link" onclick="openDriverStats('${p11}')">${p11}</b><br>
-                                <span style="color:var(--text-muted)">P21:</span> <b class="driver-link" onclick="openDriverStats('${p21}')">${p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b class="driver-link" onclick="openDriverStats('${p22}')">${p22}</b>
+                                <span style="color:var(--text-muted)">P1:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p1)})">${p1}</b> | <span style="color:var(--text-muted)">P2:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p2)})">${p2}</b> | <span style="color:var(--text-muted)">P3:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p3)})">${p3}</b><br>
+                                <span style="color:var(--text-muted)">P10:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p10)})">${p10}</b> | <span style="color:var(--text-muted)">P11:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p11)})">${p11}</b><br>
+                                <span style="color:var(--text-muted)">P21:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p21)})">${p21}</b> | <span style="color:var(--text-muted)">P22:</span> <b class="driver-link" onclick="openDriverStats(${jsArg(x.p22)})">${p22}</b>
                             </div>
                         </div>
 
@@ -3195,8 +3193,8 @@
                         <div class="live-card-section">
                             <strong class="live-card-title" style="color:var(--gold); border-bottom-color: rgba(197, 155, 39, 0.3);">Wildcards</strong>
                             <div style="line-height:1.8; color: var(--text-main);">
-                                <span style="color:var(--text-muted)">Race Loser:</span> <b class="driver-link" style="color:var(--red)" onclick="openDriverStats('${raceLoser}')">${raceLoser}</b>
-                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b class="driver-link" style="color:#009940" onclick="openDriverStats('${sprintGainer}')">${sprintGainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b class="driver-link" style="color:var(--red)" onclick="openDriverStats('${sprintLoser}')">${sprintLoser}</b>` : ''}
+                                <span style="color:var(--text-muted)">Race Loser:</span> <b class="driver-link" style="color:var(--red)" onclick="openDriverStats(${jsArg(x.w_race_loser)})">${raceLoser}</b>
+                                ${x.w_sprint_gainer ? `<br><span style="color:var(--text-muted)">Sprint Gainer:</span> <b class="driver-link" style="color:#009940" onclick="openDriverStats(${jsArg(x.w_sprint_gainer)})">${sprintGainer}</b><br><span style="color:var(--text-muted)">Sprint Loser:</span> <b class="driver-link" style="color:var(--red)" onclick="openDriverStats(${jsArg(x.w_sprint_loser)})">${sprintLoser}</b>` : ''}
                             </div>
                         </div>
 
