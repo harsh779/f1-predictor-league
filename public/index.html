@@ -1412,6 +1412,8 @@
                 inputField.value = item.name;
                 inputField.setAttribute('value', item.name);
                 closeSelectorModal();
+                updatePredictionSummary();
+                scheduleDraftSave();
             };
             grid.appendChild(btn);
         });
@@ -3411,15 +3413,36 @@
     
     function val(id) { return document.getElementById(id).value; }
 
+    let _draftSaveTimer = null;
+    function scheduleDraftSave() {
+        clearTimeout(_draftSaveTimer);
+        _draftSaveTimer = setTimeout(saveDraftToServer, 1500);
+    }
+    async function saveDraftToServer() {
+        try {
+            const draft = {
+                p1:val('p1'), p2:val('p2'), p3:val('p3'), p10:val('p10'), p11:val('p11'),
+                p21:val('p21'), p22:val('p22'), c1:val('c1'), c2:val('c2'), c5:val('c5'),
+                c6:val('c6'), c11:val('c11'),
+                w_race_loser:val('wl'), w_sprint_gainer:val('sg'), w_sprint_loser:val('sl')
+            };
+            if (!Object.values(draft).some(v => v)) return; // nothing filled
+            await authFetch('/api/draft-picks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(draft) });
+            setText('draft-state', 'Auto-saved ✓');
+        } catch(e) {}
+    }
+
     async function loadMyPrediction() {
         try {
+            // 1. Submitted picks for this round (highest priority)
             const res = await authFetch('/api/my-prediction');
-            if (res.ok) {
-                const d = await res.json();
-                if (d) { restorePicksFromObj(d); return; }
-            }
-            const draft = localStorage.getItem('f1_pick_draft');
-            if (draft) restorePicksFromObj(JSON.parse(draft));
+            if (res.ok) { const d = await res.json(); if (d) { restorePicksFromObj(d); return; } }
+            // 2. Server-side draft (survives deploys)
+            const dr = await authFetch('/api/draft-picks');
+            if (dr.ok) { const d = await dr.json(); if (d) { restorePicksFromObj(d); setText('draft-state', 'Draft restored ✓'); return; } }
+            // 3. localStorage fallback
+            const local = localStorage.getItem('f1_pick_draft');
+            if (local) restorePicksFromObj(JSON.parse(local));
         } catch(e) {}
     }
 

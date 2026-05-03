@@ -190,6 +190,12 @@ async function setupDatabase() {
         }
         await db.execute(`CREATE TABLE IF NOT EXISTS f1_meta (key TEXT PRIMARY KEY, value TEXT)`);
         await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_draft_picks (
+            user_name TEXT PRIMARY KEY,
+            prediction_round TEXT,
+            picks TEXT NOT NULL,
+            saved_at TEXT NOT NULL
+        )`);
 
         // Backfill round history if table is empty but users have scores
         const histCount = await db.execute("SELECT count(*) as count FROM f1_round_history").then(r => r.rows[0].count);
@@ -2177,6 +2183,64 @@ app.get('/api/my-prediction', authenticateToken, async (req, res) => {
             args: [req.user.name, currentRound]
         });
         res.json(r.rows[0] || null);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Draft picks (auto-save, no lock check) ────────────────────────────────────
+app.post('/api/draft-picks', authenticateToken, async (req, res) => {
+    try {
+        const seasonCalendar = await getSeasonCalendar();
+        const currentRace = await findStrategyRace(seasonCalendar, new Date());
+        const currentRound = getRoundLabel(currentRace);
+        if (!currentRound) return res.json({ success: false, message: 'No active round' });
+        await db.execute({
+            sql: `INSERT INTO f1_draft_picks (user_name, prediction_round, picks, saved_at)
+                  VALUES (?, ?, ?, ?)
+                  ON CONFLICT(user_name) DO UPDATE SET
+                    prediction_round = excluded.prediction_round,
+                    picks = excluded.picks,
+                    saved_at = excluded.saved_at`,
+            args: [req.user.name, currentRound, JSON.stringify(req.body), new Date().toISOString()]
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+app.get('/api/draft-picks', authenticateToken, async (req, res) => {
+    try {
+        const seasonCalendar = await getSeasonCalendar();
+        const currentRace = await findStrategyRace(seasonCalendar, new Date());
+        const currentRound = getRoundLabel(currentRace);
+        if (!currentRound) return res.json(null);
+        const r = await db.execute({
+            sql: 'SELECT picks, saved_at FROM f1_draft_picks WHERE user_name = ? AND prediction_round = ?',
+            args: [req.user.name, currentRound]
+        });
+        if (!r.rows[0]) return res.json(null);
+        res.json({ ...JSON.parse(r.rows[0].picks), saved_at: r.rows[0].saved_at });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin full data export ─────────────────────────────────────────────────────
+app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [drivers, predictions, drafts, history, meta] = await Promise.all([
+            db.execute("SELECT * FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC"),
+            db.execute("SELECT * FROM f1_predictions_v4 ORDER BY user_name"),
+            db.execute("SELECT * FROM f1_draft_picks ORDER BY saved_at DESC"),
+            db.execute("SELECT * FROM f1_round_history ORDER BY id ASC"),
+            db.execute("SELECT * FROM f1_meta"),
+        ]);
+        const exported_at = new Date().toISOString();
+        res.setHeader('Content-Disposition', `attachment; filename="f1-league-backup-${exported_at.slice(0,10)}.json"`);
+        res.json({
+            exported_at,
+            drivers:     drivers.rows,
+            predictions: predictions.rows,
+            drafts:      drafts.rows,
+            history:     history.rows,
+            meta:        meta.rows,
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
