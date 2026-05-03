@@ -2166,6 +2166,20 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
     } catch (e) { console.error(`[RESEND] Background error for ${round}:`, e.message); }
 });
 
+app.get('/api/my-prediction', authenticateToken, async (req, res) => {
+    try {
+        const seasonCalendar = await getSeasonCalendar();
+        const currentRace = await findStrategyRace(seasonCalendar, new Date());
+        const currentRound = getRoundLabel(currentRace);
+        if (!currentRound) return res.json(null);
+        const r = await db.execute({
+            sql: "SELECT * FROM f1_predictions_v4 WHERE user_name = ? AND prediction_round = ?",
+            args: [req.user.name, currentRound]
+        });
+        res.json(r.rows[0] || null);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/predictions', authenticateToken, async (req, res) => {
     const seasonCalendar = await getSeasonCalendar();
     const currentRace = await findStrategyRace(seasonCalendar, new Date());
