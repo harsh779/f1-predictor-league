@@ -291,7 +291,7 @@ const f1Calendar2026 = [
 ];
 
 const SEASON_CALENDAR_CACHE_KEY = 'season_calendar_2026_v2';
-const SEASON_CALENDAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const SEASON_CALENDAR_CACHE_TTL_MS = 30 * 1000;
 let seasonCalendarCache = { data: null, fetchedAt: 0 };
 const UNAVAILABLE_2026_RACES = ['Bahrain Grand Prix', 'Saudi Arabian Grand Prix'];
 
@@ -382,8 +382,12 @@ const OFFICIAL_2026_FALLBACK_MAP = new Map(
 );
 
 function buildOfficialCalendar(sourceCalendar = []) {
-    const sourceMap = new Map(
-        (Array.isArray(sourceCalendar) ? sourceCalendar : []).map(r => [normalizeRaceName(r.name), r])
+    const sourceEntries = Array.isArray(sourceCalendar) ? sourceCalendar : [];
+    const sourceMap = new Map(sourceEntries.map(r => [normalizeRaceName(r.name), r]));
+    const sourceByOfficialRound = new Map(
+        sourceEntries
+            .map(r => [Number(r.officialRound || r.official_round || r.apiRound || r.api_round || r.round || 0), r])
+            .filter(([round]) => round)
     );
 
     const visibleCalendar = OFFICIAL_2026_CALENDAR_PLAN.filter(
@@ -393,7 +397,7 @@ function buildOfficialCalendar(sourceCalendar = []) {
     return visibleCalendar.map((planRace, index) => {
         const key = normalizeRaceName(planRace.name);
         const fallback = OFFICIAL_2026_FALLBACK_MAP.get(key);
-        const source = sourceMap.get(key);
+        const source = sourceByOfficialRound.get(planRace.round) || sourceMap.get(key);
         const sessions = { ...(fallback?.sessions || {}), ...(source?.sessions || {}) };
         const trackDetails = source?.trackDetails || fallback?.trackDetails;
         const race = {
@@ -433,12 +437,16 @@ function normalizeCalendarEntry(entry) {
         fp2: sessions.fp2 || sessions.second_practice || null,
         fp3: sessions.fp3 || sessions.third_practice || null,
         sprintQuali: sessions.sprintQuali || sessions.sprint_qualifying || sessions.sprintShootout || null,
+        sprint_qualifying: sessions.sprint_qualifying || sessions.sprintQuali || sessions.sprintShootout || null,
         sprint: sessions.sprint || null,
         quali: sessions.quali || sessions.qualifying || null,
+        qualifying: sessions.qualifying || sessions.quali || null,
         race: sessions.race || entry.session_time || entry.date || null
     };
     return {
         round: Number(entry.round),
+        officialRound: Number(entry.officialRound ?? entry.official_round ?? entry.round),
+        apiRound: entry.apiRound || entry.api_round ? Number(entry.apiRound ?? entry.api_round) : null,
         name: entry.name || entry.meeting,
         hasSprint: Boolean(entry.hasSprint ?? entry.has_sprint),
         date: normalizedSessions.race,
@@ -495,10 +503,9 @@ async function fetchSeasonCalendarFromApi() {
     const normalized = Array.isArray(remote) ? remote.map(normalizeCalendarEntry).filter(Boolean) : [];
     normalized.sort((a, b) => a.round - b.round);
     if (!isValidSeasonCalendar(normalized)) throw new Error('Calendar API returned invalid data');
-    const merged = buildOfficialCalendar(normalized);
-    seasonCalendarCache = { data: merged, fetchedAt: Date.now() };
-    await persistSeasonCalendar(merged);
-    return merged;
+    seasonCalendarCache = { data: normalized, fetchedAt: Date.now() };
+    await persistSeasonCalendar(normalized);
+    return normalized;
 }
 
 async function getSeasonCalendar(options = {}) {
@@ -517,11 +524,11 @@ async function getSeasonCalendar(options = {}) {
 
     const persisted = await loadPersistedSeasonCalendar();
     if (persisted) {
-        seasonCalendarCache = { data: buildOfficialCalendar(persisted), fetchedAt: Date.now() };
+        seasonCalendarCache = { data: persisted, fetchedAt: Date.now() };
         return seasonCalendarCache.data;
     }
 
-    return buildOfficialCalendar(f1Calendar2026);
+    throw new Error('Season calendar unavailable from timing API and no last-good dynamic cache exists');
 }
 
 function findUpcomingRace(calendar, now = new Date()) {
@@ -603,6 +610,12 @@ function getPredictionLockInfo(race) {
     const lockTime = new Date(session.startsAt);
     lockTime.setMinutes(lockTime.getMinutes() - 1);
     return { ...session, lockTime };
+}
+
+async function getSeasonPicksLockInfo() {
+    const seasonCalendar = await getSeasonCalendar();
+    const openingRace = seasonCalendar[0];
+    return getPredictionLockInfo(openingRace);
 }
 
 function getRaceNotificationScope(race, lockInfo) {
@@ -1836,14 +1849,28 @@ app.get('/api/live-sessions', async (req, res) => {
 app.get('/api/season-picks', authenticateToken, async (req, res) => {
     try {
         const r = await db.execute({ sql: "SELECT season_driver, season_constructor FROM f1_drivers WHERE name = ?", args: [req.user.name] });
-        res.json(r.rows[0] || {});
+        const seasonLock = await getSeasonPicksLockInfo();
+        const payload = r.rows[0] || {};
+        res.json({
+            ...payload,
+            seasonLockTime: seasonLock?.lockTime?.toISOString?.() || null,
+            seasonLockSession: seasonLock?.label || null,
+            seasonLocked: seasonLock ? new Date() > seasonLock.lockTime : false
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/season-picks', authenticateToken, async (req, res) => {
-    const ausQuali = new Date("2026-03-07T10:30:00+05:30");
-    if (new Date() > ausQuali) {
-        return res.status(403).json({ success: false, message: "Season predictions are permanently locked." });
+    try {
+        const seasonLock = await getSeasonPicksLockInfo();
+        if (!seasonLock) {
+            return res.status(503).json({ success: false, message: "Season prediction lock timing unavailable right now." });
+        }
+        if (new Date() > seasonLock.lockTime) {
+            return res.status(403).json({ success: false, message: "Season predictions are permanently locked." });
+        }
+    } catch (e) {
+        return res.status(503).json({ success: false, message: `Season calendar unavailable: ${e.message}` });
     }
 
     try {
@@ -2733,7 +2760,34 @@ app.get('/api/last-race-results', async (_req, res) => {
 });
 app.get('/api/live/status', (_, res) => liveProxy('/status', res));
 app.get('/api/live/calendar-current', (_, res) => liveProxy('/calendar/current', res));
-app.get('/api/live/results', (_, res) => liveProxy('/results', res));
+app.get('/api/live/results', async (_, res) => {
+    try {
+        const [results, seasonCalendar] = await Promise.all([
+            f1TimingApiGet('/results', { timeout: 10000 }),
+            getSeasonCalendar().catch(() => [])
+        ]);
+        const normalized = Array.isArray(results) ? results.map(result => {
+            const resultRound = Number(result.round || 0);
+            const resultName = normalizeRaceName(result.meeting || '');
+            const calendarRace = seasonCalendar.find(r =>
+                Number(r.apiRound || 0) === resultRound
+                && resultName
+                && normalizeRaceName(r.name) === resultName
+            ) || seasonCalendar.find(r => resultName && normalizeRaceName(r.name) === resultName);
+            if (!calendarRace) return result;
+            return {
+                ...result,
+                timing_round: result.round,
+                round: calendarRace.round,
+                display_round: calendarRace.round,
+                meeting: calendarRace.name || result.meeting
+            };
+        }) : results;
+        res.json(normalized);
+    } catch (e) {
+        res.status(502).json({ error: e.message });
+    }
+});
 app.get('/api/live/results/:filename', (req, res) => {
     const RESULT_FILENAME_RE = /^\d{4}_R\d{2}_[\w]+\.json$/;
     if (!RESULT_FILENAME_RE.test(req.params.filename)) return res.status(400).json({ error: 'Invalid filename' });

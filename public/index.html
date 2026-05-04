@@ -889,7 +889,7 @@
         
         <div id="season-predict-box" class="predict-group" style="border-color: #009940; background: rgba(0, 153, 64, 0.03);">
             <h3 style="color: #009940; border-color: rgba(0, 153, 64, 0.3);">2026 World Champions</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0; margin-bottom: 15px;">Locks permanently at Australian GP Qualifying!</p>
+            <p id="season-lock-note" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0; margin-bottom: 15px;">Loading lock timing...</p>
             
             <label>World Drivers' Champion (+50 pts)</label>
             <input type="text" id="s_driver" class="selector-input" readonly placeholder="Tap to select..." onclick="openSelectorModal('s_driver', 'driver', 'Select Drivers Champion')">
@@ -1185,7 +1185,7 @@
             <h3 style="margin-top:20px;">6. Championship Prize</h3>
             <ul>
                 <li>The overall tournament winner will receive <strong>₹500</strong> from each of the other players.</li>
-                <li><strong>Season-Long Predictions:</strong> Predict the World Drivers' Champion (+50 pts) and World Constructors' Champion (+25 pts). This form permanently locks at the start of Australian GP Qualifying!</li>
+                <li><strong>Season-Long Predictions:</strong> Predict the World Drivers' Champion (+50 pts) and World Constructors' Champion (+25 pts). This form permanently locks at the first race weekend prediction lock.</li>
             </ul>
         </div>
     </div>
@@ -3109,15 +3109,20 @@
                 document.getElementById('s_team').value = d.season_constructor;
                 document.getElementById('s_team').setAttribute('value', d.season_constructor);
             }
+            const lockNote = document.getElementById('season-lock-note');
+            if (lockNote) {
+                const lockDate = d.seasonLockTime ? new Date(d.seasonLockTime) : null;
+                lockNote.textContent = lockDate && !Number.isNaN(lockDate.getTime())
+                    ? `Locks permanently at ${d.seasonLockSession || 'the first prediction lock'} (${lockDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })})`
+                    : 'Season lock timing unavailable.';
+            }
+            if (d.seasonLocked) {
+                document.getElementById('s_driver').onclick = null;
+                document.getElementById('s_team').onclick = null;
+                document.getElementById('save-season-btn').classList.add('hidden');
+                document.getElementById('season-locked-msg').classList.remove('hidden');
+            }
         } catch(e) {}
-        
-        const ausQuali = new Date("2026-03-07T10:30:00+05:30");
-        if (new Date() > ausQuali) {
-            document.getElementById('s_driver').onclick = null;
-            document.getElementById('s_team').onclick = null;
-            document.getElementById('save-season-btn').classList.add('hidden');
-            document.getElementById('season-locked-msg').classList.remove('hidden');
-        }
     }
 
     async function saveSeasonPicks() {
