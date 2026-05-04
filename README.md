@@ -70,8 +70,8 @@ Tap any driver to inspect:
 ### Standings
 
 - Player league table
-- F1 Drivers' Championship view
-- F1 Constructors' Championship view
+- F1 Drivers' Championship view with official rank/points
+- F1 Constructors' Championship view with Race-only win counts
 
 ### Calendar
 
@@ -80,6 +80,19 @@ Tap any driver to inspect:
 - session timing
 - next-race countdown
 - track intelligence and weather
+
+---
+
+## Recent fixes
+
+- The app now uses the F1 Live API calendar as the source of truth for race/session timing.
+- Static local schedule timings are no longer used as an automatic runtime fallback when the API and last-good dynamic cache are unavailable.
+- Session aliases support both API and app naming styles, including `sprint_qualifying`/`sprintQuali` and `qualifying`/`quali`.
+- Display round and timing archive round are preserved separately, so Miami can display as round 4 while using archive `apiRound` 6.
+- `/api/live/results` maps archive result files back to app display rounds for Past Sessions.
+- Season-long prediction locks now come from the dynamic first-race lock calculation instead of a hardcoded Australian GP Qualifying timestamp.
+- The Standings tab receives official F1 rank/points with Race-only wins and podiums from the API.
+- See [API + App Ecosystem Flow](docs/ECOSYSTEM_FLOW.md) for the full Mermaid data-flow diagram.
 
 ---
 
