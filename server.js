@@ -1796,13 +1796,32 @@ app.get('/api/driver-stats/:name', async (req, res) => {
 // --- F1 Live Timing Widget Proxy (backed by direct F1 SignalR WebSocket feed) ---
 let widgetCache = null;
 let widgetCacheTime = 0;
+const STALE_FINALISED_TIMING_MS = 2 * 60 * 60 * 1000;
+
+function isStaleFinalisedTiming(status) {
+    const sessionStatus = status?.session?.SessionStatus;
+    const lastUpdate = status?.last_update ? new Date(status.last_update).getTime() : NaN;
+    const isOld = !Number.isFinite(lastUpdate) || Date.now() - lastUpdate > STALE_FINALISED_TIMING_MS;
+    return status?.connected === false && (sessionStatus === 'Finalised' || sessionStatus === 'Ends') && isOld;
+}
+
 app.get('/api/live-widget', async (_req, res) => {
     if (widgetCache && Date.now() - widgetCacheTime < 10000) return res.json(widgetCache);
     try {
         const get = (path) => f1TimingApiGet(path, { timeout: 10000 }).catch(() => null);
         const [timing, status] = await Promise.all([get('/timing'), get('/status')]);
-        if (!timing?.drivers?.length) return res.status(503).json({ error: 'No live timing data' });
-        widgetCache = { timing, status };
+        const staleFinalisedTiming = Boolean(timing?.stale) || Boolean(status?.stale) || isStaleFinalisedTiming(status);
+        const hasDrivers = !staleFinalisedTiming && Array.isArray(timing?.drivers) && timing.drivers.length > 0;
+        const seasonCalendar = await getSeasonCalendar().catch(() => []);
+        const nextRace = seasonCalendar.length ? await findStrategyRace(seasonCalendar, new Date()).catch(() => null) : null;
+        const nextSession = nextRace ? findNextWeekendSession(nextRace, new Date()) : null;
+        widgetCache = {
+            timing: hasDrivers ? timing : { ...(timing || {}), drivers: [], stale: staleFinalisedTiming || Boolean(timing?.stale) },
+            status: status ? { ...status, stale: staleFinalisedTiming || Boolean(status.stale) } : null,
+            nextRace: nextRace ? { round: nextRace.round, name: nextRace.name } : null,
+            nextSession: nextSession ? { key: nextSession.key, label: nextSession.label, time: nextSession.time } : null,
+            error: hasDrivers ? null : (staleFinalisedTiming ? 'Live timing feed is stale' : 'No live timing data')
+        };
         widgetCacheTime = Date.now();
         res.json(widgetCache);
     } catch (e) { res.status(500).json({ error: e.message }); }
