@@ -7,6 +7,7 @@ const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production'
