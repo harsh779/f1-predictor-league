@@ -573,6 +573,20 @@ async function hasUnstampedActivePredictions() {
     }
 }
 
+async function hasScorablePredictionsForRound(roundLabel) {
+    if (!roundLabel) return false;
+    try {
+        const result = await db.execute({
+            sql: "SELECT COUNT(*) AS count FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
+            args: [roundLabel]
+        });
+        return Number(result.rows[0]?.count || 0) > 0;
+    } catch (e) {
+        console.warn('[PREDICTIONS] Failed to inspect scorable predictions:', e.message);
+        return false;
+    }
+}
+
 async function findStrategyRace(calendar, now = new Date()) {
     const current = findUpcomingRace(calendar, now);
     if (!current) return null;
@@ -2951,16 +2965,27 @@ async function checkAndFinalize() {
         if (session.SessionStatus !== 'Finalised') { console.log(`[AUTO] Race status: ${session.SessionStatus} — waiting`); return; }
 
         const sessionKey = String(session.Key);
+        const seasonCalendar = await getSeasonCalendar();
+        const latestCompletedRace = findLatestCompletedRace(seasonCalendar, new Date());
+        const latestCompletedRound = getRoundLabel(latestCompletedRace);
+        const hasPendingScoring = latestCompletedRound
+            && !await hasRoundBeenScored(latestCompletedRound)
+            && await hasScorablePredictionsForRound(latestCompletedRound);
 
         // Skip silently if we already handled this session (in-memory fast path)
-        if (lastKnownFinalizedSession === sessionKey) return;
+        if (lastKnownFinalizedSession === sessionKey && !hasPendingScoring) return;
+        if (lastKnownFinalizedSession === sessionKey && hasPendingScoring) {
+            console.warn(`[AUTO] Session ${sessionKey} was marked finalized but ${latestCompletedRound} still has scorable predictions — retrying`);
+        }
 
         // Check DB in case server restarted and memory was lost
         const meta = await db.execute({ sql: "SELECT value FROM f1_meta WHERE key = 'last_finalized_session'", args: [] });
-        if (meta.rows[0]?.value === sessionKey) {
+        if (meta.rows[0]?.value === sessionKey && !hasPendingScoring) {
             lastKnownFinalizedSession = sessionKey; // cache it so we never hit DB again for this session
             console.log(`[AUTO] Session ${sessionKey} already finalized — skipping future checks`);
             return;
+        } else if (meta.rows[0]?.value === sessionKey && hasPendingScoring) {
+            console.warn(`[AUTO] DB marker says session ${sessionKey} is finalized, but ${latestCompletedRound} is unscored with picks — retrying`);
         }
 
         console.log(`[AUTO] Race session ${sessionKey} finalised — triggering scoring`);
@@ -2968,7 +2993,7 @@ async function checkAndFinalize() {
 
         const result = await performFinalization();
 
-        if (result.success || result.message === "Already scored." || result.message === "No predictions found.") {
+        if (result.success || result.message === "Already scored." || (result.message === "No predictions found." && !await hasActivePredictions())) {
             await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('last_finalized_session', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [sessionKey] });
             lastKnownFinalizedSession = sessionKey; // cache after successful DB write
             if (result.success) console.log(`[AUTO] Scoring complete for session ${sessionKey}`);
