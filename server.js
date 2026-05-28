@@ -2425,6 +2425,34 @@ app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, re
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/admin/restore-season-picks', authenticateToken, requireAdmin, async (req, res) => {
+    const entries = Array.isArray(req.body?.entries) ? req.body.entries : [];
+    if (entries.length === 0) {
+        return res.status(400).json({ success: false, message: 'entries array required' });
+    }
+
+    const tx = await db.transaction("write");
+    try {
+        let updated = 0;
+        for (const entry of entries) {
+            const name = String(entry.name || '').trim();
+            const seasonDriver = String(entry.season_driver || entry.seasonDriver || '').trim();
+            const seasonConstructor = String(entry.season_constructor || entry.seasonConstructor || '').trim();
+            if (!name || !seasonDriver || !seasonConstructor) continue;
+            const result = await tx.execute({
+                sql: "UPDATE f1_drivers SET season_driver = ?, season_constructor = ? WHERE lower(name) = lower(?)",
+                args: [seasonDriver, seasonConstructor, name]
+            });
+            updated += Number(result.rowsAffected || 0);
+        }
+        await tx.commit();
+        res.json({ success: true, updated });
+    } catch (e) {
+        try { await tx.rollback(); } catch (_) { }
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 app.post('/api/admin/merge-driver', authenticateToken, requireAdmin, async (req, res) => {
     const sourceName = String(req.body?.sourceName || '').trim();
     const targetName = String(req.body?.targetName || '').trim();
