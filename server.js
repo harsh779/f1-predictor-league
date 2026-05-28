@@ -553,6 +553,26 @@ async function hasActivePredictions() {
     }
 }
 
+async function getActivePredictionRounds() {
+    try {
+        return await db.execute("SELECT DISTINCT prediction_round FROM f1_predictions_v4 WHERE prediction_round IS NOT NULL AND prediction_round != ''")
+            .then(r => r.rows.map(row => String(row.prediction_round)).filter(Boolean));
+    } catch (e) {
+        console.warn('[PREDICTIONS] Failed to inspect active prediction rounds:', e.message);
+        return [];
+    }
+}
+
+async function hasUnstampedActivePredictions() {
+    try {
+        const result = await db.execute("SELECT COUNT(*) AS count FROM f1_predictions_v4 WHERE prediction_round IS NULL OR prediction_round = ''");
+        return Number(result.rows[0]?.count || 0) > 0;
+    } catch (e) {
+        console.warn('[PREDICTIONS] Failed to inspect unstamped predictions:', e.message);
+        return false;
+    }
+}
+
 async function findStrategyRace(calendar, now = new Date()) {
     const current = findUpcomingRace(calendar, now);
     if (!current) return null;
@@ -589,6 +609,24 @@ async function hasRoundBeenScored(raceOrRound) {
         console.warn('[PREDICTIONS] Failed to inspect round history:', e.message);
         return false;
     }
+}
+
+async function findVisiblePredictionRace(calendar, now = new Date()) {
+    const activeRounds = await getActivePredictionRounds();
+    for (const roundLabel of activeRounds) {
+        if (!await hasRoundBeenScored(roundLabel)) {
+            const roundNumber = Number(String(roundLabel).replace(/^R/i, ''));
+            const race = calendar.find(r => Number(r.round) === roundNumber);
+            if (race) return race;
+        }
+    }
+
+    if (await hasUnstampedActivePredictions()) {
+        const latestCompleted = findLatestCompletedRace(calendar, now);
+        if (latestCompleted && !await hasRoundBeenScored(latestCompleted)) return latestCompleted;
+    }
+
+    return findStrategyRace(calendar, now);
 }
 
 function getPredictionLockSession(race) {
@@ -755,7 +793,7 @@ async function shouldRevealPredictionsTo(user) {
     if (user?.isAdmin) return true;
     const now = new Date();
     const seasonCalendar = await getSeasonCalendar();
-    const currentRace = await findStrategyRace(seasonCalendar, now);
+    const currentRace = await findVisiblePredictionRace(seasonCalendar, now);
     if (!currentRace) return true;
     const lockInfo = getPredictionLockInfo(currentRace);
     if (!lockInfo) return false;
@@ -1494,7 +1532,8 @@ async function performFinalization() {
         console.log(`[FINALIZE] Grid map: ${Object.keys(gridMap).length} drivers`);
 
         // 1b. Check if this round was already scored
-        const roundCheck = `R${raceData.round}`;
+        const roundLabel = `R${raceData.round}`;
+        const roundCheck = roundLabel;
         await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
         const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
         if (alreadyScored.rows[0].count > 0) {
@@ -1504,10 +1543,16 @@ async function performFinalization() {
         }
 
         const check = await db.execute({
-            sql: "SELECT count(*) as count FROM f1_predictions_v4 WHERE prediction_round = ?",
+            sql: "SELECT count(*) as count FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
             args: [roundCheck]
         });
-        if (check.rows[0].count === 0) return { success: false, message: "No predictions found." };
+        if (check.rows[0].count === 0) {
+            const activeRounds = await getActivePredictionRounds();
+            if (activeRounds.length > 0) {
+                return { success: false, message: `No predictions found for ${roundCheck}; active prediction rounds: ${activeRounds.join(', ')}.` };
+            }
+            return { success: false, message: "No predictions found." };
+        }
         console.log(`[FINALIZE] ${check.rows[0].count} predictions to score`);
 
         // --- DRIVER MATH (DNFs = 22) ---
@@ -1588,7 +1633,7 @@ async function performFinalization() {
 
         // --- SCORE CALCULATION ---
         const predictions = await db.execute({
-            sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ?",
+            sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
             args: [roundLabel]
         }).then(r => r.rows);
         let scores = {}; let scoreBreakdowns = {}; let lowest = Infinity;
@@ -1614,7 +1659,6 @@ async function performFinalization() {
             finalScores[d.name] = { score: fs, hadPrediction: scores[d.name] !== undefined, isNewJoiner };
         }
 
-        const roundLabel = `R${raceData.round}`;
         const timestamp = new Date().toISOString();
 
         // Capture lowest standing BEFORE applying round scores (for new joiner penalty)
@@ -2301,7 +2345,7 @@ app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) =
 
 app.get('/api/predictions', authenticateToken, async (req, res) => {
     const seasonCalendar = await getSeasonCalendar();
-    const currentRace = await findStrategyRace(seasonCalendar, new Date());
+    const currentRace = await findVisiblePredictionRace(seasonCalendar, new Date());
     const currentRound = getRoundLabel(currentRace);
     if (currentRound && await hasRoundBeenScored(currentRound)) {
         return res.json([]);
@@ -2312,8 +2356,10 @@ app.get('/api/predictions', authenticateToken, async (req, res) => {
     }
     if (!currentRound) return res.json([]);
 
+    const hasStampedRounds = (await getActivePredictionRounds()).length > 0;
     const r = await db.execute({
-        sql: "SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name WHERE p.prediction_round = ?",
+        sql: `SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name
+              WHERE p.prediction_round = ? ${hasStampedRounds ? '' : "OR p.prediction_round IS NULL OR p.prediction_round = ''"}`,
         args: [currentRound]
     });
     res.json(r.rows);
