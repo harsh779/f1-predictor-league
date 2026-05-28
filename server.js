@@ -2381,7 +2381,7 @@ app.get('/api/predictions', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-    const r = await db.execute("SELECT name, total_score, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+    const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
     res.json(r.rows);
 });
 
@@ -2395,7 +2395,7 @@ app.get('/api/round-scores', authenticateToken, async (req, res) => {
 // --- 8. ADMIN ROUTES ---
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
+        const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
         res.json(r.rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
