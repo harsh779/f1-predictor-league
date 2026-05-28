@@ -1012,6 +1012,18 @@
                     Merge Duplicate Driver
                 </button>
             </div>
+            <div style="text-align:left; margin-bottom:30px; padding:20px; border:1px solid var(--border); border-radius:10px; background:var(--surface);">
+                <h4 style="margin:0 0 10px; color:var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px;">Re-score Round History</h4>
+                <p style="margin:0 0 12px; color:var(--text-muted); line-height:1.6;">
+                    Recalculate an already-finalized round from stored history rows.
+                </p>
+                <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                    <input id="admin-rescore-round" type="text" value="R5" placeholder="Round, e.g. R5" style="width:150px; border-radius:8px; border:1px solid var(--border); background:var(--surface-inner); color:var(--text-main); padding:12px 14px; font-family:'Titillium Web';">
+                    <button onclick="rescoreRoundFromHistory()" style="background:var(--red); color:white; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px;">
+                        Re-score From History
+                    </button>
+                </div>
+            </div>
             <h4 style="text-align: left; color: var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">User Management</h4>
             <div id="admin-user-list" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
                 </div>
@@ -3548,6 +3560,33 @@
 
         showToast(`Round finalized. Restored ${data.restoredPredictionCount || 0} existing prediction(s).`, 'success');
         setTimeout(() => location.reload(), 1500);
+    }
+
+    async function rescoreRoundFromHistory() {
+        const round = document.getElementById('admin-rescore-round').value.trim().toUpperCase();
+        if (!round) {
+            showToast('Enter a round to re-score.', 'error');
+            return;
+        }
+
+        if (!confirm(`Re-score ${round} from stored round history? This updates season totals and sends the score breakdown.`)) {
+            return;
+        }
+
+        showToast(`Re-scoring ${round} from history...`, 'success');
+        const res = await authFetch('/api/rescore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ round })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            showToast('Re-score failed: ' + (data.message || 'Unknown error'), 'error');
+            return;
+        }
+
+        showToast(data.message || `${round} re-score started.`, 'success');
+        setTimeout(() => location.reload(), 2500);
     }
 
     async function mergeDuplicateDriver() {
