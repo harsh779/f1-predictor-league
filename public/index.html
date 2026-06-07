@@ -2863,7 +2863,7 @@
                                             <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed||'-'}</td>
                                             <td style="text-align:center;">${stC ? `<span style="background:${tBg};color:${tTx};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${stC[0]}</span>` : '-'}</td>
                                             <td style="text-align:right;font-weight:700;color:var(--text-main);">${escapeHtml(r.best_lap_time||'-')}</td>
-                                            <td style="text-align:right;font-weight:900;color:var(--red);">${escapeHtml(r.gap_to_leader||'WINNER')}</td>
+                                            <td style="text-align:right;font-weight:900;color:var(--red);">${r.position===1 ? 'WINNER' : escapeHtml(r.gap_to_leader||'-')}</td>
                                             <td colspan="5" style="text-align:center;color:var(--text-muted);font-size:0.75rem;">—</td>
                                         </tr>`;
                                     }).join('');
