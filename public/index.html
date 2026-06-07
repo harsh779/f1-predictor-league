@@ -2821,9 +2821,22 @@
                         const resList = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
                         if (!Array.isArray(resList) || !resList.length) throw new Error('empty list');
 
-                        // API already returns results sorted newest-first (filename alphabetical desc)
-                        // Just take the first non-practice entry
-                        const best = resList.find(r => !isPracticeSession(r)) || resList[0];
+                        // Filename sort != chronological order (API file round != app round)
+                        // Sort by normalized app `round` DESC, then by session priority within round
+                        const sesScore = s => {
+                            const t = String(s.session_type || s.session_name || '').toLowerCase();
+                            if (t === 'race' || t === 'grand prix') return 5;
+                            if (t === 'sprint race' || t === 'sprint') return 4;
+                            if (t.includes('qualifying') && !t.includes('sprint')) return 3;
+                            if (t.includes('sprint')) return 2;
+                            return 1;
+                        };
+                        const best = [...resList]
+                            .filter(r => !isPracticeSession(r))
+                            .sort((a, b) => {
+                                const rd = Number(b.round || 0) - Number(a.round || 0);
+                                return rd !== 0 ? rd : sesScore(b) - sesScore(a);
+                            })[0] || resList[0];
 
                         if (!best?.filename) throw new Error('no filename');
 
