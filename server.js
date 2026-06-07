@@ -18,6 +18,7 @@ const F1_TIMING_API_KEY = process.env.F1_TIMING_API_KEY || '';
 const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(',').map(x => x.trim()).filter(Boolean));
 const SESSION_COOKIE_NAME = 'f1_session';
 const DEFAULT_LOCAL_DB_URL = `file:${path.resolve(__dirname, 'local-preview.db').replace(/\\/g, '/')}`;
+const DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS === '1' && process.env.NODE_ENV !== 'production';
 
 function buildF1TimingApiUrl(apiPath = '') {
     const base = F1_TIMING_API.replace(/\/+$/, '');
@@ -986,11 +987,53 @@ function normalizeConstructor(c) {
 }
 
 // --- 4. JWT AUTHENTICATION MIDDLEWARE ---
+let devAuthUserCache = null;
+
+async function getDevAuthUser() {
+    const name = String(process.env.DEV_AUTH_NAME || 'Dev Admin').trim().slice(0, 80) || 'Dev Admin';
+    const authId = `dev_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'admin'}`;
+    const email = `${authId}@local.dev`;
+    const isAdmin = process.env.DEV_AUTH_ADMIN !== '0';
+
+    if (devAuthUserCache?.auth_id === authId && devAuthUserCache.isAdmin === isAdmin) return devAuthUserCache;
+
+    const existing = await findUserByAuthId(authId);
+    if (existing) {
+        await db.execute({
+            sql: "UPDATE f1_drivers SET name = ?, auth_email = ?, is_admin = ? WHERE auth_id = ?",
+            args: [name, email, isAdmin ? 1 : 0, authId]
+        });
+    } else {
+        await db.execute({
+            sql: "INSERT INTO f1_drivers (name, auth_id, auth_email, is_admin) VALUES (?, ?, ?, ?)",
+            args: [name, authId, email, isAdmin ? 1 : 0]
+        });
+    }
+
+    const dbUser = await findUserByAuthId(authId);
+    devAuthUserCache = {
+        driverId: dbUser.id,
+        name: dbUser.name,
+        auth_id: dbUser.auth_id,
+        email: dbUser.auth_email || email,
+        isAdmin
+    };
+    return devAuthUserCache;
+}
+
 async function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const headerToken = authHeader && authHeader.split(' ')[1];
     const cookieToken = parseCookies(req)[SESSION_COOKIE_NAME];
     const token = headerToken || cookieToken;
+    if (DEV_AUTH_BYPASS) {
+        try {
+            req.user = await getDevAuthUser();
+            return next();
+        } catch (err) {
+            return res.status(500).json({ error: `Dev auth bypass failed: ${err.message}` });
+        }
+    }
     if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
 
     try {

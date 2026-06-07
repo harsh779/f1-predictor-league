@@ -2248,7 +2248,11 @@
                     <th style="text-align:center;width:40px;">P</th>
                     <th style="text-align:left;">Driver</th>
                     <th style="text-align:right;">Best Lap</th>
-                    <th style="text-align:right;">Gap</th>
+                    <th style="text-align:right;">INT</th>
+                    <th style="text-align:right;">S1</th>
+                    <th style="text-align:right;">S2</th>
+                    <th style="text-align:right;">S3</th>
+                    <th style="text-align:right;">SPD</th>
                     <th style="text-align:center;">Laps</th>
                     <th style="text-align:center;">Tyres</th>
                 </tr></thead>
@@ -2258,6 +2262,8 @@
                     const tc = info.color || 'var(--border)';
                     const status = r.retired ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">DNF</span>' : r.stopped ? '<span style="color:#e10600;font-weight:900;font-size:0.75rem;margin-left:4px;">OUT</span>' : '';
                     const posCol = r.position <= 3 ? (r.position === 1 ? '#c59b27' : r.position === 2 ? '#999' : '#b87333') : 'var(--text-muted)';
+                    const sectors = [0, 1, 2].map(i => r.sectors?.[i]?.value || '-');
+                    const speed = r.speed_traps?.st || r.speed_traps?.fl || r.speed_traps?.i2 || r.speed_traps?.i1 || '-';
                     const stints = (r.stints || []).map(s => {
                         const bg = tyreColors[(s.compound || '').toUpperCase()] || '#888';
                         const txt = tyreTextColors[(s.compound || '').toUpperCase()] || '#fff';
@@ -2522,7 +2528,9 @@
                         <td style="text-align:center;font-weight:900;color:${posCol};">${escapeHtml(r.position)}</td>
                         <td><span style="display:inline-block;width:3px;height:14px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${dName}</b>${status}</td>
                         <td style="text-align:right;font-weight:700;">${escapeHtml(r.best_lap_time || '-')}</td>
-                        <td style="text-align:right;font-weight:700;color:var(--red);">${escapeHtml(r.gap_to_leader || '-')}</td>
+                        <td style="text-align:right;font-weight:700;color:var(--red);">${escapeHtml(r.interval || '-')}</td>
+                        ${sectors.map(value => `<td style="text-align:right;font-weight:700;">${escapeHtml(value)}</td>`).join('')}
+                        <td style="text-align:right;font-weight:700;">${escapeHtml(speed)}</td>
                         <td style="text-align:center;color:var(--text-muted);">${escapeHtml(r.laps_completed || '-')}</td>
                         <td style="text-align:center;"><div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${stints || '-'}</div></td>
                     </tr>`;
