@@ -1870,17 +1870,18 @@ app.get('/api/live-widget', async (_req, res) => {
         const get = (path) => f1TimingApiGet(path, { timeout: 10000 }).catch(() => null);
         const [timing, status] = await Promise.all([get('/timing'), get('/status')]);
         const staleFinalisedTiming = Boolean(timing?.stale) || Boolean(status?.stale) || isStaleFinalisedTiming(status);
-        const hasDrivers = !staleFinalisedTiming && Array.isArray(timing?.drivers) && timing.drivers.length > 0;
+        const hasLiveDrivers = !staleFinalisedTiming && Array.isArray(timing?.drivers) && timing.drivers.length > 0;
+        const hasAnyDrivers = Array.isArray(timing?.drivers) && timing.drivers.length > 0;
         const seasonCalendar = await getSeasonCalendar().catch(() => []);
         const nextRace = seasonCalendar.length ? await findStrategyRace(seasonCalendar, new Date()).catch(() => null) : null;
         const nextSession = nextRace ? findNextWeekendSession(nextRace, new Date()) : null;
         widgetCache = {
-            timing: hasDrivers ? timing : { ...(timing || {}), drivers: [], stale: staleFinalisedTiming || Boolean(timing?.stale) },
+            timing: { ...(timing || {}), stale: staleFinalisedTiming || Boolean(timing?.stale) },
             status: status ? { ...status, stale: staleFinalisedTiming || Boolean(status.stale) } : null,
             nextRace: nextRace ? { round: nextRace.round, name: nextRace.name } : null,
             nextSession: nextSession ? { key: nextSession.key, label: nextSession.label, time: nextSession.time } : null,
-            noLiveSession: !hasDrivers,
-            error: hasDrivers ? null : (staleFinalisedTiming ? 'Live timing feed is stale' : 'No live timing data')
+            noLiveSession: !hasLiveDrivers,
+            error: hasLiveDrivers ? null : (staleFinalisedTiming && !hasAnyDrivers ? 'Live timing feed is stale' : (!hasAnyDrivers ? 'No live timing data' : null))
         };
         widgetCacheTime = Date.now();
         res.json(widgetCache);
