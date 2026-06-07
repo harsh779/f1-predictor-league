@@ -2804,10 +2804,6 @@
             const connected = d.status?.connected;
             const trackMsg = d.status?.track_status?.Message || '';
 
-            // Save original thead once so we can restore it when live session starts
-            const theadRow = document.querySelector('#timing-table thead tr');
-            if (!window._timingHeaderLive) window._timingHeaderLive = theadRow.innerHTML;
-
             if (d.noLiveSession) {
                 liveSessionFinished = true;
                 window.__liveSessionStartAt = null;
@@ -2825,24 +2821,9 @@
                         const resList = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
                         if (!Array.isArray(resList) || !resList.length) throw new Error('empty list');
 
-                        // Round extracted from filename (2026_R09_Qualifying.json → 9)
-                        const getRound = s => parseInt((s.filename || '').match(/_R(\d+)_/)?.[1] || s.round || 0);
-                        // Within same round: Race=5, Sprint=4, Qualifying=3, Sprint Qualifying=2, else=1
-                        const sesScore = s => {
-                            const t = String(s.session_type || s.session_name || '').toLowerCase();
-                            if (t.includes('race') && !t.includes('sprint')) return 5;
-                            if (t === 'sprint') return 4;
-                            if (t.includes('qualifying')) return 3;
-                            if (t.includes('sprint')) return 2;
-                            return 1;
-                        };
-                        // Sort: round DESC, then session priority DESC within same round
-                        const best = [...resList]
-                            .filter(r => !isPracticeSession(r))
-                            .sort((a, b) => {
-                                const rd = getRound(b) - getRound(a);
-                                return rd !== 0 ? rd : sesScore(b) - sesScore(a);
-                            })[0] || [...resList].sort((a, b) => getRound(b) - getRound(a))[0];
+                        // API already returns results sorted newest-first (filename alphabetical desc)
+                        // Just take the first non-practice entry
+                        const best = resList.find(r => !isPracticeSession(r)) || resList[0];
 
                         if (!best?.filename) throw new Error('no filename');
 
@@ -2881,20 +2862,6 @@
 
                         status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block;flex-shrink:0;box-shadow:0 0 6px #6b7280;"></span> <b style="color:var(--text-main);">${escapeHtml(meetingName)}</b> <span style="color:var(--text-muted);">Final — ${escapeHtml(sesTypeName)}${nextLabel ? ' &nbsp;·&nbsp; ' + nextLabel : ''}</span>`;
 
-                        // Swap header: S1→I1, S2→I2, S3→FL, Spd→ST (speed trap columns)
-                        theadRow.innerHTML = `
-                            <th style="text-align:center;">P</th>
-                            <th style="text-align:left;">Driver</th>
-                            <th style="text-align:left;">Team</th>
-                            <th style="text-align:center;">Laps</th>
-                            <th style="text-align:center;">Tyre</th>
-                            <th style="text-align:right;">Best</th>
-                            <th style="text-align:right;">Gap</th>
-                            <th style="text-align:right;">Int</th>
-                            <th style="text-align:right;">I1</th>
-                            <th style="text-align:right;">I2</th>
-                            <th style="text-align:right;">FL</th>
-                            <th style="text-align:right;">ST</th>`;
 
                         const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
                         const tyreText   = { MEDIUM:'#111', HARD:'#111' };
@@ -2912,7 +2879,6 @@
                             const badge = r.retired ? '<span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;margin-left:4px;">DNF</span>'
                                         : r.stopped ? '<span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;margin-left:4px;">OUT</span>' : '';
                             const gap  = posNum === 1 ? '-' : escapeHtml(r.gap_to_leader || '-');
-                            const sp   = r.speed_traps || {};
                             return `<tr>
                                 <td style="text-align:center;font-weight:900;color:${posCol};">${posNum}</td>
                                 <td><span style="display:inline-block;width:3px;height:16px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${name}</b>${badge}</td>
@@ -2922,10 +2888,10 @@
                                 <td style="text-align:right;font-weight:700;">${escapeHtml(r.best_lap_time || '-')}</td>
                                 <td style="text-align:right;font-weight:700;color:var(--red);">${gap}</td>
                                 <td style="text-align:right;color:var(--text-muted);">-</td>
-                                <td style="text-align:right;color:var(--text-muted);">${sp.i1 || '-'}</td>
-                                <td style="text-align:right;color:var(--text-muted);">${sp.i2 || '-'}</td>
-                                <td style="text-align:right;color:var(--text-muted);">${sp.fl || '-'}</td>
-                                <td style="text-align:right;color:var(--text-muted);">${sp.st || '-'}</td>
+                                <td style="text-align:right;color:var(--text-muted);">-</td>
+                                <td style="text-align:right;color:var(--text-muted);">-</td>
+                                <td style="text-align:right;color:var(--text-muted);">-</td>
+                                <td style="text-align:right;color:var(--text-muted);">-</td>
                             </tr>`;
                         }).join('');
 
@@ -2960,7 +2926,6 @@
                     } catch (_) { /* fall through to no-data placeholder */ }
 
                     // Archive unavailable — show minimal placeholder
-                    theadRow.innerHTML = window._timingHeaderLive;
                     const noSessionHtml = `<div style="text-align:center;padding:30px;color:var(--text-muted);">
                         <div style="font-weight:700;margin-bottom:6px;">${escapeHtml(sesName || 'No active session')}</div>
                         ${nextLabel ? `<div style="font-size:0.82rem;margin-top:4px;">${nextLabel}</div>` : ''}
@@ -2972,9 +2937,6 @@
                 }
                 // Stale drivers from live feed — fall through to normal render below
             }
-
-            // Restore live header in case we were previously in final classification mode
-            if (window._timingHeaderLive) theadRow.innerHTML = window._timingHeaderLive;
 
             if (drivers.length === 0) throw new Error('No data');
 
