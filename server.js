@@ -808,7 +808,9 @@ async function shouldRevealPredictionsTo(user) {
     if (user?.isAdmin) return true;
     const now = new Date();
     const seasonCalendar = await getSeasonCalendar();
-    const currentRace = await findVisiblePredictionRace(seasonCalendar, now);
+    // Reveal timing belongs to the actual current weekend. Stored prediction
+    // round stamps are only for selecting rows and may use legacy/API rounds.
+    const currentRace = await findStrategyRace(seasonCalendar, now);
     if (!currentRace) return true;
     const lockInfo = getPredictionLockInfo(currentRace);
     if (!lockInfo) return false;
