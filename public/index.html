@@ -2795,16 +2795,38 @@
 
         try {
             const d = await fetch('/api/live-widget?t=' + Date.now()).then(r => r.json());
-            if (d.error) throw new Error(d.error);
+            if (d.error && !d.noLiveSession) throw new Error(d.error);
 
             const drivers = d.timing?.drivers || [];
-            if (drivers.length === 0) throw new Error('No data');
-
             const session = d.status?.session;
             const sesName = session?.Name || d.timing?.session || '';
             const sesType = session?.Type || '';
             const connected = d.status?.connected;
             const trackMsg = d.status?.track_status?.Message || '';
+
+            if (d.noLiveSession) {
+                liveSessionFinished = isSessionFinished(session);
+                window.__liveSessionStartAt = null;
+                const lastLabel = sesName ? `Last session: ${escapeHtml(sesName)}` : 'No active session';
+                const nextLabel = d.nextSession?.label && d.nextSession?.time
+                    ? `Next: ${escapeHtml(d.nextSession.label)} &nbsp;·&nbsp; ${escapeHtml(new Date(d.nextSession.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}`
+                    : '';
+                const noSessionHtml = `<div style="text-align:center;padding:30px;color:var(--text-muted);">
+                    <div style="font-weight:700;margin-bottom:6px;">${lastLabel}</div>
+                    ${nextLabel ? `<div style="font-size:0.82rem;margin-top:4px;">${nextLabel}</div>` : ''}
+                </div>`;
+                body.innerHTML = `<tr><td colspan="12">${noSessionHtml}</td></tr>`;
+                cards.innerHTML = noSessionHtml;
+                status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block;flex-shrink:0;box-shadow:0 0 6px #6b7280;"></span> <b style="color:var(--text-main);">${escapeHtml(sesName || 'No Session')}</b> <span style="color:var(--text-muted);">No active session</span>`;
+                refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                document.getElementById('track-banner').className = '';
+                document.getElementById('track-banner').style.display = 'none';
+                document.getElementById('live-weather-strip').style.display = 'none';
+                return;
+            }
+
+            if (drivers.length === 0) throw new Error('No data');
+
             liveSessionFinished = isSessionFinished(session);
             window.__liveSessionStartAt = getSessionStartTimestamp(session);
 

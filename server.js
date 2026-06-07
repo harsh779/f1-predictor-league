@@ -1879,6 +1879,7 @@ app.get('/api/live-widget', async (_req, res) => {
             status: status ? { ...status, stale: staleFinalisedTiming || Boolean(status.stale) } : null,
             nextRace: nextRace ? { round: nextRace.round, name: nextRace.name } : null,
             nextSession: nextSession ? { key: nextSession.key, label: nextSession.label, time: nextSession.time } : null,
+            noLiveSession: !hasDrivers,
             error: hasDrivers ? null : (staleFinalisedTiming ? 'Live timing feed is stale' : 'No live timing data')
         };
         widgetCacheTime = Date.now();
