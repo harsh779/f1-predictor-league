@@ -2819,6 +2819,85 @@
                 refresh.textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
                 if (drivers.length === 0) {
+                    // Fetch last session classification from archive
+                    try {
+                        const resList = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
+                        if (Array.isArray(resList) && resList.length) {
+                            const sesScore = s => {
+                                const t = String(s.session_type || s.session_name || '').toLowerCase();
+                                if (t.includes('race') && !t.includes('sprint')) return 5;
+                                if (t.includes('sprint') && !t.includes('qualifying')) return 4;
+                                if (t.includes('qualifying')) return 3;
+                                if (t.includes('sprint qualifying') || t.includes('sprint shootout')) return 2;
+                                return 1;
+                            };
+                            const best = [...resList].filter(r => !isPracticeSession(r)).sort((a, b) => sesScore(b) - sesScore(a))[0]
+                                      || resList[resList.length - 1];
+                            if (best?.filename) {
+                                const rd = await fetch(`/api/live/results/${encodeURIComponent(best.filename)}?t=${Date.now()}`).then(r => r.json());
+                                const classResults = rd.results || [];
+                                if (classResults.length) {
+                                    const drvMap = {};
+                                    teamsData.forEach(t => t.drivers.forEach(dr => { drvMap[String(dr.num)] = { name: dr.name, team: t.name, color: t.color }; }));
+                                    if (rd.drivers) Object.entries(rd.drivers).forEach(([num, info]) => {
+                                        drvMap[String(num)] = { name: info.name || info.acronym || '#'+num, team: info.team || drvMap[num]?.team || '-', color: info.team_color || info.team_colour || drvMap[num]?.color || 'var(--border)' };
+                                    });
+                                    const tyreColors = { SOFT:'#e10600', MEDIUM:'#eebb00', HARD:'#e8e8e8', INTERMEDIATE:'#00cc66', WET:'#0066ff' };
+                                    const tyreText = { MEDIUM:'#111', HARD:'#111' };
+                                    const lastStint = r => (r.stints||[]).slice(-1)[0] || null;
+                                    const clsLabel = `${best.meeting || sesName} — ${formatSessionTypeLabel(best)}`;
+                                    status.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block;flex-shrink:0;box-shadow:0 0 6px #6b7280;"></span> <b style="color:var(--text-main);">${escapeHtml(best.meeting || sesName || 'Final')}</b> <span style="color:var(--text-muted);">Final classification${nextLabel ? ' &nbsp;·&nbsp; ' + nextLabel : ''}</span>`;
+                                    body.innerHTML = classResults.map(r => {
+                                        const info = drvMap[String(r.driver_number)] || {};
+                                        const tc = info.color || 'var(--border)';
+                                        const name = escapeHtml(info.name || '#'+r.driver_number);
+                                        const team = escapeHtml(info.team || '-');
+                                        const pos = r.position <= 3 ? (r.position===1?'#c59b27':r.position===2?'#999':'#b87333') : 'var(--text-main)';
+                                        const st = lastStint(r); const stC = st ? (st.compound||'').toUpperCase() : '';
+                                        const tBg = tyreColors[stC] || '#444'; const tTx = tyreText[stC] || '#fff';
+                                        const badge = r.retired ? '<span style="background:rgba(225,6,0,0.15);color:#e10600;border:1px solid rgba(225,6,0,0.3);font-size:0.6rem;font-weight:900;padding:1px 4px;border-radius:3px;margin-left:4px;">DNF</span>' : '';
+                                        return `<tr>
+                                            <td style="text-align:center;font-weight:900;color:${pos};">${r.position}</td>
+                                            <td><span style="display:inline-block;width:3px;height:16px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${name}</b>${badge}</td>
+                                            <td style="color:var(--text-muted);font-size:0.78rem;">${team}</td>
+                                            <td style="text-align:center;color:var(--text-muted);font-weight:700;">${r.laps_completed||'-'}</td>
+                                            <td style="text-align:center;">${stC ? `<span style="background:${tBg};color:${tTx};width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.7rem;font-weight:900;">${stC[0]}</span>` : '-'}</td>
+                                            <td style="text-align:right;font-weight:700;color:var(--text-main);">${escapeHtml(r.best_lap_time||'-')}</td>
+                                            <td style="text-align:right;font-weight:900;color:var(--red);">${escapeHtml(r.gap_to_leader||'WINNER')}</td>
+                                            <td colspan="5" style="text-align:center;color:var(--text-muted);font-size:0.75rem;">—</td>
+                                        </tr>`;
+                                    }).join('');
+                                    cards.innerHTML = classResults.map(r => {
+                                        const info = drvMap[String(r.driver_number)] || {};
+                                        const tc = info.color || 'var(--border)';
+                                        const name = escapeHtml(info.name || '#'+r.driver_number);
+                                        const team = escapeHtml(info.team || '-');
+                                        const pos = r.position <= 3 ? (r.position===1?'#c59b27':r.position===2?'#999':'#b87333') : 'var(--text-main)';
+                                        const st = lastStint(r); const stC = st ? (st.compound||'').toUpperCase() : '';
+                                        const tBg = tyreColors[stC] || '#444'; const tTx = tyreText[stC] || '#fff';
+                                        const gapTxt = r.position===1 ? 'WINNER' : (r.gap_to_leader||'-');
+                                        return `<div class="tr-block">
+                                            <div class="tr-pos-col"><span style="color:${pos};">${r.position}</span></div>
+                                            <div class="tr-bar" style="background:${tc};"></div>
+                                            <div class="tr-content">
+                                                <div class="tr-line1">
+                                                    <span class="tr-name">${name}</span>
+                                                    ${r.retired?'<span class="tr-badge out">DNF</span>':''}
+                                                    <div class="tr-line1-right">
+                                                        ${stC?`<span class="tr-tyre-pill" style="background:${tBg};color:${tTx};">${stC[0]}</span>`:''}
+                                                        <span class="tr-gap">${escapeHtml(gapTxt)}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="tr-line2">${team} &nbsp;·&nbsp; ${escapeHtml(r.best_lap_time||'-')} &nbsp;·&nbsp; ${r.laps_completed||'-'}L</div>
+                                            </div>
+                                        </div>`;
+                                    }).join('');
+                                    return;
+                                }
+                            }
+                        }
+                    } catch(_) {}
+                    // True fallback — no archive data at all
                     const noSessionHtml = `<div style="text-align:center;padding:30px;color:var(--text-muted);">
                         <div style="font-weight:700;margin-bottom:6px;">${lastLabel}</div>
                         ${nextLabel ? `<div style="font-size:0.82rem;margin-top:4px;">${nextLabel}</div>` : ''}
