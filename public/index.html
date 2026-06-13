@@ -2692,7 +2692,11 @@
 
             const grouped = new Map();
             [...filteredResults].reverse().forEach(r => {
-                const groupKey = `${r.round || 'NA'}::${r.meeting || r.filename}`;
+                // Group by meeting (the weekend's stable identity), NOT round: the
+                // archive can save the same weekend's sessions under inconsistent
+                // round numbers (e.g. Miami files under both R4 and R6), which would
+                // otherwise split one weekend into multiple cards.
+                const groupKey = String(r.meeting || r.filename || '').trim().toLowerCase() || ('round-' + (r.round || 'na'));
                 if (!grouped.has(groupKey)) {
                     grouped.set(groupKey, {
                         round: r.round,
@@ -2704,10 +2708,27 @@
                 grouped.get(groupKey).sessions.push(r);
             });
 
-            const weekends = [...grouped.values()].map(weekend => ({
-                ...weekend,
-                sessions: weekend.sessions.sort((a, b) => getSessionSortOrder(a) - getSessionSortOrder(b))
-            }));
+            const weekends = [...grouped.values()].map(weekend => {
+                // The archive can hold duplicate files for one session (the canonical
+                // YYYY_RXX_Type.json plus a meeting-named backfill copy), which would
+                // otherwise render as duplicate cards (e.g. Miami showing 8 instead of
+                // 4). Collapse to one entry per session type, preferring the shorter
+                // (canonical) filename.
+                const byType = new Map();
+                weekend.sessions.forEach(s => {
+                    const key = formatSessionTypeLabel(s, weekend.sessions);
+                    const existing = byType.get(key);
+                    if (!existing || String(s.filename || '').length < String(existing.filename || '').length) {
+                        byType.set(key, s);
+                    }
+                });
+                const sessions = [...byType.values()].sort((a, b) => getSessionSortOrder(a) - getSessionSortOrder(b));
+                // Round can differ across the merged files; show the lowest as the
+                // canonical weekend round.
+                const rounds = sessions.map(s => Number(s.round)).filter(Number.isFinite);
+                const round = rounds.length ? Math.min(...rounds) : weekend.round;
+                return { ...weekend, round, sessions };
+            });
 
             el.innerHTML = weekends.map(weekend => `
                 <div class="result-weekend-card">

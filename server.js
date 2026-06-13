@@ -370,7 +370,11 @@ function normalizeRaceName(name = '') {
     const aliases = {
         'sao paulo grand prix': 'saopaulograndprix',
         'são paulo grand prix': 'saopaulograndprix',
-        'sÃ£o paulo grand prix': 'saopaulograndprix'
+        'sÃ£o paulo grand prix': 'saopaulograndprix',
+        // Round 7 is "Barcelona Grand Prix" in the 2026 plan / live feed but
+        // "Spanish Grand Prix" in the static reference calendar (which carries
+        // trackDetails). Unify them so the fallback lookup resolves.
+        'barcelona grand prix': 'spanishgrandprix'
     };
     if (aliases[raw]) return aliases[raw];
     return raw
