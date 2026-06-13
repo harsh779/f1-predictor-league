@@ -370,11 +370,7 @@ function normalizeRaceName(name = '') {
     const aliases = {
         'sao paulo grand prix': 'saopaulograndprix',
         'são paulo grand prix': 'saopaulograndprix',
-        'sÃ£o paulo grand prix': 'saopaulograndprix',
-        // Round 7 is "Barcelona Grand Prix" in the 2026 plan / live feed but
-        // "Spanish Grand Prix" in the static reference calendar (which carries
-        // trackDetails). Unify them so the fallback lookup resolves.
-        'barcelona grand prix': 'spanishgrandprix'
+        'sÃ£o paulo grand prix': 'saopaulograndprix'
     };
     if (aliases[raw]) return aliases[raw];
     return raw
@@ -385,6 +381,17 @@ function normalizeRaceName(name = '') {
 
 const OFFICIAL_2026_FALLBACK_MAP = new Map(
     [...f1Calendar2026, ...OFFICIAL_2026_FALLBACK_EXTRAS].map(r => [normalizeRaceName(r.name), r])
+);
+
+// Static trackDetails keyed by round — fallback for when the live calendar feed
+// omits track data for a round (it returns track:null for some, e.g. Barcelona
+// R7 and São Paulo R19). The feed and this static set share round numbering, so
+// round is the reliable key; names diverge (the feed calls R7 "Barcelona Grand
+// Prix" and R14 "Spanish Grand Prix", whereas the static set calls R7 "Spanish
+// Grand Prix" and R14 "Madrid Grand Prix"), which is why name-matching can't be
+// used here.
+const STATIC_TRACK_DETAILS_BY_ROUND = new Map(
+    f1Calendar2026.filter(r => r.trackDetails).map(r => [Number(r.round), r.trackDetails])
 );
 
 function buildOfficialCalendar(sourceCalendar = []) {
@@ -467,7 +474,7 @@ function normalizeCalendarEntry(entry) {
             corners: entry.track.corners,
             firstGP: entry.track.first_gp,
             record: entry.track.lap_record
-        } : undefined),
+        } : undefined) || STATIC_TRACK_DETAILS_BY_ROUND.get(Number(entry.round)),
         sessions: normalizedSessions
     };
 }
