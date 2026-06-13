@@ -2829,22 +2829,15 @@
                         const resList = await fetch('/api/live/results?t=' + Date.now()).then(r => r.json());
                         if (!Array.isArray(resList) || !resList.length) throw new Error('empty list');
 
-                        // Filename sort != chronological order (API file round != app round)
-                        // Sort by normalized app `round` DESC, then by session priority within round
-                        const sesScore = s => {
-                            const t = String(s.session_type || s.session_name || '').toLowerCase();
-                            if (t === 'race' || t === 'grand prix') return 5;
-                            if (t === 'sprint race' || t === 'sprint') return 4;
-                            if (t.includes('qualifying') && !t.includes('sprint')) return 3;
-                            if (t.includes('sprint')) return 2;
-                            return 1;
-                        };
+                        // Show the most recent FINISHED session, whatever its type
+                        // (practice included). The `date` field is each session's real
+                        // start time, so it orders chronologically where filename/round
+                        // can't (e.g. only practices done so far on a race weekend ->
+                        // the last session IS a practice, and must be shown).
+                        const sessionTime = r => { const t = Date.parse(r && r.date); return Number.isNaN(t) ? -Infinity : t; };
                         const best = [...resList]
-                            .filter(r => !isPracticeSession(r))
-                            .sort((a, b) => {
-                                const rd = Number(b.round || 0) - Number(a.round || 0);
-                                return rd !== 0 ? rd : sesScore(b) - sesScore(a);
-                            })[0] || resList[0];
+                            .filter(r => r && r.filename)
+                            .sort((a, b) => sessionTime(b) - sessionTime(a))[0] || resList[0];
 
                         if (!best?.filename) throw new Error('no filename');
 
