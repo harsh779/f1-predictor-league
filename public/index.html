@@ -802,6 +802,18 @@
     </div>
 </div>
 
+<div id="telem-modal" class="result-detail-modal hidden" onclick="if(event.target===this)closeTelemModal()">
+    <div class="result-detail-card" style="max-width:940px;width:96vw;">
+        <div class="result-detail-hdr">
+            <h3 id="telem-modal-title">Telemetry</h3>
+            <button class="close-btn" onclick="closeTelemModal()">&times;</button>
+        </div>
+        <div class="result-detail-body" id="telem-modal-body" style="padding:12px 16px;">
+            <div style="padding:30px;text-align:center;color:var(--text-muted);">Loading telemetry...</div>
+        </div>
+    </div>
+</div>
+
 <header>
     <h1><span>F1</span> 2026 LEAGUE</h1>
 
@@ -2764,6 +2776,7 @@
         try {
             const d = await fetch(`/api/live/results/${encodeURIComponent(filename)}?t=${Date.now()}`).then(r => r.json());
             const meta = d.meta || {};
+            const hasTelem = !!meta.archive_path;
             document.getElementById('result-detail-title').textContent = `${meta.meeting || filename} - ${formatSessionTypeLabel(meta)}`;
             const results = d.results || [];
             if (!results.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">No classification data.</div>'; return; }
@@ -2789,6 +2802,7 @@
                     <th style="text-align:right;">Gap</th>
                     <th style="text-align:center;">Laps</th>
                     <th style="text-align:center;">Tyres</th>
+                    ${hasTelem ? '<th style="text-align:center;width:44px;color:#555;font-size:0.65rem;">TELEM</th>' : ''}
                 </tr></thead>
                 <tbody>${results.map(r => {
                     const info = numMap[String(r.driver_number)] || {};
@@ -2801,6 +2815,14 @@
                         const txt = tyreTextColors[(s.compound || '').toUpperCase()] || '#fff';
                         return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${bg};color:${txt};font-size:0.6rem;font-weight:900;" title="${escapeHtml(s.compound || '?')} (${escapeHtml(s.laps || 0)}L${s.new ? '' : ', used'})">${escapeHtml((s.compound || '?')[0])}</span>`;
                     }).join('');
+                    const telemBtn = hasTelem ? `<td style="text-align:center;padding:6px 4px;"><button
+                        data-fn="${escapeHtml(filename)}"
+                        data-dr="${escapeHtml(String(r.driver_number))}"
+                        data-dn="${escapeHtml(info.name || '#' + r.driver_number)}"
+                        data-tc="${escapeHtml(tc)}"
+                        data-lap="${escapeHtml(r.best_lap_time || '')}"
+                        onclick="openTelemChart(this.dataset.fn,this.dataset.dr,this.dataset.dn,this.dataset.tc,this.dataset.lap)"
+                        style="padding:3px 7px;font-size:0.8rem;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:4px;color:var(--text-muted);line-height:1;">&#x1F4C8;</button></td>` : '';
                     return `<tr>
                         <td style="text-align:center;font-weight:900;color:${posCol};">${escapeHtml(r.position)}</td>
                         <td><span style="display:inline-block;width:3px;height:14px;background:${tc};border-radius:2px;margin-right:6px;vertical-align:middle;"></span><b>${dName}</b>${status}</td>
@@ -2808,6 +2830,7 @@
                         <td style="text-align:right;font-weight:700;color:var(--red);">${escapeHtml(r.gap_to_leader || '-')}</td>
                         <td style="text-align:center;color:var(--text-muted);">${escapeHtml(r.laps_completed || '-')}</td>
                         <td style="text-align:center;"><div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${stints || '-'}</div></td>
+                        ${telemBtn}
                     </tr>`;
                 }).join('')}</tbody>
             </table>`;
@@ -3931,6 +3954,212 @@
             showToast('iOS: Tap the Share icon in Safari, then tap "Add to Home Screen".', 'success');
         } else {
             showToast('Android: Tap the browser menu and tap "Add to Home screen" or "Install App".', 'success');
+        }
+    }
+
+    // ── Telemetry chart ──────────────────────────────────────────────────────────
+
+    function closeTelemModal() {
+        document.getElementById('telem-modal').classList.add('hidden');
+    }
+
+    function drawTelemChart(canvas, samples, driverColor, driverName) {
+        if (!samples || !samples.length) return;
+
+        // Downsample to max 3000 pts for canvas perf
+        const MAX_PTS = 3000;
+        const step = Math.max(1, Math.floor(samples.length / MAX_PTS));
+        const pts = samples.filter((_, i) => i % step === 0);
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const ctx = canvas.getContext('2d');
+
+        // Layout constants
+        const PAD_L = 46, PAD_R = 12, PAD_TOP = 10, PAD_BOT = 22;
+        const chartW = W - PAD_L - PAD_R;
+        const chartH = H - PAD_TOP - PAD_BOT;
+        const pSpeed = { y: PAD_TOP,                              h: Math.floor(chartH * 0.46) };
+        const pRPM   = { y: PAD_TOP + pSpeed.h + 2,              h: Math.floor(chartH * 0.25) };
+        const pThr   = { y: PAD_TOP + pSpeed.h + pRPM.h + 4,    h: chartH - pSpeed.h - pRPM.h - 6 };
+
+        // Background
+        ctx.fillStyle = '#0f0f0f';
+        ctx.fillRect(0, 0, W, H);
+
+        // X axis: use cumulative distance if available, else index
+        const hasD = pts.some(p => p.d != null && p.d > 0);
+        const xVals = hasD ? pts.map(p => p.d ?? 0) : pts.map((_, i) => i);
+        const xMin = xVals[0] ?? 0;
+        const xMax = xVals[xVals.length - 1] ?? 1;
+        const xScale = v => PAD_L + ((v - xMin) / (xMax - xMin)) * chartW;
+
+        // Y max values
+        const maxV   = Math.max(300, ...pts.map(p => p.v ?? 0));
+        const minRPM = 4000;
+        const maxRPM = Math.max(14000, ...pts.map(p => p.rpm ?? 0));
+
+        // Grid helper
+        function gridLines(panel, fracs) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            fracs.forEach(f => {
+                const y = panel.y + panel.h * (1 - f);
+                ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+            });
+        }
+        function panelLine(y) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+        }
+
+        gridLines(pSpeed, [0.25, 0.5, 0.75, 1]);
+        gridLines(pRPM,   [0.5, 1]);
+        gridLines(pThr,   [0.5, 1]);
+        panelLine(pSpeed.y); panelLine(pRPM.y); panelLine(pThr.y); panelLine(pThr.y + pThr.h);
+
+        // Y-axis labels
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#555';
+        [0, Math.round(maxV * 0.5), Math.round(maxV)].forEach(v => {
+            const y = pSpeed.y + pSpeed.h - (v / maxV) * pSpeed.h;
+            ctx.fillText(v, PAD_L - 3, y + 3);
+        });
+        [minRPM, Math.round((minRPM + maxRPM) / 2), maxRPM].forEach(v => {
+            const y = pRPM.y + pRPM.h - ((v - minRPM) / (maxRPM - minRPM)) * pRPM.h;
+            ctx.fillText(v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v, PAD_L - 3, y + 3);
+        });
+        ctx.fillText('100', PAD_L - 3, pThr.y + 4);
+        ctx.fillText('0',   PAD_L - 3, pThr.y + pThr.h);
+
+        // Panel labels (top-left of each panel)
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#3a3a3a';
+        ctx.font = '9px monospace';
+        ctx.fillText('km/h', PAD_L + 4, pSpeed.y + 11);
+        ctx.fillText('RPM',  PAD_L + 4, pRPM.y + 11);
+        ctx.fillText('%',    PAD_L + 4, pThr.y + 11);
+
+        // Line trace helper
+        function drawLine(panel, vals, yMin, yMax, color, lw) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lw ?? 1.5;
+            ctx.lineJoin = 'round';
+            let first = true;
+            vals.forEach((v, i) => {
+                if (v == null) return;
+                const x = xScale(xVals[i]);
+                const pct = Math.max(0, Math.min(1, (v - yMin) / (yMax - yMin)));
+                const y = panel.y + panel.h * (1 - pct);
+                if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
+
+        // Filled area helper (throttle / brake)
+        function drawArea(panel, vals, yMax, color, alpha) {
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.globalAlpha = alpha ?? 0.85;
+            const baseY = panel.y + panel.h;
+            let lastX = PAD_L;
+            let first = true;
+            vals.forEach((v, i) => {
+                const x = xScale(xVals[i]);
+                const pct = Math.max(0, Math.min(1, (v ?? 0) / yMax));
+                const y = panel.y + panel.h * (1 - pct);
+                if (first) { ctx.moveTo(x, baseY); ctx.lineTo(x, y); first = false; }
+                else ctx.lineTo(x, y);
+                lastX = x;
+            });
+            ctx.lineTo(lastX, baseY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        // Speed trace (team colour)
+        drawLine(pSpeed, pts.map(p => p.v), 0, maxV, driverColor || '#e8710a', 1.5);
+
+        // RPM trace
+        drawLine(pRPM, pts.map(p => p.rpm), minRPM, maxRPM, '#888', 1);
+
+        // Throttle fill (green), then brake fill (red) on top
+        drawArea(pThr, pts.map(p => p.thr ?? 0), 100, '#00cc44', 0.8);
+        drawArea(pThr, pts.map(p => (p.brk ?? 0) > 0 ? 100 : 0), 100, '#e10600', 0.85);
+
+        // DRS ticks at top of speed panel
+        ctx.fillStyle = '#00aaff';
+        pts.forEach((p, i) => {
+            if (p.drs === 10 || p.drs === 12) {
+                ctx.fillRect(Math.floor(xScale(xVals[i])), pSpeed.y, Math.max(1, Math.ceil(chartW / pts.length * step * 1.5)), 3);
+            }
+        });
+
+        // Driver name
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = driverColor || '#e8710a';
+        ctx.fillText(driverName || '', PAD_L + 8, pSpeed.y + 24);
+
+        // X-axis label
+        ctx.fillStyle = '#444';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(hasD ? 'Distance' : 'Session samples', W / 2, H - 5);
+    }
+
+    async function openTelemChart(filename, driverNum, driverName, teamColor, bestLap) {
+        const modal = document.getElementById('telem-modal');
+        const body  = document.getElementById('telem-modal-body');
+        document.getElementById('telem-modal-title').textContent = driverName + ' — Telemetry';
+        body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">Loading telemetry…<br><small style="color:#444;font-size:0.75rem;">First load fetches archive — may take 15–30s</small></div>';
+        modal.classList.remove('hidden');
+
+        try {
+            const resp = await fetch(`/api/live/telemetry/archive/${encodeURIComponent(filename)}/${encodeURIComponent(driverNum)}?t=${Date.now()}`);
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+
+            if (!data.samples || !data.samples.length) {
+                body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);">No telemetry data for this driver / session.</div>';
+                return;
+            }
+
+            const sessionLabel  = data.session ? escapeHtml(`${data.session.meeting || ''} — ${data.session.session_name || ''}`.replace(/^\s*—\s*|\s*—\s*$/g, '').trim()) : '';
+            const fastestLabel  = data.fastest_lap?.time ? `Best Lap: ${escapeHtml(data.fastest_lap.time)}` : (bestLap ? `Best Lap: ${escapeHtml(bestLap)}` : '');
+            const sampleLabel   = `${(data.sample_count || data.samples.length).toLocaleString()} samples`;
+
+            body.innerHTML = `
+                <div style="display:flex;align-items:center;gap:12px;padding:4px 0 10px;flex-wrap:wrap;font-size:0.78rem;">
+                    <span style="color:var(--text-muted);">${sessionLabel}</span>
+                    ${fastestLabel ? `<span style="font-weight:700;color:#9b59b6;">${fastestLabel}</span>` : ''}
+                    <span style="color:#3a3a3a;">${sampleLabel}</span>
+                </div>
+                <canvas id="telem-chart-canvas" style="display:block;width:100%;border-radius:4px;background:#0f0f0f;"></canvas>
+                <div style="display:flex;gap:14px;padding:8px 0 2px;font-size:0.72rem;flex-wrap:wrap;">
+                    <span style="color:#00cc44;">&#9646; Throttle</span>
+                    <span style="color:#e10600;">&#9646; Brake</span>
+                    <span style="color:#00aaff;">&#9646; DRS active</span>
+                    <span style="color:#888;">&#8212; RPM</span>
+                </div>`;
+
+            const canvas = document.getElementById('telem-chart-canvas');
+            const cw = Math.max(400, (canvas.parentElement?.clientWidth || 600) - 24);
+            canvas.width  = cw;
+            canvas.height = 380;
+            canvas.style.height = '380px';
+
+            drawTelemChart(canvas, data.samples, teamColor, driverName);
+
+        } catch (e) {
+            body.innerHTML = `<div style="padding:30px;text-align:center;color:var(--text-muted);">Failed to load telemetry: ${escapeHtml(e.message)}</div>`;
         }
     }
 </script>

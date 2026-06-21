@@ -2882,6 +2882,13 @@ app.get('/api/live/team-radio', async (_, res) => {
     }
 });
 app.get('/api/live/telemetry', (_, res) => liveProxy('/telemetry', res));
+app.get('/api/live/telemetry/archive/:filename', (req, res) => {
+    liveProxy(`/telemetry/archive/${encodeURIComponent(req.params.filename)}`, res);
+});
+app.get('/api/live/telemetry/archive/:filename/:driver', (req, res) => {
+    if (!/^\d{1,3}$/.test(req.params.driver)) return res.status(400).json({ error: 'Invalid driver number' });
+    liveProxy(`/telemetry/archive/${encodeURIComponent(req.params.filename)}/${req.params.driver}`, res);
+});
 app.get('/api/live/telemetry/:number', (req, res) => {
     if (!/^\d{1,3}$/.test(req.params.number)) return res.status(400).json({ error: 'Invalid driver number' });
     liveProxy(`/telemetry/${req.params.number}`, res);
