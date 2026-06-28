@@ -2417,25 +2417,30 @@ app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) =
 });
 
 app.get('/api/predictions', authenticateToken, async (req, res) => {
-    const seasonCalendar = await getSeasonCalendar();
-    const currentRace = await findVisiblePredictionRace(seasonCalendar, new Date());
-    const currentRound = getRoundLabel(currentRace);
-    if (currentRound && await hasRoundBeenScored(currentRound)) {
-        return res.json([]);
-    }
+    try {
+        const seasonCalendar = await getSeasonCalendar();
+        const currentRace = await findVisiblePredictionRace(seasonCalendar, new Date());
+        const currentRound = getRoundLabel(currentRace);
+        if (currentRound && await hasRoundBeenScored(currentRound)) {
+            return res.json([]);
+        }
 
-    if (!await shouldRevealPredictionsTo(req.user)) {
-        return res.status(403).json({ error: 'Predictions unlock after strategy lockout.' });
-    }
-    if (!currentRound) return res.json([]);
+        if (!await shouldRevealPredictionsTo(req.user)) {
+            return res.status(403).json({ error: 'Predictions unlock after strategy lockout.' });
+        }
+        if (!currentRound) return res.json([]);
 
-    const hasStampedRounds = (await getActivePredictionRounds()).length > 0;
-    const r = await db.execute({
-        sql: `SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name
-              WHERE p.prediction_round = ? ${hasStampedRounds ? '' : "OR p.prediction_round IS NULL OR p.prediction_round = ''"}`,
-        args: [currentRound]
-    });
-    res.json(r.rows);
+        const hasStampedRounds = (await getActivePredictionRounds()).length > 0;
+        const r = await db.execute({
+            sql: `SELECT p.*, d.total_score FROM f1_predictions_v4 p JOIN f1_drivers d ON p.user_name = d.name
+                  WHERE p.prediction_round = ? ${hasStampedRounds ? '' : "OR p.prediction_round IS NULL OR p.prediction_round = ''"}`,
+            args: [currentRound]
+        });
+        res.json(r.rows);
+    } catch (e) {
+        console.error('[PREDICTIONS] /api/predictions failed:', e.message);
+        res.status(500).json({ error: 'Failed to load predictions.' });
+    }
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {

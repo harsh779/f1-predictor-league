@@ -3362,14 +3362,20 @@
     async function loadLive() {
         const list = document.getElementById('live-list');
         list.innerHTML = `<div class="predict-group"><div class="skeleton" style="width:40%; margin-bottom:15px;"></div><div class="skeleton" style="width:100%; height:60px;"></div></div>`;
-        const resp = await authFetch('/api/predictions?t=' + new Date().getTime());
-        const d = await resp.json();
+        let resp, d;
+        try {
+            resp = await authFetch('/api/predictions?t=' + new Date().getTime());
+            d = await resp.json();
+        } catch (e) {
+            list.innerHTML = `<div class='predict-group' style='text-align: center; color: var(--text-muted);'>Couldn't load picks. Try again.</div>`;
+            return;
+        }
         if (!resp.ok) {
             list.innerHTML = `<div class='predict-group' style='text-align: center; color: var(--text-muted);'>${escapeHtml(d.error || 'Predictions are unavailable right now.')}</div>`;
             return;
         }
-        
-        if (d.length === 0) { 
+
+        if (d.length === 0) {
             list.innerHTML = "<div class='predict-group' style='text-align: center; color: var(--text-muted);'>No telemetry submitted yet for this session.</div>"; 
         } else {
             list.innerHTML = d.map(x=>{
