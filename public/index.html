@@ -976,6 +976,21 @@
             <h3 style="color: var(--red); font-weight: 900; letter-spacing: 1px; margin-top:0; font-size: 1.5rem;">STEWARDS CONTROL</h3>
             <button onclick="finalize()" style="background:var(--red); color:white; padding:14px 28px; cursor:pointer; border: none; font-weight: 900; border-radius: 8px; font-family: 'Titillium Web'; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; width: 100%; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);">Finalize Race Weekend</button>
             <div style="text-align:left; margin-bottom:30px; padding:20px; border:1px solid var(--border); border-radius:10px; background:var(--surface);">
+                <h4 style="margin:0 0 10px; color:var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px;">Prediction Safety &amp; Backup</h4>
+                <p style="margin:0 0 12px; color:var(--text-muted); line-height:1.6;">
+                    Every submission is saved to an append-only archive. Download the full database backup, or restore the latest archived copy for a round without overwriting players who already have picks for another round.
+                </p>
+                <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                    <input id="admin-archive-round" type="text" placeholder="Round, e.g. R12" style="width:170px; border-radius:8px; border:1px solid var(--border); background:var(--surface-inner); color:var(--text-main); padding:12px 14px; font-family:'Titillium Web';">
+                    <button onclick="downloadAdminBackup()" style="background:#444; color:#fff; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px;">
+                        Download Full Backup
+                    </button>
+                    <button onclick="restorePredictionsFromArchive()" style="background:var(--gold); color:#111; padding:12px 18px; cursor:pointer; border:none; border-radius:8px; font-family:'Titillium Web'; font-weight:900; text-transform:uppercase; letter-spacing:1px;">
+                        Restore Round From Archive
+                    </button>
+                </div>
+            </div>
+            <div style="text-align:left; margin-bottom:30px; padding:20px; border:1px solid var(--border); border-radius:10px; background:var(--surface);">
                 <h4 style="margin:0 0 10px; color:var(--text-main); text-transform: uppercase; border-bottom: 2px solid var(--border); padding-bottom: 10px;">Manual Prediction Import</h4>
                 <p style="margin:0 0 12px; color:var(--text-muted); line-height:1.6;">
                     Paste a JSON array of WhatsApp submissions here, import them into the backend, then finalize the round as normal.
@@ -3694,6 +3709,57 @@
         else { showToast('Error: ' + d.message, 'error'); }
     }
 
+    async function downloadAdminBackup() {
+        showToast('Preparing full backup...', 'success');
+        const res = await authFetch('/api/admin/export');
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast('Backup failed: ' + (data.error || data.message || 'Unknown error'), 'error');
+            return;
+        }
+
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        const filename = match?.[1] || `f1-league-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast('Full backup downloaded.', 'success');
+    }
+
+    async function restorePredictionsFromArchive() {
+        const round = document.getElementById('admin-archive-round').value.trim().toUpperCase();
+        if (!/^R\d+$/.test(round)) {
+            showToast('Enter a round such as R12.', 'error');
+            return;
+        }
+        if (!confirm(`Restore the latest archived predictions for ${round}? Picks already active for another round will be preserved and skipped.`)) {
+            return;
+        }
+
+        showToast(`Restoring ${round} from the archive...`, 'success');
+        const res = await authFetch('/api/admin/restore-predictions-from-archive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ round })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            showToast('Restore failed: ' + (data.message || 'Unknown error'), 'error');
+            return;
+        }
+
+        const skipped = Array.isArray(data.skipped) ? data.skipped.length : 0;
+        showToast(`Restored ${data.restored || 0} prediction(s); preserved ${skipped} conflicting active pick(s).`, 'success');
+        setTimeout(() => location.reload(), 1500);
+    }
+
     async function importManualPredictions() {
         const raw = document.getElementById('admin-import-json').value.trim();
         const clearExisting = document.getElementById('admin-import-clear').checked;
@@ -3769,7 +3835,7 @@
             return;
         }
 
-        showToast(`Round finalized. Restored ${data.restoredPredictionCount || 0} existing prediction(s).`, 'success');
+        showToast('Round finalized. Existing active predictions were never touched.', 'success');
         setTimeout(() => location.reload(), 1500);
     }
 

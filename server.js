@@ -205,6 +205,35 @@ async function setupDatabase() {
             picks TEXT NOT NULL,
             saved_at TEXT NOT NULL
         )`);
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_prediction_archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_name TEXT NOT NULL,
+            prediction_round TEXT NOT NULL,
+            prediction TEXT NOT NULL,
+            source TEXT NOT NULL,
+            saved_at TEXT NOT NULL
+        )`);
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_prediction_archive_round_user ON f1_prediction_archive (prediction_round, user_name, id DESC)");
+
+        // Capture any live rows created before the archive feature was deployed.
+        // This makes the currently restored round recoverable immediately after rollout.
+        const unarchivedPredictions = await db.execute(`
+            SELECT p.*
+            FROM f1_predictions_v4 p
+            WHERE p.prediction_round IS NOT NULL
+              AND p.prediction_round != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM f1_prediction_archive a
+                  WHERE a.user_name = p.user_name
+                    AND a.prediction_round = p.prediction_round
+              )
+        `).then(r => r.rows);
+        for (const row of unarchivedPredictions) {
+            await archivePredictionRecord(db, row.user_name, row, row.prediction_round, 'startup-snapshot');
+        }
+        if (unarchivedPredictions.length > 0) {
+            console.log(`[DB] Archived ${unarchivedPredictions.length} pre-existing prediction(s)`);
+        }
 
         // Backfill round history if table is empty but users have scores
         const histCount = await db.execute("SELECT count(*) as count FROM f1_round_history").then(r => r.rows[0].count);
@@ -915,6 +944,45 @@ async function upsertPredictionRecord(executor, userName, payload, predictionRou
     });
 }
 
+function predictionSnapshot(payload) {
+    return {
+        p1: payload.p1,
+        p2: payload.p2,
+        p3: payload.p3,
+        p10: payload.p10,
+        p11: payload.p11,
+        p21: payload.p21,
+        p22: payload.p22,
+        c1: payload.c1,
+        c2: payload.c2,
+        c5: payload.c5,
+        c6: payload.c6,
+        c11: payload.c11,
+        w_race_loser: payload.w_race_loser,
+        w_sprint_gainer: payload.w_sprint_gainer || null,
+        w_sprint_loser: payload.w_sprint_loser || null
+    };
+}
+
+async function archivePredictionRecord(executor, userName, payload, predictionRound, source) {
+    const round = String(predictionRound || '').trim().toUpperCase();
+    if (!round) throw new Error('prediction_round is required for archive writes');
+    await executor.execute({
+        sql: `INSERT INTO f1_prediction_archive
+              (user_name, prediction_round, prediction, source, saved_at)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: [userName, round, JSON.stringify(predictionSnapshot(payload)), source, new Date().toISOString()]
+    });
+}
+
+function normalizedPredictionRow(entry, predictionRound) {
+    return {
+        user_name: entry.userName,
+        prediction_round: entry.predictionRound || predictionRound,
+        ...predictionSnapshot(entry.payload)
+    };
+}
+
 async function recalculateDriverTotal(executor, userName) {
     const row = await executor.execute({
         sql: "SELECT COALESCE(SUM(score), 0) AS total FROM f1_round_history WHERE user_name = ?",
@@ -927,14 +995,6 @@ async function recalculateDriverTotal(executor, userName) {
     });
 
     return Number(row.total || 0);
-}
-
-async function replacePredictionsTable(executor, entries, predictionRound = null) {
-    await executor.execute("DELETE FROM f1_predictions_v4");
-    for (const entry of entries) {
-        await ensureDriverRecord(executor, entry.userName);
-        await upsertPredictionRecord(executor, entry.userName, entry.payload, entry.predictionRound ?? predictionRound);
-    }
 }
 
 function normalizeImportSubmissions(rawSubmissions) {
@@ -1506,7 +1566,9 @@ function calcDetailedBreakdown(p, actualDriverPositions, actualCRanges, raceLose
     return { driverPts, constructorPts, wildcardPts, total: driverPts + constructorPts + wildcardPts, driverDetails, teamDetails, wcDetails };
 }
 
-async function performFinalization() {
+async function performFinalization(options = {}) {
+    const suppliedPredictions = Array.isArray(options.predictions) ? options.predictions : null;
+    const preserveActivePredictions = suppliedPredictions !== null;
     try {
         // 1. Fetch Race Data — own API first, Ergast fallback
         let raceData = null;
@@ -1612,25 +1674,43 @@ async function performFinalization() {
             // Never clear the whole table here. The live timing API can remain on a
             // previously-finalised race while players are already submitting picks
             // for the next round. A table-wide delete would erase those new picks.
-            await db.execute({
-                sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ?",
-                args: [roundCheck]
-            });
+            if (!preserveActivePredictions) {
+                const cleanupTx = await db.transaction("write");
+                try {
+                    const staleRows = await cleanupTx.execute({
+                        sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ?",
+                        args: [roundCheck]
+                    }).then(r => r.rows);
+                    for (const row of staleRows) {
+                        await archivePredictionRecord(cleanupTx, row.user_name, row, roundCheck, 'pre-cleanup');
+                    }
+                    await cleanupTx.execute({
+                        sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ?",
+                        args: [roundCheck]
+                    });
+                    await cleanupTx.commit();
+                } catch (cleanupError) {
+                    try { await cleanupTx.rollback(); } catch (_) { }
+                    throw cleanupError;
+                }
+            }
             return { success: false, message: "Already scored." };
         }
 
-        const check = await db.execute({
-            sql: "SELECT count(*) as count FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
-            args: [roundCheck]
-        });
-        if (check.rows[0].count === 0) {
+        const predictionCount = suppliedPredictions
+            ? suppliedPredictions.length
+            : Number(await db.execute({
+                sql: "SELECT count(*) as count FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
+                args: [roundCheck]
+            }).then(r => r.rows[0]?.count || 0));
+        if (predictionCount === 0) {
             const activeRounds = await getActivePredictionRounds();
             if (activeRounds.length > 0) {
                 return { success: false, message: `No predictions found for ${roundCheck}; active prediction rounds: ${activeRounds.join(', ')}.` };
             }
             return { success: false, message: "No predictions found." };
         }
-        console.log(`[FINALIZE] ${check.rows[0].count} predictions to score`);
+        console.log(`[FINALIZE] ${predictionCount} predictions to score${preserveActivePredictions ? ' (supplied safely by admin)' : ''}`);
 
         // --- DRIVER MATH (DNFs = 22) ---
         const actualDriverPositions = {};
@@ -1709,7 +1789,7 @@ async function performFinalization() {
         }
 
         // --- SCORE CALCULATION ---
-        const predictions = await db.execute({
+        const predictions = suppliedPredictions || await db.execute({
             sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
             args: [roundLabel]
         }).then(r => r.rows);
@@ -1772,7 +1852,8 @@ async function performFinalization() {
             // --- SAVE ROUND HISTORY ---
             await tx.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
             for (const p of predictions) {
-                const predSnapshot = JSON.stringify({ p1: p.p1, p2: p.p2, p3: p.p3, p10: p.p10, p11: p.p11, p21: p.p21, p22: p.p22, c1: p.c1, c2: p.c2, c5: p.c5, c6: p.c6, c11: p.c11, w_race_loser: p.w_race_loser, w_sprint_gainer: p.w_sprint_gainer, w_sprint_loser: p.w_sprint_loser });
+                const predSnapshot = JSON.stringify(predictionSnapshot(p));
+                await archivePredictionRecord(tx, p.user_name, p, roundLabel, 'pre-finalization');
                 await tx.execute({ sql: "INSERT INTO f1_round_history (round, race_name, user_name, prediction, score, scored_at) VALUES (?, ?, ?, ?, ?, ?)", args: [roundLabel, raceData.raceName, p.user_name, predSnapshot, scores[p.user_name] ?? 0, timestamp] });
             }
             for (const [name, data] of Object.entries(finalScores)) {
@@ -1788,10 +1869,12 @@ async function performFinalization() {
 
             // Remove only the predictions that were scored. Preserve any stamped
             // future-round rows that may already exist in the active table.
-            await tx.execute({
-                sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
-                args: [roundLabel]
-            });
+            if (!preserveActivePredictions) {
+                await tx.execute({
+                    sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
+                    args: [roundLabel]
+                });
+            }
             await tx.commit();
         } catch (writeError) {
             try { await tx.rollback(); } catch (_) { }
@@ -2057,16 +2140,31 @@ app.post('/predict', predictLimiter, authenticateToken, async (req, res) => {
         return res.status(400).json({ success: false, message: `Invalid: ${validationError}.` });
     }
 
+    const predictionRound = getRoundLabel(currentRace);
+    const tx = await db.transaction("write");
     try {
-        await upsertPredictionRecord(db, userName, d, getRoundLabel(currentRace));
-        await db.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
+        await upsertPredictionRecord(tx, userName, d, predictionRound);
+        await archivePredictionRecord(tx, userName, d, predictionRound, 'player-submit');
+        await tx.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
+        await tx.commit();
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    } catch (e) {
+        try { await tx.rollback(); } catch (_) { }
+        res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 app.post('/api/finalize', authenticateToken, requireAdmin, async (req, res) => {
-    const result = await performFinalization();
-    res.status(result.success ? 200 : 400).json(result);
+    if (finalizationPending) {
+        return res.status(409).json({ success: false, message: 'Another finalization is already running.' });
+    }
+    finalizationPending = true;
+    try {
+        const result = await performFinalization();
+        res.status(result.success ? 200 : 400).json(result);
+    } finally {
+        finalizationPending = false;
+    }
 });
 
 app.post('/api/test-discord', authenticateToken, requireAdmin, async (req, res) => {
@@ -2407,9 +2505,10 @@ app.use('/api/admin', adminLimiter);
 // ── Admin full data export ─────────────────────────────────────────────────────
 app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const [drivers, predictions, drafts, history, meta] = await Promise.all([
+        const [drivers, predictions, predictionArchive, drafts, history, meta] = await Promise.all([
             db.execute("SELECT * FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC"),
             db.execute("SELECT * FROM f1_predictions_v4 ORDER BY user_name"),
+            db.execute("SELECT * FROM f1_prediction_archive ORDER BY id ASC"),
             db.execute("SELECT * FROM f1_draft_picks ORDER BY saved_at DESC"),
             db.execute("SELECT * FROM f1_round_history ORDER BY id ASC"),
             db.execute("SELECT * FROM f1_meta"),
@@ -2420,6 +2519,7 @@ app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) =
             exported_at,
             drivers:     drivers.rows,
             predictions: predictions.rows,
+            prediction_archive: predictionArchive.rows,
             drafts:      drafts.rows,
             history:     history.rows,
             meta:        meta.rows,
@@ -2622,6 +2722,9 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
     const seasonCalendar = await getSeasonCalendar();
     const currentRace = await findStrategyRace(seasonCalendar, new Date());
     const predictionRound = getRoundLabel(currentRace);
+    if (!predictionRound) {
+        return res.status(409).json({ success: false, message: 'No active prediction round is available for import.' });
+    }
     let normalized;
     try {
         normalized = normalizeImportSubmissions(req.body?.submissions);
@@ -2632,7 +2735,17 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
     const tx = await db.transaction("write");
     try {
         if (clearExisting) {
-            await tx.execute("DELETE FROM f1_predictions_v4");
+            const replacedRows = await tx.execute({
+                sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
+                args: [predictionRound]
+            }).then(r => r.rows);
+            for (const row of replacedRows) {
+                await archivePredictionRecord(tx, row.user_name, row, predictionRound, 'pre-admin-replace');
+            }
+            await tx.execute({
+                sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
+                args: [predictionRound]
+            });
         }
 
         let createdUsers = 0;
@@ -2640,6 +2753,7 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
             const ensured = await ensureDriverRecord(tx, entry.userName);
             if (ensured.created) createdUsers += 1;
             await upsertPredictionRecord(tx, entry.userName, entry.payload, predictionRound);
+            await archivePredictionRecord(tx, entry.userName, entry.payload, predictionRound, 'admin-import');
         }
 
         await tx.commit();
@@ -2656,9 +2770,6 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
 });
 
 app.post('/api/admin/manual-finalize', authenticateToken, requireAdmin, async (req, res) => {
-    const seasonCalendar = await getSeasonCalendar();
-    const currentRace = await findStrategyRace(seasonCalendar, new Date());
-    const predictionRound = getRoundLabel(currentRace);
     let normalized;
     try {
         normalized = normalizeImportSubmissions(req.body?.submissions);
@@ -2666,80 +2777,134 @@ app.post('/api/admin/manual-finalize', authenticateToken, requireAdmin, async (r
         return res.status(400).json({ success: false, message: e.message });
     }
 
-    const backupRows = await db.execute("SELECT * FROM f1_predictions_v4 ORDER BY id ASC").then(r => r.rows);
-    const backupEntries = backupRows.map(row => ({
-        userName: row.user_name,
-        predictionRound: row.prediction_round,
-        payload: {
-            p1: row.p1,
-            p2: row.p2,
-            p3: row.p3,
-            p10: row.p10,
-            p11: row.p11,
-            p21: row.p21,
-            p22: row.p22,
-            c1: row.c1,
-            c2: row.c2,
-            c5: row.c5,
-            c6: row.c6,
-            c11: row.c11,
-            w_race_loser: row.w_race_loser,
-            w_sprint_gainer: row.w_sprint_gainer,
-            w_sprint_loser: row.w_sprint_loser
-        }
-    }));
+    if (finalizationPending) {
+        return res.status(409).json({ success: false, message: 'Another finalization is already running.' });
+    }
 
-    let staged = false;
+    finalizationPending = true;
     try {
-        const stageTx = await db.transaction("write");
-        try {
-            await replacePredictionsTable(stageTx, normalized, predictionRound);
-            await stageTx.commit();
-            staged = true;
-        } catch (stageError) {
-            try { await stageTx.rollback(); } catch (_) { }
-            throw stageError;
+        const seasonCalendar = await getSeasonCalendar();
+        const completedRace = findLatestCompletedRace(seasonCalendar, new Date());
+        const predictionRound = getRoundLabel(completedRace);
+        if (!predictionRound) {
+            return res.status(409).json({ success: false, message: 'No completed race is available to finalize.' });
         }
 
-        const finalizeResult = await performFinalization();
-
-        const restoreTx = await db.transaction("write");
+        const suppliedPredictions = normalized.map(entry => normalizedPredictionRow(entry, predictionRound));
+        const archiveTx = await db.transaction("write");
         try {
-            if (backupEntries.length > 0) {
-                await replacePredictionsTable(restoreTx, backupEntries);
-            } else {
-                await restoreTx.execute("DELETE FROM f1_predictions_v4");
+            for (const entry of normalized) {
+                await ensureDriverRecord(archiveTx, entry.userName);
+                await archivePredictionRecord(archiveTx, entry.userName, entry.payload, predictionRound, 'admin-manual-finalize');
             }
-            await restoreTx.commit();
-        } catch (restoreError) {
-            try { await restoreTx.rollback(); } catch (_) { }
-            return res.status(500).json({
-                success: false,
-                message: `Manual finalization completed with restore failure: ${restoreError.message}`,
-                finalizeResult
-            });
+            await archiveTx.commit();
+        } catch (archiveError) {
+            try { await archiveTx.rollback(); } catch (_) { }
+            throw archiveError;
         }
+
+        const finalizeResult = await performFinalization({ predictions: suppliedPredictions });
 
         return res.json({
             ...finalizeResult,
             stagedImportCount: normalized.length,
-            restoredPredictionCount: backupEntries.length
+            restoredPredictionCount: 0,
+            activePredictionsPreserved: true
         });
     } catch (e) {
-        if (staged) {
-            const restoreTx = await db.transaction("write");
-            try {
-                if (backupEntries.length > 0) {
-                    await replacePredictionsTable(restoreTx, backupEntries);
-                } else {
-                    await restoreTx.execute("DELETE FROM f1_predictions_v4");
-                }
-                await restoreTx.commit();
-            } catch (_) {
-                try { await restoreTx.rollback(); } catch (_) { }
-            }
-        }
         return res.status(500).json({ success: false, message: e.message });
+    } finally {
+        finalizationPending = false;
+    }
+});
+
+app.get('/api/admin/prediction-archive', authenticateToken, requireAdmin, async (req, res) => {
+    const round = String(req.query?.round || '').trim().toUpperCase();
+    if (!/^R\d+$/.test(round)) {
+        return res.status(400).json({ success: false, message: 'round must look like R12' });
+    }
+
+    try {
+        const rows = await db.execute({
+            sql: `SELECT a.*
+                  FROM f1_prediction_archive a
+                  WHERE a.prediction_round = ?
+                    AND a.id = (
+                        SELECT MAX(latest.id)
+                        FROM f1_prediction_archive latest
+                        WHERE latest.prediction_round = a.prediction_round
+                          AND latest.user_name = a.user_name
+                    )
+                  ORDER BY a.user_name`,
+            args: [round]
+        }).then(r => r.rows);
+        res.json({
+            success: true,
+            round,
+            count: rows.length,
+            submissions: rows.map(row => ({ user_name: row.user_name, ...JSON.parse(row.prediction) }))
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/admin/restore-predictions-from-archive', authenticateToken, requireAdmin, async (req, res) => {
+    const round = String(req.body?.round || '').trim().toUpperCase();
+    if (!/^R\d+$/.test(round)) {
+        return res.status(400).json({ success: false, message: 'round must look like R12' });
+    }
+
+    try {
+        const archiveRows = await db.execute({
+            sql: `SELECT a.*
+                  FROM f1_prediction_archive a
+                  WHERE a.prediction_round = ?
+                    AND a.id = (
+                        SELECT MAX(latest.id)
+                        FROM f1_prediction_archive latest
+                        WHERE latest.prediction_round = a.prediction_round
+                          AND latest.user_name = a.user_name
+                    )
+                  ORDER BY a.user_name`,
+            args: [round]
+        }).then(r => r.rows);
+        if (archiveRows.length === 0) {
+            return res.status(404).json({ success: false, message: `No archived predictions found for ${round}.` });
+        }
+
+        const tx = await db.transaction("write");
+        const skipped = [];
+        let restored = 0;
+        try {
+            for (const row of archiveRows) {
+                const active = await tx.execute({
+                    sql: "SELECT prediction_round FROM f1_predictions_v4 WHERE user_name = ? LIMIT 1",
+                    args: [row.user_name]
+                }).then(r => r.rows[0] || null);
+                const activeRound = String(active?.prediction_round || '').trim().toUpperCase();
+                if (active && activeRound && activeRound !== round) {
+                    skipped.push({ user_name: row.user_name, active_round: activeRound });
+                    continue;
+                }
+
+                const payload = JSON.parse(row.prediction);
+                const validationError = validatePredictionPayload(payload);
+                if (validationError) throw new Error(`Archived prediction for ${row.user_name} is invalid: ${validationError}`);
+                await ensureDriverRecord(tx, row.user_name);
+                await upsertPredictionRecord(tx, row.user_name, payload, round);
+                await archivePredictionRecord(tx, row.user_name, payload, round, 'admin-restore');
+                restored += 1;
+            }
+            await tx.commit();
+        } catch (restoreError) {
+            try { await tx.rollback(); } catch (_) { }
+            throw restoreError;
+        }
+
+        res.json({ success: true, round, restored, skipped });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 
@@ -3142,11 +3307,11 @@ if (process.env.ENABLE_LOCAL_AUTH === '1' && process.env.NODE_ENV !== 'productio
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v8.0';
+const APP_VERSION = 'v8.1';
 const APP_CHANGELOG = [
-    'Fixed driver career stats: verified all 22 drivers against official F1 website',
-    'Corrected pole positions, race counts, and championship data (Norris 2025 WDC)',
-    'Hadjar & Bortoleto no longer marked as rookies (debuted 2025)',
+    'Added an append-only archive for every submitted prediction',
+    'Added one-click full backup download and safe archive restore in Stewards Control',
+    'Removed table-wide prediction deletion from admin and manual-finalization workflows',
 ];
 async function notifyDeployUpdate() {
     try {
