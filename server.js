@@ -1609,7 +1609,13 @@ async function performFinalization() {
         const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
         if (alreadyScored.rows[0].count > 0) {
             console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
-            await db.execute("DELETE FROM f1_predictions_v4");
+            // Never clear the whole table here. The live timing API can remain on a
+            // previously-finalised race while players are already submitting picks
+            // for the next round. A table-wide delete would erase those new picks.
+            await db.execute({
+                sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ?",
+                args: [roundCheck]
+            });
             return { success: false, message: "Already scored." };
         }
 
@@ -1780,7 +1786,12 @@ async function performFinalization() {
             }
             console.log(`[FINALIZE] Round history saved for ${roundLabel}`);
 
-            await tx.execute("DELETE FROM f1_predictions_v4");
+            // Remove only the predictions that were scored. Preserve any stamped
+            // future-round rows that may already exist in the active table.
+            await tx.execute({
+                sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ? OR prediction_round IS NULL OR prediction_round = ''",
+                args: [roundLabel]
+            });
             await tx.commit();
         } catch (writeError) {
             try { await tx.rollback(); } catch (_) { }
