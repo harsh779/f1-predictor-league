@@ -3071,7 +3071,10 @@ async function checkAndFinalize() {
         const status = await f1TimingApiGet('/status', { timeout: 8000 });
         const session = status?.session;
 
-        if (!session || session.Type !== 'Race') return;
+        // F1 marks Sprint sessions as a race-type session too. Only the main
+        // Grand Prix race may trigger championship scoring/finalization.
+        const sessionName = String(session?.Name || '');
+        if (!session || session.Type !== 'Race' || /sprint/i.test(sessionName)) return;
         if (session.SessionStatus !== 'Finalised') { console.log(`[AUTO] Race status: ${session.SessionStatus} — waiting`); return; }
 
         const sessionKey = String(session.Key);
