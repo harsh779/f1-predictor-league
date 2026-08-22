@@ -2,6 +2,7 @@ const express = require('express');
 const { createClient } = require('@libsql/client');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
@@ -167,6 +168,12 @@ function getDatabaseConfig() {
 }
 
 const db = createClient(getDatabaseConfig());
+const backupDb = process.env.TURSO_BACKUP_DATABASE_URL && process.env.TURSO_BACKUP_AUTH_TOKEN
+    ? createClient({
+        url: process.env.TURSO_BACKUP_DATABASE_URL,
+        authToken: process.env.TURSO_BACKUP_AUTH_TOKEN
+    })
+    : null;
 
 // --- 1. DATABASE SETUP ---
 async function setupDatabase() {
@@ -214,6 +221,14 @@ async function setupDatabase() {
             saved_at TEXT NOT NULL
         )`);
         await db.execute("CREATE INDEX IF NOT EXISTS idx_prediction_archive_round_user ON f1_prediction_archive (prediction_round, user_name, id DESC)");
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_round_finalization (
+            round TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            lock_owner TEXT,
+            locked_at TEXT,
+            completed_at TEXT,
+            last_error TEXT
+        )`);
 
         // Capture any live rows created before the archive feature was deployed.
         // This makes the currently restored round recoverable immediately after rollout.
@@ -291,9 +306,12 @@ async function setupDatabase() {
         }
 
         console.log("Database synced.");
-    } catch (e) { console.error("DB Error:", e); }
+    } catch (e) {
+        console.error("DB Error:", e);
+        throw e;
+    }
 }
-setupDatabase();
+const databaseReady = setupDatabase();
 
 // --- 2. FULL 2026 CALENDAR (FULLY UPDATED WITH ALL SESSIONS) ---
 const f1Calendar2026 = [
@@ -863,6 +881,15 @@ function validateUniqueSelection(values) {
     return new Set(normalized).size === normalized.length;
 }
 
+function getAllowedPredictionValues() {
+    const grid = Array.isArray(OFFICIAL_2026_GRID) ? OFFICIAL_2026_GRID : [];
+    return {
+        drivers: new Set(grid.flatMap(team => team.drivers || []).map(normalizeStr)),
+        teams: new Set(grid.map(team => normalizeConstructor(team.team))),
+        driverTeams: new Map(grid.flatMap(team => (team.drivers || []).map(driver => [normalizeStr(driver), normalizeConstructor(team.team)])))
+    };
+}
+
 function validatePredictionPayload(payload) {
     const requiredDriverFields = ['p1', 'p2', 'p3', 'p10', 'p11', 'p21', 'p22'];
     const requiredTeamFields = ['c1', 'c2', 'c5', 'c6', 'c11'];
@@ -883,6 +910,14 @@ function validatePredictionPayload(payload) {
 
     const wildcardValues = [payload.w_race_loser, payload.w_sprint_gainer, payload.w_sprint_loser].filter(Boolean);
     if (!validateUniqueSelection(wildcardValues)) return 'Wildcard predictions must be unique';
+
+    const allowed = getAllowedPredictionValues();
+    const unknownDriver = driverValues.find(value => !allowed.drivers.has(normalizeStr(value)));
+    if (unknownDriver) return `Unknown driver: ${unknownDriver}`;
+    const unknownTeam = teamValues.find(value => !allowed.teams.has(normalizeConstructor(value)));
+    if (unknownTeam) return `Unknown constructor: ${unknownTeam}`;
+    const unknownWildcard = wildcardValues.find(value => !allowed.drivers.has(normalizeStr(value)));
+    if (unknownWildcard) return `Unknown wildcard driver: ${unknownWildcard}`;
 
     const allValues = [...driverValues, ...teamValues, ...wildcardValues];
     if (allValues.some(v => String(v).length > 80)) return 'Prediction values are too long';
@@ -1566,9 +1601,193 @@ function calcDetailedBreakdown(p, actualDriverPositions, actualCRanges, raceLose
     return { driverPts, constructorPts, wildcardPts, total: driverPts + constructorPts + wildcardPts, driverDetails, teamDetails, wcDetails };
 }
 
+function validateFinalRaceResults(results) {
+    const expectedDrivers = OFFICIAL_2026_GRID.reduce((count, team) => count + team.drivers.length, 0);
+    if (!Array.isArray(results) || results.length !== expectedDrivers) {
+        return `Expected ${expectedDrivers} classified drivers, received ${Array.isArray(results) ? results.length : 0}`;
+    }
+
+    const names = results.map(result => normalizeStr(`${result?.Driver?.givenName || ''} ${result?.Driver?.familyName || ''}`));
+    if (names.some(name => !name) || new Set(names).size !== expectedDrivers) {
+        return 'Race classification contains missing or duplicate drivers';
+    }
+
+    const allowedDrivers = getAllowedPredictionValues().drivers;
+    const unknown = names.find(name => !allowedDrivers.has(name));
+    if (unknown) return `Race classification contains an unknown driver: ${unknown}`;
+
+    const positions = results.map(result => Number(result?.position));
+    const invalidPosition = results.find(result => {
+        const position = Number(result?.position);
+        return !Number.isInteger(position) || position < 1 || position > expectedDrivers;
+    });
+    if (invalidPosition) return 'Race classification contains an invalid position';
+    if (new Set(positions).size !== expectedDrivers) return 'Race classification contains duplicate positions';
+
+    const driverTeams = getAllowedPredictionValues().driverTeams;
+    const mismatchedTeam = results.find(result => {
+        const name = normalizeStr(`${result?.Driver?.givenName || ''} ${result?.Driver?.familyName || ''}`);
+        return normalizeConstructor(result?.Constructor?.name || '') !== driverTeams.get(name);
+    });
+    if (mismatchedTeam) {
+        return `Race classification has the wrong constructor for ${mismatchedTeam.Driver?.givenName || ''} ${mismatchedTeam.Driver?.familyName || ''}`.trim();
+    }
+    return null;
+}
+
+function isMatchingFinalisedRaceSession(session, race) {
+    if (!session || session.Type !== 'Race' || /sprint/i.test(String(session.Name || ''))) return false;
+    if (session.SessionStatus !== 'Finalised') return false;
+    const meetingNumber = Number(session.Meeting?.Number);
+    if (Number.isFinite(meetingNumber) && meetingNumber === Number(race?.round)) return true;
+    const meetingName = normalizeRaceName(session.Meeting?.Name || session.Name || '');
+    return Boolean(meetingName && meetingName === normalizeRaceName(race?.name || ''));
+}
+
+async function assertRaceResultsAreFinal(race, results) {
+    const validationError = validateFinalRaceResults(results);
+    if (validationError) throw new Error(`Finalization blocked: ${validationError}.`);
+
+    const raceStart = new Date(race?.sessions?.race || race?.date || '');
+    const fourHoursAfterStart = new Date(raceStart.getTime() + 4 * 60 * 60 * 1000);
+    if (!Number.isNaN(fourHoursAfterStart.getTime()) && new Date() >= fourHoursAfterStart) return;
+
+    let status;
+    try {
+        status = await f1TimingApiGet('/status', { timeout: 8000 });
+    } catch (e) {
+        throw new Error(`Finalization blocked: race completion could not be verified (${e.message}).`);
+    }
+    if (!isMatchingFinalisedRaceSession(status?.session, race)) {
+        throw new Error('Finalization blocked: the main race has not been confirmed Finalised.');
+    }
+}
+
+async function fetchOfficialSprintGrid(apiRound) {
+    try {
+        const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/sprint.json`, { timeout: 10000 })
+            .then(response => response.data?.MRData?.RaceTable?.Races || []);
+        const sprintResults = races[0]?.SprintResults || [];
+        const grid = {};
+        sprintResults.forEach(result => {
+            const name = normalizeStr(`${result.Driver?.givenName || ''} ${result.Driver?.familyName || ''}`);
+            const position = Number(result.grid);
+            if (name && Number.isInteger(position) && position >= 0) grid[name] = position;
+        });
+        return grid;
+    } catch (e) {
+        console.warn('[FINALIZE] Official Sprint grid fallback failed:', e.message);
+        return {};
+    }
+}
+
+async function fetchOfficialRaceGrid(apiRound) {
+    try {
+        const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/results.json`, { timeout: 10000 })
+            .then(response => response.data?.MRData?.RaceTable?.Races || []);
+        const raceResults = races[0]?.Results || [];
+        const grid = {};
+        raceResults.forEach(result => {
+            const name = normalizeStr(`${result.Driver?.givenName || ''} ${result.Driver?.familyName || ''}`);
+            const position = Number(result.grid);
+            if (name && Number.isInteger(position) && position >= 0) grid[name] = position;
+        });
+        return grid;
+    } catch (e) {
+        console.warn('[FINALIZE] Official race grid fallback failed:', e.message);
+        return {};
+    }
+}
+
+function resolveStartingGrid(result, driverName, officialGrid) {
+    const rawGrid = result?.grid;
+    const ownGrid = Number(rawGrid);
+    if (rawGrid !== undefined && rawGrid !== null && rawGrid !== '' && Number.isInteger(ownGrid) && ownGrid >= 0) {
+        return ownGrid;
+    }
+    if (Object.prototype.hasOwnProperty.call(officialGrid, driverName)) return officialGrid[driverName];
+    return null;
+}
+
+function validateStartingGrid(results, label) {
+    if (!Array.isArray(results) || results.length === 0) return `${label} results are missing`;
+    const grids = results.map(result => result?.grid);
+    const invalid = grids.filter(grid => grid === '' || grid === null || grid === undefined || !Number.isInteger(Number(grid)) || Number(grid) < 0);
+    if (invalid.length > 0) return `${label} starting grid is incomplete (${results.length - invalid.length}/${results.length})`;
+    const positiveGrids = grids.map(Number).filter(grid => grid > 0);
+    if (new Set(positiveGrids).size !== positiveGrids.length) return `${label} starting grid contains duplicate positions`;
+    return null;
+}
+
+function validateRaceGrid(results) {
+    return validateStartingGrid(results, 'Race');
+}
+
+function validateSprintGrid(sprintResults) {
+    if (!Array.isArray(sprintResults) || sprintResults.length === 0) return null;
+    return validateStartingGrid(sprintResults, 'Sprint');
+}
+
+async function acquireRoundFinalizationLock(roundLabel) {
+    const owner = crypto.randomUUID();
+    const now = new Date();
+    const staleBefore = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+    const tx = await db.transaction("write");
+    try {
+        await tx.execute({
+            sql: `INSERT INTO f1_round_finalization (round, status, lock_owner, locked_at, completed_at, last_error)
+                  VALUES (?, 'processing', ?, ?, NULL, NULL)
+                  ON CONFLICT(round) DO UPDATE SET
+                    status = 'processing', lock_owner = excluded.lock_owner, locked_at = excluded.locked_at,
+                    completed_at = NULL, last_error = NULL
+                  WHERE f1_round_finalization.status != 'completed'
+                    AND (f1_round_finalization.status != 'processing' OR f1_round_finalization.locked_at < ?)`,
+            args: [roundLabel, owner, now.toISOString(), staleBefore]
+        });
+        const row = await tx.execute({
+            sql: "SELECT status, lock_owner FROM f1_round_finalization WHERE round = ?",
+            args: [roundLabel]
+        }).then(result => result.rows[0] || null);
+        await tx.commit();
+        return {
+            acquired: row?.status === 'processing' && row?.lock_owner === owner,
+            completed: row?.status === 'completed',
+            owner,
+            round: roundLabel
+        };
+    } catch (e) {
+        try { await tx.rollback(); } catch (_) { }
+        throw e;
+    }
+}
+
+async function markRoundFinalizationCompleted(executor, roundLabel, owner, completedAt = new Date().toISOString()) {
+    await executor.execute({
+        sql: `UPDATE f1_round_finalization
+              SET status = 'completed', completed_at = ?, last_error = NULL
+              WHERE round = ? AND lock_owner = ? AND status = 'processing'`,
+        args: [completedAt, roundLabel, owner]
+    });
+}
+
+async function releaseRoundFinalizationLock(roundLabel, owner, error) {
+    try {
+        await db.execute({
+            sql: `UPDATE f1_round_finalization
+                  SET status = 'failed', lock_owner = NULL, last_error = ?
+                  WHERE round = ? AND lock_owner = ? AND status = 'processing'`,
+            args: [String(error?.message || error || 'Finalization failed').slice(0, 500), roundLabel, owner]
+        });
+    } catch (releaseError) {
+        console.error('[FINALIZE] Failed to release database lock:', releaseError.message);
+    }
+}
+
 async function performFinalization(options = {}) {
     const suppliedPredictions = Array.isArray(options.predictions) ? options.predictions : null;
     const preserveActivePredictions = suppliedPredictions !== null;
+    let databaseLock = null;
+    let finalizationCommitted = false;
     try {
         // 1. Fetch Race Data — own API first, Ergast fallback
         let raceData = null;
@@ -1602,12 +1821,17 @@ async function performFinalization(options = {}) {
                         } catch (e) { console.log('[FINALIZE] Ergast qualifying fallback failed:', e.message); }
                     }
 
+                    // Wildcard movement must use the actual starting grid after
+                    // penalties, never the qualifying classification.
+                    const officialRaceGrid = await fetchOfficialRaceGrid(apiRound);
+
                     results = raceSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
+                        const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), officialRaceGrid);
                         return {
                             position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)),
-                            grid: String(gridMap[normalizeStr(d.name || '')] || 0),
+                            grid: startingGrid === null ? '' : String(startingGrid),
                             status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'),
                             Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
                             Constructor: { name: d.team || '' }
@@ -1624,14 +1848,18 @@ async function performFinalization(options = {}) {
                             const d = dMap[String(r.driver_number)];
                             if (d) sprintGridMap[normalizeStr(d.name)] = r.position;
                         });
+                        if (Object.keys(sprintGridMap).length < sprintSes.results.length - 1) {
+                            Object.assign(sprintGridMap, await fetchOfficialSprintGrid(apiRound));
+                        }
                         console.log(`[FINALIZE] Sprint Qualifying grid: ${Object.keys(sprintGridMap).length} drivers`);
 
                         sprintResults = sprintSes.results.map(r => {
                             const d = dMap[String(r.driver_number)] || {};
                             const parts = (d.name || '').split(' ');
+                            const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), sprintGridMap);
                             return {
                                 position: String(r.position), positionText: r.retired ? 'R' : String(r.position),
-                                grid: String(sprintGridMap[normalizeStr(d.name || '')] || gridMap[normalizeStr(d.name || '')] || 0),
+                                grid: startingGrid === null ? '' : String(startingGrid),
                                 status: r.retired ? 'Retired' : 'Finished',
                                 Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' },
                                 Constructor: { name: d.team || '' }
@@ -1664,19 +1892,40 @@ async function performFinalization(options = {}) {
 
         console.log(`[FINALIZE] Grid map: ${Object.keys(gridMap).length} drivers`);
 
-        // 1b. Check if this round was already scored
+        const sprintGridError = validateSprintGrid(sprintResults);
+        if (sprintGridError) return { success: false, message: `Finalization blocked: ${sprintGridError}.` };
+        const raceGridError = validateRaceGrid(results);
+        if (raceGridError) return { success: false, message: `Finalization blocked: ${raceGridError}.` };
+
+        const finalizationRace = seasonCalendar.find(race => Number(race.round) === Number(raceData.round));
+        if (!finalizationRace) return { success: false, message: `Calendar race not found for R${raceData.round}.` };
+        await assertRaceResultsAreFinal(finalizationRace, results);
+
+        // 1b. Acquire a database-backed lock before checking or applying scores.
+        // This protects against deploy overlap and multiple Render processes.
         const roundLabel = `R${raceData.round}`;
         const roundCheck = roundLabel;
+        databaseLock = await acquireRoundFinalizationLock(roundCheck);
+        if (databaseLock.completed) {
+            return { success: false, message: "Already scored." };
+        }
+        if (!databaseLock.acquired) {
+            return { success: false, message: "Finalization already running." };
+        }
+
         await db.execute("CREATE TABLE IF NOT EXISTS f1_round_history (id INTEGER PRIMARY KEY AUTOINCREMENT, round TEXT, race_name TEXT, user_name TEXT, prediction TEXT, score INTEGER, scored_at TEXT)");
-        const alreadyScored = await db.execute({ sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ?", args: [roundCheck] });
+        const alreadyScored = await db.execute({
+            sql: "SELECT count(*) as count FROM f1_round_history WHERE round = ? AND race_name != 'New Joiner Penalty'",
+            args: [roundCheck]
+        });
         if (alreadyScored.rows[0].count > 0) {
             console.log(`[FINALIZE] Round ${roundCheck} already scored — skipping`);
             // Never clear the whole table here. The live timing API can remain on a
             // previously-finalised race while players are already submitting picks
             // for the next round. A table-wide delete would erase those new picks.
-            if (!preserveActivePredictions) {
-                const cleanupTx = await db.transaction("write");
-                try {
+            const cleanupTx = await db.transaction("write");
+            try {
+                if (!preserveActivePredictions) {
                     const staleRows = await cleanupTx.execute({
                         sql: "SELECT * FROM f1_predictions_v4 WHERE prediction_round = ?",
                         args: [roundCheck]
@@ -1688,11 +1937,13 @@ async function performFinalization(options = {}) {
                         sql: "DELETE FROM f1_predictions_v4 WHERE prediction_round = ?",
                         args: [roundCheck]
                     });
-                    await cleanupTx.commit();
-                } catch (cleanupError) {
-                    try { await cleanupTx.rollback(); } catch (_) { }
-                    throw cleanupError;
                 }
+                await markRoundFinalizationCompleted(cleanupTx, roundCheck, databaseLock.owner);
+                await cleanupTx.commit();
+                finalizationCommitted = true;
+            } catch (cleanupError) {
+                try { await cleanupTx.rollback(); } catch (_) { }
+                throw cleanupError;
             }
             return { success: false, message: "Already scored." };
         }
@@ -1755,7 +2006,7 @@ async function performFinalization(options = {}) {
         let raceLosers = []; let maxRaceDrop = -999;
         results.forEach(r => {
             const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-            const grid = parseInt(r.grid) || gridMap[name] || 0;
+            const grid = parseInt(r.grid) || 0;
             if (grid > 0) {
                 let finish = parseInt(r.position);
                 if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
@@ -1769,7 +2020,7 @@ async function performFinalization(options = {}) {
         let sprintLosers = []; let maxSprintDrop = -999;
         sprintResults.forEach(r => {
             const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`);
-            const grid = parseInt(r.grid) || gridMap[name] || 0;
+            const grid = parseInt(r.grid) || 0;
             if (grid > 0) {
                 let finish = parseInt(r.position);
                 if (r.positionText === 'R' || r.positionText === 'D') finish = 22;
@@ -1875,7 +2126,10 @@ async function performFinalization(options = {}) {
                     args: [roundLabel]
                 });
             }
+            await markRoundFinalizationCompleted(tx, roundLabel, databaseLock.owner, timestamp);
             await tx.commit();
+            finalizationCommitted = true;
+            scheduleIndependentBackup('round-finalized', 5_000);
         } catch (writeError) {
             try { await tx.rollback(); } catch (_) { }
             throw writeError;
@@ -1893,7 +2147,13 @@ async function performFinalization(options = {}) {
         }
 
         return { success: true, message: "Round Finalized." };
-    } catch (e) { return { success: false, message: e.message }; }
+    } catch (e) {
+        return { success: false, message: e.message };
+    } finally {
+        if (databaseLock?.acquired && !finalizationCommitted) {
+            await releaseRoundFinalizationLock(databaseLock.round || null, databaseLock.owner, 'Finalization did not commit');
+        }
+    }
 }
 
 // --- 7. SECURE CORE ROUTES ---
@@ -2147,6 +2407,7 @@ app.post('/predict', predictLimiter, authenticateToken, async (req, res) => {
         await archivePredictionRecord(tx, userName, d, predictionRound, 'player-submit');
         await tx.execute({ sql: `UPDATE f1_drivers SET has_participated = 1 WHERE name = ?`, args: [userName] });
         await tx.commit();
+        scheduleIndependentBackup('prediction-submit');
         res.json({ success: true });
     } catch (e) {
         try { await tx.rollback(); } catch (_) { }
@@ -2204,20 +2465,24 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
                 if (Object.keys(gridMap).length === 0) {
                     try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
                 }
+                const officialRaceGrid = await fetchOfficialRaceGrid(apiRound);
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
                     const parts = (d.name || '').split(' ');
-                    return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                    const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), officialRaceGrid);
+                    return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                 });
                 const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
                 if (sprintSes?.results) {
                     const sprintGridMap = {};
                     const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
                     if (sqSes?.results) sqSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) sprintGridMap[normalizeStr(d.name)] = r.position; });
+                    if (Object.keys(sprintGridMap).length < sprintSes.results.length - 1) Object.assign(sprintGridMap, await fetchOfficialSprintGrid(apiRound));
                     sprintResults = sprintSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
-                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(sprintGridMap[normalizeStr(d.name || '')] || gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                        const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), sprintGridMap);
+                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                     });
                 }
                 console.log(`[RESCORE] Own API: ${results.length} race results`);
@@ -2234,6 +2499,10 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
         }
 
         if (!results) { console.log(`[RESCORE] No race data found for ${round}`); return; }
+        const raceGridError = validateRaceGrid(results);
+        if (raceGridError) { console.log(`[RESCORE] Blocked: ${raceGridError}`); return; }
+        const sprintGridError = validateSprintGrid(sprintResults);
+        if (sprintGridError) { console.log(`[RESCORE] Blocked: ${sprintGridError}`); return; }
 
         // Build actual positions
         let actualDriverPositions = {}, actualCRanges = {}, raceLosers = [], sprintGainers = [], sprintLosers = [];
@@ -2242,8 +2511,8 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
         const sumGroups = {}; for (const [c, sum] of Object.entries(constructorSums)) { if (!sumGroups[sum]) sumGroups[sum] = []; sumGroups[sum].push(c); }
         let currentRank = 1; Object.keys(sumGroups).map(Number).sort((a, b) => a - b).forEach(sum => { const teams = sumGroups[sum]; teams.forEach(team => { actualCRanges[team] = { min: currentRank, max: currentRank + teams.length - 1 }; }); currentRank += teams.length; });
 
-        let maxRaceDrop = -999; results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const drop = finish - grid; if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; } else if (drop === maxRaceDrop) raceLosers.push(name); } });
-        let maxSprintGain = -999, maxSprintDrop = -999; sprintResults.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const gain = grid - finish; const drop = finish - grid; if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; } else if (gain === maxSprintGain) sprintGainers.push(name); if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; } else if (drop === maxSprintDrop) sprintLosers.push(name); } });
+        let maxRaceDrop = -999; results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const drop = finish - grid; if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; } else if (drop === maxRaceDrop) raceLosers.push(name); } });
+        let maxSprintGain = -999, maxSprintDrop = -999; sprintResults.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const gain = grid - finish; const drop = finish - grid; if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; } else if (gain === maxSprintGain) sprintGainers.push(name); if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; } else if (drop === maxSprintDrop) sprintLosers.push(name); } });
 
         console.log(`[RESCORE] Race Loser(s): ${raceLosers.join(', ') || 'none'} | Sprint Gainer(s): ${sprintGainers.join(', ') || 'none'} | Sprint Loser(s): ${sprintLosers.join(', ') || 'none'}`);
 
@@ -2380,20 +2649,24 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                 if (Object.keys(gridMap).length === 0) {
                     try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
                 }
+                const officialRaceGrid = await fetchOfficialRaceGrid(apiRound);
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
                     const parts = (d.name || '').split(' ');
-                    return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: String(gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                    const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), officialRaceGrid);
+                    return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                 });
                 const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
                 if (sprintSes?.results) {
                     const sprintGridMap = {};
                     const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
                     if (sqSes?.results) sqSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) sprintGridMap[normalizeStr(d.name)] = r.position; });
+                    if (Object.keys(sprintGridMap).length < sprintSes.results.length - 1) Object.assign(sprintGridMap, await fetchOfficialSprintGrid(apiRound));
                     sprintResults = sprintSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
-                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: String(sprintGridMap[normalizeStr(d.name || '')] || gridMap[normalizeStr(d.name || '')] || 0), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
+                        const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), sprintGridMap);
+                        return { position: String(r.position), positionText: r.retired ? 'R' : String(r.position), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : 'Finished', Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                     });
                 }
                 console.log(`[RESEND] Own API: ${results.length} race results`);
@@ -2410,6 +2683,11 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
             } catch (_) { console.log('[RESEND] Ergast also failed'); }
         }
 
+        const raceGridError = results ? validateRaceGrid(results) : 'Race results are missing';
+        if (raceGridError) { console.log(`[RESEND] Blocked: ${raceGridError}`); return; }
+        const sprintGridError = validateSprintGrid(sprintResults);
+        if (sprintGridError) { console.log(`[RESEND] Blocked: ${sprintGridError}`); return; }
+
         // Build actual positions if results available
         let actualDriverPositions = {}, actualCRanges = {}, raceLosers = [], sprintGainers = [], sprintLosers = [];
         if (results) {
@@ -2417,8 +2695,8 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
             const constructorSums = {}; results.forEach(r => { const c = normalizeConstructor(r.Constructor.name); let pos = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D' || r.positionText === 'W') pos = 22; constructorSums[c] = (constructorSums[c] || 0) + pos; });
             const sumGroups = {}; for (const [c, sum] of Object.entries(constructorSums)) { if (!sumGroups[sum]) sumGroups[sum] = []; sumGroups[sum].push(c); }
             let currentRank = 1; Object.keys(sumGroups).map(Number).sort((a, b) => a - b).forEach(sum => { const teams = sumGroups[sum]; teams.forEach(team => { actualCRanges[team] = { min: currentRank, max: currentRank + teams.length - 1 }; }); currentRank += teams.length; });
-            let maxRaceDrop = -999; results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const drop = finish - grid; if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; } else if (drop === maxRaceDrop) raceLosers.push(name); } });
-            let maxSprintGain = -999, maxSprintDrop = -999; sprintResults.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || gridMap[name] || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const gain = grid - finish; const drop = finish - grid; if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; } else if (gain === maxSprintGain) sprintGainers.push(name); if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; } else if (drop === maxSprintDrop) sprintLosers.push(name); } });
+            let maxRaceDrop = -999; results.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const drop = finish - grid; if (drop > maxRaceDrop) { maxRaceDrop = drop; raceLosers = [name]; } else if (drop === maxRaceDrop) raceLosers.push(name); } });
+            let maxSprintGain = -999, maxSprintDrop = -999; sprintResults.forEach(r => { const name = normalizeStr(`${r.Driver.givenName} ${r.Driver.familyName}`); const grid = parseInt(r.grid) || 0; if (grid > 0) { let finish = parseInt(r.position); if (r.positionText === 'R' || r.positionText === 'D') finish = 22; const gain = grid - finish; const drop = finish - grid; if (gain > maxSprintGain) { maxSprintGain = gain; sprintGainers = [name]; } else if (gain === maxSprintGain) sprintGainers.push(name); if (drop > maxSprintDrop) { maxSprintDrop = drop; sprintLosers = [name]; } else if (drop === maxSprintDrop) sprintLosers.push(name); } });
         }
 
         for (const row of rows) {
@@ -2502,29 +2780,142 @@ app.get('/api/draft-picks', authenticateToken, async (req, res) => {
 // Admin route rate limiter (applies to all /api/admin/* routes)
 app.use('/api/admin', adminLimiter);
 
+async function buildFullBackupPayload() {
+    const [drivers, predictions, predictionArchive, drafts, history, finalization, meta] = await Promise.all([
+        db.execute("SELECT * FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC"),
+        db.execute("SELECT * FROM f1_predictions_v4 ORDER BY user_name"),
+        db.execute("SELECT * FROM f1_prediction_archive ORDER BY id ASC"),
+        db.execute("SELECT * FROM f1_draft_picks ORDER BY saved_at DESC"),
+        db.execute("SELECT * FROM f1_round_history ORDER BY id ASC"),
+        db.execute("SELECT * FROM f1_round_finalization ORDER BY round"),
+        db.execute("SELECT * FROM f1_meta")
+    ]);
+    return {
+        schema_version: 2,
+        exported_at: new Date().toISOString(),
+        drivers: drivers.rows,
+        predictions: predictions.rows,
+        prediction_archive: predictionArchive.rows,
+        drafts: drafts.rows,
+        history: history.rows,
+        finalization: finalization.rows,
+        meta: meta.rows
+    };
+}
+
+let independentBackupPending = false;
+let independentBackupTimer = null;
+
+async function setupIndependentBackup() {
+    if (!backupDb) {
+        console.warn('[BACKUP] Independent Turso backup is not configured');
+        return;
+    }
+    await backupDb.execute(`CREATE TABLE IF NOT EXISTS f1_backup_snapshots (
+        backup_id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        source TEXT NOT NULL,
+        checksum_sha256 TEXT NOT NULL,
+        encoding TEXT NOT NULL,
+        payload TEXT NOT NULL
+    )`);
+    await backupDb.execute("CREATE INDEX IF NOT EXISTS idx_backup_snapshots_created_at ON f1_backup_snapshots (created_at DESC)");
+}
+
+async function writeIndependentBackup(source = 'scheduled') {
+    if (!backupDb || independentBackupPending) return { skipped: true };
+    independentBackupPending = true;
+    try {
+        const backup = await buildFullBackupPayload();
+        const json = JSON.stringify(backup);
+        const compressed = zlib.gzipSync(Buffer.from(json, 'utf8'));
+        const checksum = crypto.createHash('sha256').update(compressed).digest('hex');
+        const backupId = crypto.randomUUID();
+        await backupDb.execute({
+            sql: `INSERT INTO f1_backup_snapshots
+                  (backup_id, created_at, source, checksum_sha256, encoding, payload)
+                  VALUES (?, ?, ?, ?, 'gzip+base64', ?)`,
+            args: [backupId, backup.exported_at, source, checksum, compressed.toString('base64')]
+        });
+        await backupDb.execute(`DELETE FROM f1_backup_snapshots
+                                WHERE backup_id NOT IN (
+                                    SELECT backup_id FROM f1_backup_snapshots
+                                    ORDER BY created_at DESC LIMIT 180
+                                )`);
+        await setMetaValue('independent_backup_last_success', JSON.stringify({
+            backup_id: backupId,
+            created_at: backup.exported_at,
+            source,
+            checksum_sha256: checksum
+        }));
+        console.log(`[BACKUP] Independent snapshot ${backupId} saved (${source})`);
+        return { success: true, backup_id: backupId, created_at: backup.exported_at, checksum_sha256: checksum };
+    } catch (e) {
+        await setMetaValue('independent_backup_last_error', JSON.stringify({ at: new Date().toISOString(), message: e.message })).catch(() => { });
+        console.error('[BACKUP] Independent snapshot failed:', e.message);
+        return { success: false, message: e.message };
+    } finally {
+        independentBackupPending = false;
+    }
+}
+
+function scheduleIndependentBackup(source, delayMs = 30_000) {
+    if (!backupDb || independentBackupTimer) return;
+    independentBackupTimer = setTimeout(async () => {
+        independentBackupTimer = null;
+        await writeIndependentBackup(source);
+    }, delayMs);
+}
+
 // ── Admin full data export ─────────────────────────────────────────────────────
 app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const [drivers, predictions, predictionArchive, drafts, history, meta] = await Promise.all([
-            db.execute("SELECT * FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC"),
-            db.execute("SELECT * FROM f1_predictions_v4 ORDER BY user_name"),
-            db.execute("SELECT * FROM f1_prediction_archive ORDER BY id ASC"),
-            db.execute("SELECT * FROM f1_draft_picks ORDER BY saved_at DESC"),
-            db.execute("SELECT * FROM f1_round_history ORDER BY id ASC"),
-            db.execute("SELECT * FROM f1_meta"),
-        ]);
-        const exported_at = new Date().toISOString();
-        res.setHeader('Content-Disposition', `attachment; filename="f1-league-backup-${exported_at.slice(0,10)}.json"`);
-        res.json({
-            exported_at,
-            drivers:     drivers.rows,
-            predictions: predictions.rows,
-            prediction_archive: predictionArchive.rows,
-            drafts:      drafts.rows,
-            history:     history.rows,
-            meta:        meta.rows,
-        });
+        const backup = await buildFullBackupPayload();
+        res.setHeader('Content-Disposition', `attachment; filename="f1-league-backup-${backup.exported_at.slice(0,10)}.json"`);
+        res.json(backup);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/backup-status', authenticateToken, requireAdmin, async (_req, res) => {
+    const lastSuccess = await getMetaValue('independent_backup_last_success');
+    const lastError = await getMetaValue('independent_backup_last_error');
+    res.json({
+        configured: Boolean(backupDb),
+        pending: independentBackupPending || Boolean(independentBackupTimer),
+        last_success: lastSuccess ? JSON.parse(lastSuccess) : null,
+        last_error: lastError ? JSON.parse(lastError) : null
+    });
+});
+
+app.post('/api/admin/run-backup', authenticateToken, requireAdmin, async (_req, res) => {
+    if (!backupDb) {
+        return res.status(409).json({ success: false, message: 'Independent backup is not configured.' });
+    }
+    const result = await writeIndependentBackup('admin-manual');
+    res.status(result.success ? 200 : 500).json(result);
+});
+
+app.get('/api/admin/download-independent-backup', authenticateToken, requireAdmin, async (_req, res) => {
+    if (!backupDb) {
+        return res.status(409).json({ success: false, message: 'Independent backup is not configured.' });
+    }
+    try {
+        const row = await backupDb.execute(`SELECT backup_id, created_at, checksum_sha256, encoding, payload
+                                            FROM f1_backup_snapshots
+                                            ORDER BY created_at DESC LIMIT 1`)
+            .then(result => result.rows[0] || null);
+        if (!row) return res.status(404).json({ success: false, message: 'No independent backup exists yet.' });
+        if (row.encoding !== 'gzip+base64') throw new Error(`Unsupported backup encoding: ${row.encoding}`);
+        const compressed = Buffer.from(row.payload, 'base64');
+        const checksum = crypto.createHash('sha256').update(compressed).digest('hex');
+        if (checksum !== row.checksum_sha256) throw new Error('Backup checksum verification failed.');
+        const json = zlib.gunzipSync(compressed);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="f1-independent-backup-${String(row.created_at).slice(0, 10)}.json"`);
+        res.send(json);
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 app.get('/api/predictions', authenticateToken, async (req, res) => {
@@ -2719,6 +3110,9 @@ app.post('/api/admin/merge-driver', authenticateToken, requireAdmin, async (req,
 
 app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async (req, res) => {
     const clearExisting = !!req.body?.clearExisting;
+    if (clearExisting && req.body?.confirmClearExisting !== true) {
+        return res.status(400).json({ success: false, message: 'Explicit confirmation is required to replace current-round predictions.' });
+    }
     const seasonCalendar = await getSeasonCalendar();
     const currentRace = await findStrategyRace(seasonCalendar, new Date());
     const predictionRound = getRoundLabel(currentRace);
@@ -2757,6 +3151,7 @@ app.post('/api/admin/import-predictions', authenticateToken, requireAdmin, async
         }
 
         await tx.commit();
+        scheduleIndependentBackup('admin-import', 5_000);
         res.json({
             success: true,
             imported: normalized.length,
@@ -2856,6 +3251,9 @@ app.post('/api/admin/restore-predictions-from-archive', authenticateToken, requi
     }
 
     try {
+        if (await hasRoundBeenScored(round)) {
+            return res.status(409).json({ success: false, message: `${round} is already scored. Use round history for review instead of restoring it into active predictions.` });
+        }
         const archiveRows = await db.execute({
             sql: `SELECT a.*
                   FROM f1_prediction_archive a
@@ -2897,6 +3295,7 @@ app.post('/api/admin/restore-predictions-from-archive', authenticateToken, requi
                 restored += 1;
             }
             await tx.commit();
+            scheduleIndependentBackup('archive-restore', 5_000);
         } catch (restoreError) {
             try { await tx.rollback(); } catch (_) { }
             throw restoreError;
@@ -3288,30 +3687,14 @@ async function checkAndFinalize() {
     }
 }
 
-// Regular 6-min polling
-setInterval(checkAndFinalize, 6 * 60 * 1000);
-
-// Run once on startup (catches races finalized while server was cold)
-setTimeout(checkAndFinalize, 10 * 1000);
-
-// Check Discord reminders/lockout every minute.
-setInterval(checkPredictionNotifications, 60 * 1000);
-setTimeout(checkPredictionNotifications, 15 * 1000);
-
-if (process.env.ENABLE_LOCAL_AUTH === '1' && process.env.NODE_ENV !== 'production') {
-    setTimeout(() => {
-        ensureLocalPreviewData().catch(e => console.error('[LOCAL PREVIEW] Failed to sync preview data:', e.message));
-    }, 1000);
-}
-
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v8.1';
+const APP_VERSION = 'v8.2';
 const APP_CHANGELOG = [
-    'Added an append-only archive for every submitted prediction',
-    'Added one-click full backup download and safe archive restore in Stewards Control',
-    'Removed table-wide prediction deletion from admin and manual-finalization workflows',
+    'Blocked invalid roster picks and incomplete or unconfirmed race results',
+    'Added a database-backed scoring lock and actual race/Sprint starting-grid validation',
+    'Added automatic independent Turso snapshots, safer imports and fail-fast startup',
 ];
 async function notifyDeployUpdate() {
     try {
@@ -3327,9 +3710,42 @@ async function notifyDeployUpdate() {
         console.log(`[DEPLOY] Update notification sent for ${APP_VERSION}`);
     } catch (e) { console.error('[DEPLOY] Failed to send update notification:', e.message); }
 }
-setTimeout(notifyDeployUpdate, 5 * 1000);
 
-app.listen(port, () => {
-    console.log(`🏁 Server 3000 (Google OAuth Secure)`);
-    console.log(`[ENV] DISCORD_WEBHOOK: ${process.env.DISCORD_WEBHOOK ? 'SET (' + process.env.DISCORD_WEBHOOK.substring(0, 30) + '...)' : 'NOT SET'}`);
+async function startApplication() {
+    await databaseReady;
+
+    const hasPartialBackupConfig = Boolean(process.env.TURSO_BACKUP_DATABASE_URL) !== Boolean(process.env.TURSO_BACKUP_AUTH_TOKEN);
+    if (hasPartialBackupConfig) {
+        console.warn('[BACKUP] Both TURSO_BACKUP_DATABASE_URL and TURSO_BACKUP_AUTH_TOKEN are required; independent backups are disabled.');
+    }
+    await setupIndependentBackup();
+
+    // Start workers only after every primary-database migration succeeds.
+    setInterval(checkAndFinalize, 6 * 60 * 1000);
+    setTimeout(checkAndFinalize, 10 * 1000);
+    setInterval(checkPredictionNotifications, 60 * 1000);
+    setTimeout(checkPredictionNotifications, 15 * 1000);
+
+    if (backupDb) {
+        setTimeout(() => writeIndependentBackup('startup'), 30 * 1000);
+        setInterval(() => writeIndependentBackup('scheduled'), 6 * 60 * 60 * 1000);
+    }
+
+    if (process.env.ENABLE_LOCAL_AUTH === '1' && process.env.NODE_ENV !== 'production') {
+        setTimeout(() => {
+            ensureLocalPreviewData().catch(e => console.error('[LOCAL PREVIEW] Failed to sync preview data:', e.message));
+        }, 1000);
+    }
+
+    setTimeout(notifyDeployUpdate, 5 * 1000);
+    app.listen(port, () => {
+        console.log(`🏁 Server ${port} (Google OAuth Secure)`);
+        console.log(`[ENV] DISCORD_WEBHOOK: ${process.env.DISCORD_WEBHOOK ? 'SET' : 'NOT SET'}`);
+        console.log(`[ENV] INDEPENDENT_BACKUP: ${backupDb ? 'SET' : 'NOT SET'}`);
+    });
+}
+
+startApplication().catch(error => {
+    console.error('[FATAL] Application startup failed:', error);
+    process.exit(1);
 });

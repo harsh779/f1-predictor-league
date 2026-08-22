@@ -19,11 +19,10 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@libsql/client": "^0.17.0",
-    "axios": "^1.13.6",
+    "@libsql/client": "^0.17.4",
+    "axios": "^1.19.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.4.1",
-    "jsonwebtoken": "^9.0.3",
-    "openai": "^6.25.0"
+    "express-rate-limit": "^8.6.2",
+    "jsonwebtoken": "^9.0.3"
   }
 }

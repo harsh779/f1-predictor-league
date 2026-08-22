@@ -154,12 +154,26 @@ Required production-style variables:
 | `JWT_SECRET` | JWT signing secret |
 | `TURSO_DATABASE_URL` | Turso database URL |
 | `TURSO_AUTH_TOKEN` | Turso auth token |
+| `TURSO_BACKUP_DATABASE_URL` | URL of a separate Turso database used for automatic snapshots |
+| `TURSO_BACKUP_AUTH_TOKEN` | Database token for the separate backup database |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `DISCORD_WEBHOOK` | Discord webhook URL |
 | `F1_TIMING_API` | F1 Live API URL |
 | `F1_TIMING_API_KEY` | Optional API key for live timing API |
 | `API_SPORTS_KEY` | Optional weather fallback key |
+
+### Independent backups
+
+Create a second Turso database (do not reuse `f1-league`) and configure both backup variables in Render. The app then writes a compressed, checksummed snapshot after each prediction submission and finalized round, on startup, and every six hours. It retains the latest 180 snapshots.
+
+```bash
+turso db create f1-league-backup
+turso db show f1-league-backup --url
+turso db tokens create f1-league-backup
+```
+
+Set the returned URL and token directly in Render as `TURSO_BACKUP_DATABASE_URL` and `TURSO_BACKUP_AUTH_TOKEN`. Never commit or paste the token into an issue or chat. Admins can trigger and download a verified independent snapshot from Stewards Control.
 
 ---
 
