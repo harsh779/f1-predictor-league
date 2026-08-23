@@ -20,6 +20,7 @@ const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(
 const SESSION_COOKIE_NAME = 'f1_session';
 const DEFAULT_LOCAL_DB_URL = `file:${path.resolve(__dirname, 'local-preview.db').replace(/\\/g, '/')}`;
 const DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS === '1' && process.env.NODE_ENV !== 'production';
+const LOCAL_PREVIEW = process.env.ENABLE_LOCAL_AUTH === '1' && process.env.NODE_ENV !== 'production';
 const DEFAULT_LEAGUE_SLUG = 'f1-2026-main';
 const DEFAULT_LEAGUE_NAME = 'F1 2026 Predictor League';
 
@@ -351,8 +352,9 @@ async function setupDatabase() {
             await db.execute({ sql: "INSERT INTO f1_meta (key, value) VALUES ('fix_adithya_r2_sg', 'done')", args: [] });
             console.log("[DB] Fixed Adithya R2 score: -5 -> 0 (Sprint Gainer +5 for Liam Lawson)");
 
-            // Send apology + corrected scores to Discord (deferred to allow API to wake up)
-            setTimeout(async () => {
+            // Send apology + corrected scores to Discord (deferred to allow API to wake up).
+            // Never trigger external notifications from an isolated local preview database.
+            if (!LOCAL_PREVIEW) setTimeout(async () => {
                 try {
                     let apology = `**Scoring Correction — Chinese Grand Prix (R2)**\n\n`;
                     apology += `Apologies everyone — Sprint Gainer and Sprint Loser wildcards were not scored in R2 due to a bug where Sprint Qualifying grid data was missing.\n\n`;
@@ -634,6 +636,12 @@ async function fetchSeasonCalendarFromApi() {
 
 async function getSeasonCalendar(options = {}) {
     const { forceRefresh = false } = options;
+    if (LOCAL_PREVIEW) {
+        if (!seasonCalendarCache.data || forceRefresh) {
+            seasonCalendarCache = { data: buildOfficialCalendar([]), fetchedAt: Date.now() };
+        }
+        return seasonCalendarCache.data;
+    }
     if (!forceRefresh && seasonCalendarCache.data && (Date.now() - seasonCalendarCache.fetchedAt) < SEASON_CALENDAR_CACHE_TTL_MS) {
         return seasonCalendarCache.data;
     }
@@ -4140,24 +4148,25 @@ async function startApplication() {
     }
     await setupIndependentBackup();
 
-    // Start workers only after every primary-database migration succeeds.
-    setInterval(checkAndFinalize, 6 * 60 * 1000);
-    setTimeout(checkAndFinalize, 10 * 1000);
-    setInterval(checkPredictionNotifications, 60 * 1000);
-    setTimeout(checkPredictionNotifications, 15 * 1000);
+    // Local preview must never run automatic scoring or notification workers.
+    if (!LOCAL_PREVIEW) {
+        setInterval(checkAndFinalize, 6 * 60 * 1000);
+        setTimeout(checkAndFinalize, 10 * 1000);
+        setInterval(checkPredictionNotifications, 60 * 1000);
+        setTimeout(checkPredictionNotifications, 15 * 1000);
+    }
 
     if (backupDb) {
         setTimeout(() => writeIndependentBackup('startup'), 30 * 1000);
         setInterval(() => writeIndependentBackup('scheduled'), 6 * 60 * 60 * 1000);
     }
 
-    if (process.env.ENABLE_LOCAL_AUTH === '1' && process.env.NODE_ENV !== 'production') {
-        setTimeout(() => {
-            ensureLocalPreviewData().catch(e => console.error('[LOCAL PREVIEW] Failed to sync preview data:', e.message));
-        }, 1000);
+    if (LOCAL_PREVIEW) {
+        await ensureLocalPreviewData();
+        console.log('[LOCAL PREVIEW] Seed data ready; automatic workers disabled');
     }
 
-    setTimeout(notifyDeployUpdate, 5 * 1000);
+    if (!LOCAL_PREVIEW) setTimeout(notifyDeployUpdate, 5 * 1000);
     app.listen(port, () => {
         console.log(`🏁 Server ${port} (Google OAuth Secure)`);
         console.log(`[ENV] DISCORD_WEBHOOK: ${process.env.DISCORD_WEBHOOK ? 'SET' : 'NOT SET'}`);
