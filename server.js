@@ -1612,10 +1612,6 @@ function validateFinalRaceResults(results) {
         return 'Race classification contains missing or duplicate drivers';
     }
 
-    const allowedDrivers = getAllowedPredictionValues().drivers;
-    const unknown = names.find(name => !allowedDrivers.has(name));
-    if (unknown) return `Race classification contains an unknown driver: ${unknown}`;
-
     const positions = results.map(result => Number(result?.position));
     const invalidPosition = results.find(result => {
         const position = Number(result?.position);
@@ -1624,13 +1620,16 @@ function validateFinalRaceResults(results) {
     if (invalidPosition) return 'Race classification contains an invalid position';
     if (new Set(positions).size !== expectedDrivers) return 'Race classification contains duplicate positions';
 
-    const driverTeams = getAllowedPredictionValues().driverTeams;
-    const mismatchedTeam = results.find(result => {
-        const name = normalizeStr(`${result?.Driver?.givenName || ''} ${result?.Driver?.familyName || ''}`);
-        return normalizeConstructor(result?.Constructor?.name || '') !== driverTeams.get(name);
-    });
-    if (mismatchedTeam) {
-        return `Race classification has the wrong constructor for ${mismatchedTeam.Driver?.givenName || ''} ${mismatchedTeam.Driver?.familyName || ''}`.trim();
+    // Driver transfers/substitutions during the season must come from the F1
+    // Live API archive, not the preseason static prediction roster.
+    const constructors = results.map(result => normalizeConstructor(result?.Constructor?.name || ''));
+    if (constructors.some(team => !team)) return 'Race classification contains a missing constructor';
+    const constructorCounts = constructors.reduce((counts, team) => {
+        counts[team] = (counts[team] || 0) + 1;
+        return counts;
+    }, {});
+    if (Object.keys(constructorCounts).length !== 11 || Object.values(constructorCounts).some(count => count !== 2)) {
+        return 'Race classification must contain exactly two drivers for each of 11 constructors';
     }
     return null;
 }
@@ -1663,50 +1662,35 @@ async function assertRaceResultsAreFinal(race, results) {
     }
 }
 
-async function fetchOfficialSprintGrid(apiRound) {
-    try {
-        const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/sprint.json`, { timeout: 10000 })
-            .then(response => response.data?.MRData?.RaceTable?.Races || []);
-        const sprintResults = races[0]?.SprintResults || [];
-        const grid = {};
-        sprintResults.forEach(result => {
-            const name = normalizeStr(`${result.Driver?.givenName || ''} ${result.Driver?.familyName || ''}`);
-            const position = Number(result.grid);
-            if (name && Number.isInteger(position) && position >= 0) grid[name] = position;
-        });
-        return grid;
-    } catch (e) {
-        console.warn('[FINALIZE] Official Sprint grid fallback failed:', e.message);
-        return {};
-    }
-}
-
-async function fetchOfficialRaceGrid(apiRound) {
-    try {
-        const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/results.json`, { timeout: 10000 })
-            .then(response => response.data?.MRData?.RaceTable?.Races || []);
-        const raceResults = races[0]?.Results || [];
-        const grid = {};
-        raceResults.forEach(result => {
-            const name = normalizeStr(`${result.Driver?.givenName || ''} ${result.Driver?.familyName || ''}`);
-            const position = Number(result.grid);
-            if (name && Number.isInteger(position) && position >= 0) grid[name] = position;
-        });
-        return grid;
-    } catch (e) {
-        console.warn('[FINALIZE] Official race grid fallback failed:', e.message);
-        return {};
-    }
-}
-
-function resolveStartingGrid(result, driverName, officialGrid) {
+function resolveStartingGrid(result, driverName, sessionGrid) {
     const rawGrid = result?.grid;
     const ownGrid = Number(rawGrid);
     if (rawGrid !== undefined && rawGrid !== null && rawGrid !== '' && Number.isInteger(ownGrid) && ownGrid >= 0) {
         return ownGrid;
     }
-    if (Object.prototype.hasOwnProperty.call(officialGrid, driverName)) return officialGrid[driverName];
+    if (Object.prototype.hasOwnProperty.call(sessionGrid, driverName)) return sessionGrid[driverName];
     return null;
+}
+
+async function getArchivedSessionDriverMap(session) {
+    const map = {};
+    const archivedDrivers = session?.drivers;
+    if (archivedDrivers && !Array.isArray(archivedDrivers) && typeof archivedDrivers === 'object') {
+        Object.entries(archivedDrivers).forEach(([number, driver]) => {
+            map[String(number)] = { ...driver, driver_number: String(driver?.driver_number || number) };
+        });
+    } else if (Array.isArray(archivedDrivers)) {
+        archivedDrivers.forEach(driver => {
+            if (driver?.driver_number != null) map[String(driver.driver_number)] = driver;
+        });
+    }
+    if (Object.keys(map).length > 0) return map;
+
+    const driverList = await f1TimingApiGet('/drivers', { timeout: 10000 });
+    driverList.forEach(driver => {
+        if (driver?.driver_number != null) map[String(driver.driver_number)] = driver;
+    });
+    return map;
 }
 
 function validateStartingGrid(results, label) {
@@ -1789,7 +1773,7 @@ async function performFinalization(options = {}) {
     let databaseLock = null;
     let finalizationCommitted = false;
     try {
-        // 1. Fetch Race Data — own API first, Ergast fallback
+        // 1. Fetch all scoring data from the F1 Live API archive.
         let raceData = null;
         let results = null;
         let sprintResults = [];
@@ -1804,31 +1788,16 @@ async function performFinalization(options = {}) {
                 const roundData = await f1TimingApiGet(`/results/round/${apiRound}`, { timeout: 15000 });
                 const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
                 if (raceSes?.results?.length) {
-                    const driverList = await f1TimingApiGet('/drivers', { timeout: 10000 });
-                    const dMap = {};
-                    driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+                    const dMap = await getArchivedSessionDriverMap(raceSes);
                     const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                     if (qualSes?.results) qualSes.results.forEach(r => {
                         const d = dMap[String(r.driver_number)];
                         if (d) gridMap[normalizeStr(d.name)] = r.position;
                     });
-                    // Ergast qualifying fallback if own API qualifying not available
-                    if (Object.keys(gridMap).length === 0) {
-                        try {
-                            const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 10000 }).then(r => r.data.MRData.RaceTable.Races);
-                            if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
-                            console.log(`[FINALIZE] Ergast qualifying fallback: ${Object.keys(gridMap).length} drivers`);
-                        } catch (e) { console.log('[FINALIZE] Ergast qualifying fallback failed:', e.message); }
-                    }
-
-                    // Wildcard movement must use the actual starting grid after
-                    // penalties, never the qualifying classification.
-                    const officialRaceGrid = await fetchOfficialRaceGrid(apiRound);
-
                     results = raceSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
-                        const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), officialRaceGrid);
+                        const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), gridMap);
                         return {
                             position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)),
                             grid: startingGrid === null ? '' : String(startingGrid),
@@ -1848,9 +1817,6 @@ async function performFinalization(options = {}) {
                             const d = dMap[String(r.driver_number)];
                             if (d) sprintGridMap[normalizeStr(d.name)] = r.position;
                         });
-                        if (Object.keys(sprintGridMap).length < sprintSes.results.length - 1) {
-                            Object.assign(sprintGridMap, await fetchOfficialSprintGrid(apiRound));
-                        }
                         console.log(`[FINALIZE] Sprint Qualifying grid: ${Object.keys(sprintGridMap).length} drivers`);
 
                         sprintResults = sprintSes.results.map(r => {
@@ -1871,24 +1837,7 @@ async function performFinalization(options = {}) {
             } catch (e) { console.log('[FINALIZE] Own API failed:', e.message); }
         }
 
-        if (!raceData) {
-            let races;
-            try { races = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { }
-            if (!races?.length) { try { races = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/results.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { } }
-            if (!races?.length) return { success: false, message: "No race data found." };
-            raceData = races[0]; results = raceData.Results;
-            try {
-                const sprintRes = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/sprint.json', { timeout: 15000 }).then(r => r.data);
-                if (sprintRes.MRData.RaceTable.Races.length > 0) sprintResults = sprintRes.MRData.RaceTable.Races[0].SprintResults;
-            } catch (e) { }
-            try {
-                let qr = null;
-                try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/current/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { }
-                if (!qr?.length) { try { qr = await axios.get('https://api.jolpi.ca/ergast/f1/2026/last/qualifying.json', { timeout: 15000 }).then(r => r.data.MRData.RaceTable.Races); } catch (e) { } }
-                if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); });
-            } catch (e) { }
-            console.log(`[FINALIZE] Ergast: ${raceData.raceName} (R${raceData.round}) — ${results.length} drivers`);
-        }
+        if (!raceData) return { success: false, message: "Race data unavailable from F1 Live API." };
 
         console.log(`[FINALIZE] Grid map: ${Object.keys(gridMap).length} drivers`);
 
@@ -2458,18 +2407,13 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
             const roundData = await f1TimingApiGet(`/results/round/${apiRound}`, { timeout: 8000 });
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
-                const driverList = await f1TimingApiGet('/drivers', { timeout: 8000 });
-                const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+                const dMap = await getArchivedSessionDriverMap(raceSes);
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
-                if (Object.keys(gridMap).length === 0) {
-                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
-                }
-                const officialRaceGrid = await fetchOfficialRaceGrid(apiRound);
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
                     const parts = (d.name || '').split(' ');
-                    const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), officialRaceGrid);
+                    const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), gridMap);
                     return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                 });
                 const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
@@ -2477,7 +2421,6 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
                     const sprintGridMap = {};
                     const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
                     if (sqSes?.results) sqSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) sprintGridMap[normalizeStr(d.name)] = r.position; });
-                    if (Object.keys(sprintGridMap).length < sprintSes.results.length - 1) Object.assign(sprintGridMap, await fetchOfficialSprintGrid(apiRound));
                     sprintResults = sprintSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
@@ -2489,16 +2432,7 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
             }
         } catch (e) { console.log('[RESCORE] Own API failed:', e.message); }
 
-        if (!results) {
-            try {
-                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
-                if (races?.length) { results = races[0].Results; }
-                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
-                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
-            } catch (_) { }
-        }
-
-        if (!results) { console.log(`[RESCORE] No race data found for ${round}`); return; }
+        if (!results) { console.log(`[RESCORE] No F1 Live API race data found for ${round}`); return; }
         const raceGridError = validateRaceGrid(results);
         if (raceGridError) { console.log(`[RESCORE] Blocked: ${raceGridError}`); return; }
         const sprintGridError = validateSprintGrid(sprintResults);
@@ -2642,18 +2576,13 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
             const roundData = await f1TimingApiGet(`/results/round/${apiRound}`, { timeout: 8000 });
             const raceSes = Array.isArray(roundData) ? roundData.find(s => s.meta?.session_type === 'Race') : null;
             if (raceSes?.results?.length) {
-                const driverList = await f1TimingApiGet('/drivers', { timeout: 8000 });
-                const dMap = {}; driverList.forEach(d => { dMap[String(d.driver_number)] = d; });
+                const dMap = await getArchivedSessionDriverMap(raceSes);
                 const qualSes = roundData.find(s => s.meta?.session_type === 'Qualifying');
                 if (qualSes?.results) qualSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) gridMap[normalizeStr(d.name)] = r.position; });
-                if (Object.keys(gridMap).length === 0) {
-                    try { const eqr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (eqr?.length) eqr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
-                }
-                const officialRaceGrid = await fetchOfficialRaceGrid(apiRound);
                 results = raceSes.results.map(r => {
                     const d = dMap[String(r.driver_number)] || {};
                     const parts = (d.name || '').split(' ');
-                    const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), officialRaceGrid);
+                    const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), gridMap);
                     return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                 });
                 const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
@@ -2661,7 +2590,6 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                     const sprintGridMap = {};
                     const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
                     if (sqSes?.results) sqSes.results.forEach(r => { const d = dMap[String(r.driver_number)]; if (d) sprintGridMap[normalizeStr(d.name)] = r.position; });
-                    if (Object.keys(sprintGridMap).length < sprintSes.results.length - 1) Object.assign(sprintGridMap, await fetchOfficialSprintGrid(apiRound));
                     sprintResults = sprintSes.results.map(r => {
                         const d = dMap[String(r.driver_number)] || {};
                         const parts = (d.name || '').split(' ');
@@ -2673,15 +2601,7 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
             }
         } catch (e) { console.log('[RESEND] Own API failed:', e.message); }
 
-        if (!results) {
-            try {
-                console.log('[RESEND] Trying Ergast...');
-                const races = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/results.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races);
-                if (races?.length) { results = races[0].Results; console.log(`[RESEND] Ergast: ${results.length} results`); }
-                try { const sr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/sprint.json`, { timeout: 8000 }).then(r => r.data); if (sr.MRData.RaceTable.Races.length > 0) sprintResults = sr.MRData.RaceTable.Races[0].SprintResults; } catch (_) { }
-                try { const qr = await axios.get(`https://api.jolpi.ca/ergast/f1/2026/${apiRound}/qualifying.json`, { timeout: 8000 }).then(r => r.data.MRData.RaceTable.Races); if (qr?.length) qr[0].QualifyingResults.forEach(q => { gridMap[normalizeStr(`${q.Driver.givenName} ${q.Driver.familyName}`)] = parseInt(q.position); }); } catch (_) { }
-            } catch (_) { console.log('[RESEND] Ergast also failed'); }
-        }
+        if (!results) { console.log(`[RESEND] No F1 Live API race data found for ${round}`); return; }
 
         const raceGridError = results ? validateRaceGrid(results) : 'Race results are missing';
         if (raceGridError) { console.log(`[RESEND] Blocked: ${raceGridError}`); return; }
@@ -3690,11 +3610,11 @@ async function checkAndFinalize() {
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v8.2';
+const APP_VERSION = 'v8.3';
 const APP_CHANGELOG = [
-    'Blocked invalid roster picks and incomplete or unconfirmed race results',
-    'Added a database-backed scoring lock and actual race/Sprint starting-grid validation',
-    'Added automatic independent Turso snapshots, safer imports and fail-fast startup',
+    'Removed external race-result and starting-grid fallbacks from scoring',
+    'Race wildcards now use the F1 Live API Qualifying archive',
+    'Sprint wildcards now use the F1 Live API Sprint Qualifying archive',
 ];
 async function notifyDeployUpdate() {
     try {
