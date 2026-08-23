@@ -50,11 +50,20 @@ requireInvariant(
 );
 requireInvariant(
     source.includes('validateRaceGrid(results)') && !source.includes('parseInt(r.grid) || gridMap[name]'),
-    'race wildcard scoring must use the actual starting grid, not qualifying order'
+    'race wildcard scoring must use the validated session-grid field'
 );
 requireInvariant(
     !source.includes('sprintGridMap[normalizeStr(d.name || \'\')] || gridMap'),
     'Sprint wildcard scoring must never fall back to Grand Prix qualifying'
+);
+requireInvariant(
+    !/api\.jolpi\.ca|ergast/i.test(source),
+    'scoring must not call an external Formula 1 results API'
+);
+requireInvariant(
+    source.includes("roundData.find(s => s.meta?.session_type === 'Qualifying')")
+        && source.includes("roundData.find(s => s.meta?.session_type === 'Sprint Qualifying')"),
+    'race and Sprint grid references must come from F1 Live API session archives'
 );
 requireInvariant(
     source.includes('await databaseReady;') && source.includes("'[FATAL] Application startup failed:'"),
