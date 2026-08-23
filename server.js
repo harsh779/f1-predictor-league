@@ -1672,6 +1672,10 @@ function resolveStartingGrid(result, driverName, sessionGrid) {
     return null;
 }
 
+function isSprintRaceArchive(session) {
+    return /^(sprint|sprint race)$/i.test(String(session?.meta?.session_type || '').trim());
+}
+
 async function getArchivedSessionDriverMap(session) {
     const map = {};
     const archivedDrivers = session?.drivers;
@@ -1808,7 +1812,7 @@ async function performFinalization(options = {}) {
                     });
                     raceData = { round: String(latestCalRace.round), raceName: raceSes.meta?.meeting || latestCalRace.name, Results: results };
 
-                    const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+                    const sprintSes = roundData.find(isSprintRaceArchive);
                     if (sprintSes?.results) {
                         // Sprint grid comes from Sprint Qualifying, not regular Qualifying
                         const sprintGridMap = {};
@@ -2416,7 +2420,7 @@ app.post('/api/rescore', authenticateToken, requireAdmin, async (req, res) => {
                     const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), gridMap);
                     return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                 });
-                const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+                const sprintSes = roundData.find(isSprintRaceArchive);
                 if (sprintSes?.results) {
                     const sprintGridMap = {};
                     const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
@@ -2585,7 +2589,7 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
                     const startingGrid = resolveStartingGrid(r, normalizeStr(d.name || ''), gridMap);
                     return { position: String(r.position), positionText: r.retired ? 'R' : (r.stopped ? 'D' : String(r.position)), grid: startingGrid === null ? '' : String(startingGrid), status: r.retired ? 'Retired' : (r.stopped ? 'Collision' : 'Finished'), Driver: { givenName: parts[0] || '', familyName: parts.slice(1).join(' ') || '' }, Constructor: { name: d.team || '' } };
                 });
-                const sprintSes = roundData.find(s => s.meta?.session_type === 'Sprint');
+                const sprintSes = roundData.find(isSprintRaceArchive);
                 if (sprintSes?.results) {
                     const sprintGridMap = {};
                     const sqSes = roundData.find(s => s.meta?.session_type === 'Sprint Qualifying');
@@ -3610,11 +3614,11 @@ async function checkAndFinalize() {
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 // --- DEPLOY UPDATE NOTIFICATION ---
-const APP_VERSION = 'v8.3';
+const APP_VERSION = 'v8.4';
 const APP_CHANGELOG = [
     'Removed external race-result and starting-grid fallbacks from scoring',
     'Race wildcards now use the F1 Live API Qualifying archive',
-    'Sprint wildcards now use the F1 Live API Sprint Qualifying archive',
+    'Sprint Race and Sprint Qualifying archive labels are now scored correctly',
 ];
 async function notifyDeployUpdate() {
     try {

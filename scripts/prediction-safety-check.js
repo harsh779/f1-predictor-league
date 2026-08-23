@@ -66,6 +66,11 @@ requireInvariant(
     'race and Sprint grid references must come from F1 Live API session archives'
 );
 requireInvariant(
+    source.includes('roundData.find(isSprintRaceArchive)')
+        && source.includes('/^(sprint|sprint race)$/i'),
+    'both Sprint and Sprint Race archive labels must be recognized'
+);
+requireInvariant(
     source.includes('await databaseReady;') && source.includes("'[FATAL] Application startup failed:'"),
     'the server must fail fast when database setup fails'
 );
