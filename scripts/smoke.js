@@ -111,8 +111,8 @@ async function runChecks() {
         assert(Array.isArray(json), '/api/season-leaderboard did not return an array');
     });
 
-    await checkRoute('round scores contract', '/api/round-scores', { allowedStatuses: [200] }, ({ json }) => {
-        assert(Array.isArray(json), '/api/round-scores did not return an array');
+    await checkRoute('round scores auth guard', '/api/round-scores', { allowedStatuses: [401] }, ({ json }) => {
+        assert(json?.error, '/api/round-scores should reject guest access');
     });
 
     await checkRoute('weather contract', '/api/live/weather', { allowedStatuses: [200, 503] }, ({ response, json }) => {

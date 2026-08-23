@@ -20,6 +20,8 @@ const configuredAdminAuthIds = new Set((process.env.ADMIN_AUTH_IDS || '').split(
 const SESSION_COOKIE_NAME = 'f1_session';
 const DEFAULT_LOCAL_DB_URL = `file:${path.resolve(__dirname, 'local-preview.db').replace(/\\/g, '/')}`;
 const DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS === '1' && process.env.NODE_ENV !== 'production';
+const DEFAULT_LEAGUE_SLUG = 'f1-2026-main';
+const DEFAULT_LEAGUE_NAME = 'F1 2026 Predictor League';
 
 function buildF1TimingApiUrl(apiPath = '') {
     const base = F1_TIMING_API.replace(/\/+$/, '');
@@ -229,6 +231,68 @@ async function setupDatabase() {
             completed_at TEXT,
             last_error TEXT
         )`);
+
+        // League membership is intentionally separate from authentication. A signed-in
+        // account can exist without being eligible to submit picks for a league.
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_leagues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            season INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('upcoming', 'active', 'completed')),
+            visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public', 'private')),
+            created_at TEXT NOT NULL
+        )`);
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_league_memberships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            league_id INTEGER NOT NULL,
+            driver_id INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'player' CHECK(role IN ('player', 'admin', 'owner')),
+            status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'active', 'removed')),
+            joined_at TEXT NOT NULL,
+            UNIQUE(league_id, driver_id),
+            FOREIGN KEY(league_id) REFERENCES f1_leagues(id),
+            FOREIGN KEY(driver_id) REFERENCES f1_drivers(id)
+        )`);
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_league_memberships_driver ON f1_league_memberships (driver_id, status)");
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_league_memberships_league ON f1_league_memberships (league_id, status)");
+        await db.execute(`CREATE TABLE IF NOT EXISTS f1_player_profiles (
+            driver_id INTEGER PRIMARY KEY,
+            bio TEXT NOT NULL DEFAULT '',
+            location TEXT NOT NULL DEFAULT '',
+            favorite_driver TEXT NOT NULL DEFAULT '',
+            favorite_constructor TEXT NOT NULL DEFAULT '',
+            avatar_url TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(driver_id) REFERENCES f1_drivers(id)
+        )`);
+
+        const nowIso = new Date().toISOString();
+        await db.execute({
+            sql: `INSERT INTO f1_leagues (slug, name, season, status, visibility, created_at)
+                  VALUES (?, ?, 2026, 'active', 'public', ?)
+                  ON CONFLICT(slug) DO UPDATE SET name = excluded.name`,
+            args: [DEFAULT_LEAGUE_SLUG, DEFAULT_LEAGUE_NAME, nowIso]
+        });
+        const defaultLeagueId = await db.execute({
+            sql: 'SELECT id FROM f1_leagues WHERE slug = ? LIMIT 1',
+            args: [DEFAULT_LEAGUE_SLUG]
+        }).then(r => r.rows[0].id);
+        await db.execute({
+            sql: `INSERT INTO f1_league_memberships (league_id, driver_id, role, status, joined_at)
+                  SELECT ?, id, CASE WHEN is_admin = 1 THEN 'admin' ELSE 'player' END, 'active', ?
+                  FROM f1_drivers
+                  WHERE has_participated = 1 OR is_admin = 1
+                  ON CONFLICT(league_id, driver_id) DO UPDATE SET
+                    role = CASE WHEN (SELECT is_admin FROM f1_drivers WHERE id = excluded.driver_id) = 1 THEN 'admin' ELSE f1_league_memberships.role END`,
+            args: [defaultLeagueId, nowIso]
+        });
+        await db.execute({
+            sql: `INSERT INTO f1_player_profiles (driver_id, updated_at)
+                  SELECT id, ? FROM f1_drivers WHERE 1 = 1
+                  ON CONFLICT(driver_id) DO NOTHING`,
+            args: [nowIso]
+        });
 
         // Capture any live rows created before the archive feature was deployed.
         // This makes the currently restored round recoverable immediately after rollout.
@@ -1128,42 +1192,110 @@ async function getDevAuthUser() {
 }
 
 async function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const headerToken = authHeader && authHeader.split(' ')[1];
-    const cookieToken = parseCookies(req)[SESSION_COOKIE_NAME];
-    const token = headerToken || cookieToken;
-    if (DEV_AUTH_BYPASS) {
-        try {
-            req.user = await getDevAuthUser();
-            return next();
-        } catch (err) {
-            return res.status(500).json({ error: `Dev auth bypass failed: ${err.message}` });
-        }
-    }
-    if (!token) return res.status(401).json({ error: "Access Denied: Missing Token" });
-
     try {
-        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-        const authId = decoded.auth_id || decoded.id;
-        const dbUser = await findUserByAuthId(authId);
-        if (!dbUser) return res.status(403).json({ error: "Access Denied: Unknown User" });
-
-        req.user = {
-            driverId: dbUser.id,
-            name: dbUser.name,
-            auth_id: dbUser.auth_id,
-            email: dbUser.auth_email || null,
-            isAdmin: Number(dbUser.is_admin || 0) === 1 || isConfiguredAdmin(dbUser.auth_id)
-        };
+        req.user = await resolveAuthenticatedUser(req);
+        if (!req.user) return res.status(401).json({ error: "Access Denied: Missing Token" });
         next();
     } catch (err) {
         return res.status(403).json({ error: "Access Denied: Invalid Token" });
     }
 }
 
+async function resolveAuthenticatedUser(req) {
+    const authHeader = req.headers['authorization'];
+    const headerToken = authHeader && authHeader.split(' ')[1];
+    const cookieToken = parseCookies(req)[SESSION_COOKIE_NAME];
+    const token = headerToken || cookieToken;
+    if (DEV_AUTH_BYPASS) {
+        return getDevAuthUser();
+    }
+    if (!token) return null;
+
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    const authId = decoded.auth_id || decoded.id;
+    const dbUser = await findUserByAuthId(authId);
+    if (!dbUser) throw new Error('Unknown user');
+    return {
+        driverId: dbUser.id,
+        name: dbUser.name,
+        auth_id: dbUser.auth_id,
+        email: dbUser.auth_email || null,
+        isAdmin: Number(dbUser.is_admin || 0) === 1 || isConfiguredAdmin(dbUser.auth_id)
+    };
+}
+
+async function optionalAuthenticateToken(req, _res, next) {
+    try {
+        req.user = await resolveAuthenticatedUser(req);
+    } catch (_) {
+        req.user = null;
+    }
+    next();
+}
+
 function requireAdmin(req, res, next) {
     if (!req.user?.isAdmin) return res.status(403).json({ success: false, error: 'Unauthorized' });
     next();
+}
+
+async function getActiveMemberships(driverId) {
+    if (!driverId) return [];
+    return db.execute({
+        sql: `SELECT l.id AS league_id, l.slug, l.name, l.season, l.status AS league_status,
+                     l.visibility, m.role, m.status AS membership_status, m.joined_at
+              FROM f1_league_memberships m
+              JOIN f1_leagues l ON l.id = m.league_id
+              WHERE m.driver_id = ? AND m.status = 'active'
+              ORDER BY CASE l.status WHEN 'active' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
+                       l.season DESC, l.name ASC`,
+        args: [driverId]
+    }).then(r => r.rows);
+}
+
+async function buildSessionPayload(user) {
+    if (!user) {
+        return {
+            authenticated: false,
+            user: null,
+            memberships: [],
+            activeLeague: null,
+            entitlements: { publicLeague: true, compete: false, live: false, profileEdit: false, admin: false }
+        };
+    }
+    const memberships = await getActiveMemberships(user.driverId);
+    const activeLeague = memberships.find(m => m.league_status === 'active') || null;
+    const canCompete = Boolean(activeLeague) || user.isAdmin;
+    return {
+        authenticated: true,
+        user: { id: user.driverId, name: user.name, isAdmin: user.isAdmin },
+        memberships,
+        activeLeague,
+        entitlements: {
+            publicLeague: true,
+            compete: canCompete,
+            live: canCompete,
+            profileEdit: true,
+            admin: Boolean(user.isAdmin)
+        }
+    };
+}
+
+async function requireActiveLeagueMember(req, res, next) {
+    try {
+        if (req.user?.isAdmin) return next();
+        const memberships = await getActiveMemberships(req.user?.driverId);
+        const activeLeague = memberships.find(m => m.league_status === 'active');
+        if (!activeLeague) {
+            return res.status(403).json({
+                error: 'Active league membership required',
+                code: 'LEAGUE_MEMBERSHIP_REQUIRED'
+            });
+        }
+        req.activeLeague = activeLeague;
+        next();
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 }
 
 async function ensureLocalPreviewData() {
@@ -1270,6 +1402,27 @@ async function ensureLocalPreviewData() {
             });
         }
     }
+
+    const previewLeagueId = await db.execute({
+        sql: 'SELECT id FROM f1_leagues WHERE slug = ? LIMIT 1',
+        args: [DEFAULT_LEAGUE_SLUG]
+    }).then(r => r.rows[0]?.id);
+    if (previewLeagueId) {
+        const syncedAt = new Date().toISOString();
+        await db.execute({
+            sql: `INSERT INTO f1_league_memberships (league_id, driver_id, role, status, joined_at)
+                  SELECT ?, id, CASE WHEN is_admin = 1 THEN 'admin' ELSE 'player' END, 'active', ?
+                  FROM f1_drivers WHERE has_participated = 1 OR is_admin = 1
+                  ON CONFLICT(league_id, driver_id) DO UPDATE SET status = 'active'`,
+            args: [previewLeagueId, syncedAt]
+        });
+        await db.execute({
+            sql: `INSERT INTO f1_player_profiles (driver_id, updated_at)
+                  SELECT id, ? FROM f1_drivers WHERE 1 = 1
+                  ON CONFLICT(driver_id) DO NOTHING`,
+            args: [syncedAt]
+        });
+    }
 }
 
 // --- 5. OAUTH ROUTES (GOOGLE ONLY) ---
@@ -1346,11 +1499,30 @@ app.get('/auth/local-dev', async (req, res) => {
         return res.status(404).send('Not found');
     }
 
-    const authId = 'admin_override';
-    const localName = process.env.LOCAL_AUTH_NAME || 'Harsh khandelwal';
     await ensureLocalPreviewData();
+    const persona = String(req.query.persona || 'admin').toLowerCase();
+    const personas = {
+        admin: { authId: 'admin_override', name: process.env.LOCAL_AUTH_NAME || 'Harsh khandelwal', isAdmin: 1 },
+        player: { authId: 'preview_chaitanya', name: 'Chaitanya Agarwal', isAdmin: 0 },
+        nonmember: { authId: 'local_nonmember', name: 'Local Registered Fan', isAdmin: 0 }
+    };
+    const selected = personas[persona];
+    if (!selected) return res.status(400).json({ error: 'persona must be admin, player, or nonmember' });
+    const { authId, name: localName, isAdmin } = selected;
     await db.execute({ sql: "UPDATE f1_drivers SET auth_id = NULL WHERE auth_id = ? AND name != ?", args: [authId, localName] });
-    await db.execute({ sql: "UPDATE f1_drivers SET auth_id = ?, is_admin = 1 WHERE name = ?", args: [authId, localName] });
+    await db.execute({
+        sql: `INSERT INTO f1_drivers (name, auth_id, auth_email, is_admin, has_participated)
+              VALUES (?, ?, ?, ?, 0)
+              ON CONFLICT(name) DO UPDATE SET auth_id = excluded.auth_id, auth_email = excluded.auth_email,
+                  is_admin = excluded.is_admin`,
+        args: [localName, authId, `${authId}@local.dev`, isAdmin]
+    });
+    await db.execute({
+        sql: `INSERT INTO f1_player_profiles (driver_id, updated_at)
+              SELECT id, ? FROM f1_drivers WHERE auth_id = ?
+              ON CONFLICT(driver_id) DO NOTHING`,
+        args: [new Date().toISOString(), authId]
+    });
     const token = jwt.sign({ name: localName, auth_id: authId }, JWT_SECRET, { expiresIn: '12h' });
     setSessionCookie(res, token);
     res.redirect('/');
@@ -2289,7 +2461,7 @@ app.get('/api/live-sessions', async (req, res) => {
 });
 
 // --- NEW: SEASON-LONG PREDICTIONS ROUTES ---
-app.get('/api/season-picks', authenticateToken, async (req, res) => {
+app.get('/api/season-picks', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const r = await db.execute({ sql: "SELECT season_driver, season_constructor FROM f1_drivers WHERE name = ?", args: [req.user.name] });
         const seasonLock = await getSeasonPicksLockInfo();
@@ -2303,7 +2475,7 @@ app.get('/api/season-picks', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/season-picks', authenticateToken, async (req, res) => {
+app.post('/api/season-picks', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const seasonLock = await getSeasonPicksLockInfo();
         if (!seasonLock) {
@@ -2325,15 +2497,197 @@ app.post('/api/season-picks', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+app.get('/api/session', optionalAuthenticateToken, async (req, res) => {
+    res.json(await buildSessionPayload(req.user));
+});
+
 app.get('/api/me', authenticateToken, async (req, res) => {
+    const session = await buildSessionPayload(req.user);
     res.json({
+        id: req.user.driverId,
         name: req.user.name,
-        isAdmin: req.user.isAdmin
+        isAdmin: req.user.isAdmin,
+        memberships: session.memberships,
+        activeLeague: session.activeLeague,
+        entitlements: session.entitlements
     });
 });
 
+app.get('/api/leagues', async (_req, res) => {
+    try {
+        const leagues = await db.execute(`
+            SELECT l.id, l.slug, l.name, l.season, l.status, l.visibility, l.created_at,
+                   COUNT(CASE WHEN m.status = 'active' AND d.name != 'admin' THEN 1 END) AS member_count
+            FROM f1_leagues l
+            LEFT JOIN f1_league_memberships m ON m.league_id = l.id
+            LEFT JOIN f1_drivers d ON d.id = m.driver_id
+            WHERE l.visibility = 'public'
+            GROUP BY l.id
+            ORDER BY CASE l.status WHEN 'active' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
+                     l.season DESC, l.name ASC
+        `).then(r => r.rows);
+        res.json(leagues);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/leagues/:slug/players', async (req, res) => {
+    try {
+        const league = await db.execute({
+            sql: `SELECT id, slug, name, season, status, visibility
+                  FROM f1_leagues WHERE slug = ? AND visibility = 'public' LIMIT 1`,
+            args: [req.params.slug]
+        }).then(r => r.rows[0] || null);
+        if (!league) return res.status(404).json({ error: 'Public league not found' });
+        const players = await db.execute({
+            sql: `SELECT d.id, d.name, d.total_score, d.is_vip,
+                         p.location, p.favorite_driver, p.favorite_constructor, p.avatar_url,
+                         m.role, m.joined_at
+                  FROM f1_league_memberships m
+                  JOIN f1_drivers d ON d.id = m.driver_id
+                  LEFT JOIN f1_player_profiles p ON p.driver_id = d.id
+                  WHERE m.league_id = ? AND m.status = 'active' AND d.name != 'admin'
+                  ORDER BY d.total_score DESC, d.name ASC`,
+            args: [league.id]
+        }).then(r => r.rows.map((row, index) => ({ ...row, rank: index + 1 })));
+        res.json({ league, players });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+async function buildPlayerProfile(driverId, leagueSlug = DEFAULT_LEAGUE_SLUG) {
+    const league = await db.execute({
+        sql: `SELECT l.id, l.slug, l.name, l.season, l.status, l.visibility, m.role, m.status AS membership_status, m.joined_at
+              FROM f1_leagues l
+              JOIN f1_league_memberships m ON m.league_id = l.id
+              WHERE l.slug = ? AND m.driver_id = ? AND m.status = 'active'
+              LIMIT 1`,
+        args: [leagueSlug, driverId]
+    }).then(r => r.rows[0] || null);
+    if (!league || league.visibility !== 'public') return null;
+
+    const player = await db.execute({
+        sql: `SELECT d.id, d.name, d.total_score, d.is_vip, d.season_driver, d.season_constructor,
+                     COALESCE(p.bio, '') AS bio, COALESCE(p.location, '') AS location,
+                     COALESCE(p.favorite_driver, '') AS favorite_driver,
+                     COALESCE(p.favorite_constructor, '') AS favorite_constructor,
+                     COALESCE(p.avatar_url, '') AS avatar_url, p.updated_at
+              FROM f1_drivers d
+              LEFT JOIN f1_player_profiles p ON p.driver_id = d.id
+              WHERE d.id = ? LIMIT 1`,
+        args: [driverId]
+    }).then(r => r.rows[0] || null);
+    if (!player) return null;
+
+    const leaderboard = await db.execute({
+        sql: `SELECT d.id FROM f1_league_memberships m
+              JOIN f1_drivers d ON d.id = m.driver_id
+              WHERE m.league_id = ? AND m.status = 'active' AND d.name != 'admin'
+              ORDER BY d.total_score DESC, d.name ASC`,
+        args: [league.id]
+    }).then(r => r.rows);
+    const history = await db.execute({
+        sql: `SELECT round, race_name, score, scored_at
+              FROM f1_round_history WHERE user_name = ?
+              ORDER BY id DESC`,
+        args: [player.name]
+    }).then(r => r.rows);
+    const scoredRounds = history.filter(row => row.race_name !== 'New Joiner Penalty');
+    const scores = scoredRounds.map(row => Number(row.score || 0));
+    const rankIndex = leaderboard.findIndex(row => Number(row.id) === Number(driverId));
+    return {
+        player,
+        league,
+        performance: {
+            rank: rankIndex >= 0 ? rankIndex + 1 : null,
+            memberCount: leaderboard.length,
+            roundsPlayed: new Set(scoredRounds.map(row => row.round)).size,
+            averageScore: scores.length ? Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 10) / 10 : null,
+            bestRound: scores.length ? Math.max(...scores) : null,
+            recentForm: scoredRounds.slice(0, 5).map(row => Number(row.score || 0))
+        },
+        history
+    };
+}
+
+app.get('/api/players/:driverId/profile', async (req, res) => {
+    const driverId = Number.parseInt(req.params.driverId, 10);
+    if (!Number.isInteger(driverId) || driverId < 1) return res.status(400).json({ error: 'Invalid player id' });
+    try {
+        const profile = await buildPlayerProfile(driverId, String(req.query.league || DEFAULT_LEAGUE_SLUG));
+        if (!profile) return res.status(404).json({ error: 'Public player profile not found' });
+        res.json(profile);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/profile', authenticateToken, async (req, res) => {
+    try {
+        const publicProfile = await buildPlayerProfile(req.user.driverId);
+        if (publicProfile) return res.json({ ...publicProfile, editable: true });
+        const player = await db.execute({
+            sql: `SELECT d.id, d.name, d.total_score, d.season_driver, d.season_constructor,
+                         COALESCE(p.bio, '') AS bio, COALESCE(p.location, '') AS location,
+                         COALESCE(p.favorite_driver, '') AS favorite_driver,
+                         COALESCE(p.favorite_constructor, '') AS favorite_constructor,
+                         COALESCE(p.avatar_url, '') AS avatar_url, p.updated_at
+                  FROM f1_drivers d LEFT JOIN f1_player_profiles p ON p.driver_id = d.id
+                  WHERE d.id = ? LIMIT 1`,
+            args: [req.user.driverId]
+        }).then(r => r.rows[0] || null);
+        res.json({
+            player,
+            league: null,
+            performance: { rank: null, memberCount: 0, roundsPlayed: 0, averageScore: null, bestRound: null, recentForm: [] },
+            history: [],
+            editable: true
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.patch('/api/profile', authenticateToken, async (req, res) => {
+    const fields = {
+        bio: String(req.body.bio || '').trim(),
+        location: String(req.body.location || '').trim(),
+        favorite_driver: String(req.body.favorite_driver || '').trim(),
+        favorite_constructor: String(req.body.favorite_constructor || '').trim(),
+        avatar_url: String(req.body.avatar_url || '').trim()
+    };
+    const limits = { bio: 240, location: 80, favorite_driver: 80, favorite_constructor: 80, avatar_url: 500 };
+    const tooLong = Object.keys(fields).find(key => fields[key].length > limits[key]);
+    if (tooLong) return res.status(400).json({ error: `${tooLong} is too long` });
+    if (fields.avatar_url && !/^https:\/\//i.test(fields.avatar_url)) {
+        return res.status(400).json({ error: 'Avatar URL must use https' });
+    }
+    try {
+        const updatedAt = new Date().toISOString();
+        await db.execute({
+            sql: `INSERT INTO f1_player_profiles
+                    (driver_id, bio, location, favorite_driver, favorite_constructor, avatar_url, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT(driver_id) DO UPDATE SET
+                    bio = excluded.bio,
+                    location = excluded.location,
+                    favorite_driver = excluded.favorite_driver,
+                    favorite_constructor = excluded.favorite_constructor,
+                    avatar_url = excluded.avatar_url,
+                    updated_at = excluded.updated_at`,
+            args: [req.user.driverId, fields.bio, fields.location, fields.favorite_driver, fields.favorite_constructor, fields.avatar_url, updatedAt]
+        });
+        scheduleIndependentBackup('profile-update');
+        res.json({ success: true, profile: { ...fields, updated_at: updatedAt } });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // --- RACE PREDICTION SUBMIT ---
-app.post('/predict', predictLimiter, authenticateToken, async (req, res) => {
+app.post('/predict', predictLimiter, authenticateToken, requireActiveLeagueMember, async (req, res) => {
     const d = req.body;
     const userName = req.user.name;
 
@@ -2652,7 +3006,7 @@ app.post('/api/resend-discord', authenticateToken, requireAdmin, async (req, res
     } catch (e) { console.error(`[RESEND] Background error for ${round}:`, e.message); }
 });
 
-app.get('/api/my-prediction', authenticateToken, async (req, res) => {
+app.get('/api/my-prediction', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const seasonCalendar = await getSeasonCalendar();
         const currentRace = await findStrategyRace(seasonCalendar, new Date());
@@ -2667,7 +3021,7 @@ app.get('/api/my-prediction', authenticateToken, async (req, res) => {
 });
 
 // ── Draft picks (auto-save, no lock check) ────────────────────────────────────
-app.post('/api/draft-picks', authenticateToken, async (req, res) => {
+app.post('/api/draft-picks', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const seasonCalendar = await getSeasonCalendar();
         const currentRace = await findStrategyRace(seasonCalendar, new Date());
@@ -2686,7 +3040,7 @@ app.post('/api/draft-picks', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-app.get('/api/draft-picks', authenticateToken, async (req, res) => {
+app.get('/api/draft-picks', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const seasonCalendar = await getSeasonCalendar();
         const currentRace = await findStrategyRace(seasonCalendar, new Date());
@@ -2705,17 +3059,20 @@ app.get('/api/draft-picks', authenticateToken, async (req, res) => {
 app.use('/api/admin', adminLimiter);
 
 async function buildFullBackupPayload() {
-    const [drivers, predictions, predictionArchive, drafts, history, finalization, meta] = await Promise.all([
+    const [drivers, predictions, predictionArchive, drafts, history, finalization, meta, leagues, memberships, profiles] = await Promise.all([
         db.execute("SELECT * FROM f1_drivers WHERE name != 'admin' ORDER BY total_score DESC"),
         db.execute("SELECT * FROM f1_predictions_v4 ORDER BY user_name"),
         db.execute("SELECT * FROM f1_prediction_archive ORDER BY id ASC"),
         db.execute("SELECT * FROM f1_draft_picks ORDER BY saved_at DESC"),
         db.execute("SELECT * FROM f1_round_history ORDER BY id ASC"),
         db.execute("SELECT * FROM f1_round_finalization ORDER BY round"),
-        db.execute("SELECT * FROM f1_meta")
+        db.execute("SELECT * FROM f1_meta"),
+        db.execute("SELECT * FROM f1_leagues ORDER BY id"),
+        db.execute("SELECT * FROM f1_league_memberships ORDER BY league_id, driver_id"),
+        db.execute("SELECT * FROM f1_player_profiles ORDER BY driver_id")
     ]);
     return {
-        schema_version: 2,
+        schema_version: 3,
         exported_at: new Date().toISOString(),
         drivers: drivers.rows,
         predictions: predictions.rows,
@@ -2723,7 +3080,10 @@ async function buildFullBackupPayload() {
         drafts: drafts.rows,
         history: history.rows,
         finalization: finalization.rows,
-        meta: meta.rows
+        meta: meta.rows,
+        leagues: leagues.rows,
+        memberships: memberships.rows,
+        profiles: profiles.rows
     };
 }
 
@@ -2842,7 +3202,7 @@ app.get('/api/admin/download-independent-backup', authenticateToken, requireAdmi
     }
 });
 
-app.get('/api/predictions', authenticateToken, async (req, res) => {
+app.get('/api/predictions', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const seasonCalendar = await getSeasonCalendar();
         const currentRace = await findVisiblePredictionRace(seasonCalendar, new Date());
@@ -2870,11 +3230,22 @@ app.get('/api/predictions', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/season-leaderboard', async (req, res) => {
-    const r = await db.execute("SELECT name, total_score, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY total_score DESC");
+    const r = await db.execute({
+        sql: `SELECT d.id, d.name, d.total_score, d.is_vip, d.season_driver, d.season_constructor,
+                     l.slug AS league_slug, l.name AS league_name,
+                     COALESCE(p.avatar_url, '') AS avatar_url
+              FROM f1_league_memberships m
+              JOIN f1_leagues l ON l.id = m.league_id
+              JOIN f1_drivers d ON d.id = m.driver_id
+              LEFT JOIN f1_player_profiles p ON p.driver_id = d.id
+              WHERE l.slug = ? AND l.visibility = 'public' AND m.status = 'active' AND d.name != 'admin'
+              ORDER BY d.total_score DESC, d.name ASC`,
+        args: [String(req.query.league || DEFAULT_LEAGUE_SLUG)]
+    });
     res.json(r.rows);
 });
 
-app.get('/api/round-scores', authenticateToken, async (req, res) => {
+app.get('/api/round-scores', authenticateToken, requireActiveLeagueMember, async (req, res) => {
     try {
         const rows = await db.execute("SELECT round, race_name, user_name, prediction, score FROM f1_round_history ORDER BY id ASC").then(r => r.rows);
         res.json(rows);
@@ -2884,9 +3255,89 @@ app.get('/api/round-scores', authenticateToken, async (req, res) => {
 // --- 8. ADMIN ROUTES ---
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const r = await db.execute("SELECT id, name, total_score, has_participated, is_vip, season_driver, season_constructor FROM f1_drivers WHERE name != 'admin' AND has_participated = 1 ORDER BY name ASC");
+        const r = await db.execute({
+            sql: `SELECT d.id, d.name, d.total_score, d.has_participated, d.is_vip, d.season_driver, d.season_constructor
+                  FROM f1_league_memberships m
+                  JOIN f1_leagues l ON l.id = m.league_id
+                  JOIN f1_drivers d ON d.id = m.driver_id
+                  WHERE l.slug = ? AND m.status = 'active' AND d.name != 'admin'
+                  ORDER BY d.name ASC`,
+            args: [DEFAULT_LEAGUE_SLUG]
+        });
         res.json(r.rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/leagues', authenticateToken, requireAdmin, async (_req, res) => {
+    try {
+        const leagues = await db.execute(`SELECT * FROM f1_leagues ORDER BY season DESC, name ASC`).then(r => r.rows);
+        const memberships = await db.execute(`
+            SELECT m.id, m.league_id, m.driver_id, d.name AS driver_name, m.role, m.status, m.joined_at
+            FROM f1_league_memberships m
+            JOIN f1_drivers d ON d.id = m.driver_id
+            ORDER BY m.league_id, d.name
+        `).then(r => r.rows);
+        res.json(leagues.map(league => ({
+            ...league,
+            memberships: memberships.filter(membership => Number(membership.league_id) === Number(league.id))
+        })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/admin/leagues', authenticateToken, requireAdmin, async (req, res) => {
+    const slug = String(req.body.slug || '').trim().toLowerCase();
+    const name = String(req.body.name || '').trim();
+    const season = Number.parseInt(req.body.season, 10);
+    const status = String(req.body.status || 'upcoming');
+    const visibility = String(req.body.visibility || 'public');
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 80) {
+        return res.status(400).json({ error: 'Slug must contain lowercase letters, numbers and hyphens only' });
+    }
+    if (!name || name.length > 120) return res.status(400).json({ error: 'League name is required and must be at most 120 characters' });
+    if (!Number.isInteger(season) || season < 2020 || season > 2100) return res.status(400).json({ error: 'Invalid season' });
+    if (!['upcoming', 'active', 'completed'].includes(status)) return res.status(400).json({ error: 'Invalid league status' });
+    if (!['public', 'private'].includes(visibility)) return res.status(400).json({ error: 'Invalid league visibility' });
+    try {
+        const result = await db.execute({
+            sql: `INSERT INTO f1_leagues (slug, name, season, status, visibility, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?)`,
+            args: [slug, name, season, status, visibility, new Date().toISOString()]
+        });
+        scheduleIndependentBackup('league-created', 5_000);
+        res.status(201).json({ success: true, id: Number(result.lastInsertRowid), slug });
+    } catch (e) {
+        if (/unique/i.test(e.message)) return res.status(409).json({ error: 'League slug already exists' });
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/admin/leagues/:leagueId/memberships/:driverId', authenticateToken, requireAdmin, async (req, res) => {
+    const leagueId = Number.parseInt(req.params.leagueId, 10);
+    const driverId = Number.parseInt(req.params.driverId, 10);
+    const role = String(req.body.role || 'player');
+    const status = String(req.body.status || 'active');
+    if (!Number.isInteger(leagueId) || !Number.isInteger(driverId)) return res.status(400).json({ error: 'Invalid league or driver id' });
+    if (!['player', 'admin', 'owner'].includes(role)) return res.status(400).json({ error: 'Invalid membership role' });
+    if (!['pending', 'active', 'removed'].includes(status)) return res.status(400).json({ error: 'Invalid membership status' });
+    try {
+        const [league, driver] = await Promise.all([
+            db.execute({ sql: 'SELECT id FROM f1_leagues WHERE id = ? LIMIT 1', args: [leagueId] }).then(r => r.rows[0]),
+            db.execute({ sql: 'SELECT id FROM f1_drivers WHERE id = ? LIMIT 1', args: [driverId] }).then(r => r.rows[0])
+        ]);
+        if (!league || !driver) return res.status(404).json({ error: 'League or player not found' });
+        await db.execute({
+            sql: `INSERT INTO f1_league_memberships (league_id, driver_id, role, status, joined_at)
+                  VALUES (?, ?, ?, ?, ?)
+                  ON CONFLICT(league_id, driver_id) DO UPDATE SET role = excluded.role, status = excluded.status`,
+            args: [leagueId, driverId, role, status, new Date().toISOString()]
+        });
+        scheduleIndependentBackup('league-membership-updated', 5_000);
+        res.json({ success: true, leagueId, driverId, role, status });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 app.post('/api/admin/toggle-vip', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -2895,10 +3346,26 @@ app.post('/api/admin/toggle-vip', authenticateToken, requireAdmin, async (req, r
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/reset-user', authenticateToken, requireAdmin, async (req, res) => {
+    const tx = await db.transaction('write');
     try {
-        await db.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE name = ?", args: [req.body.targetUser] });
+        const driver = await tx.execute({ sql: 'SELECT id FROM f1_drivers WHERE name = ? LIMIT 1', args: [req.body.targetUser] }).then(r => r.rows[0]);
+        if (!driver) {
+            await tx.rollback();
+            return res.status(404).json({ error: 'Player not found' });
+        }
+        await tx.execute({ sql: "UPDATE f1_drivers SET total_score = 0, has_participated = 0 WHERE id = ?", args: [driver.id] });
+        await tx.execute({
+            sql: `UPDATE f1_league_memberships SET status = 'removed'
+                  WHERE driver_id = ? AND league_id = (SELECT id FROM f1_leagues WHERE slug = ?)`,
+            args: [driver.id, DEFAULT_LEAGUE_SLUG]
+        });
+        await tx.commit();
+        scheduleIndependentBackup('admin-reset-player', 5_000);
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+        try { await tx.rollback(); } catch (_) { }
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/api/admin/set-score', authenticateToken, requireAdmin, async (req, res) => {
@@ -3009,6 +3476,35 @@ app.post('/api/admin/merge-driver', authenticateToken, requireAdmin, async (req,
         });
 
         await recalculateDriverTotal(tx, targetName);
+        await tx.execute({
+            sql: `INSERT INTO f1_league_memberships (league_id, driver_id, role, status, joined_at)
+                  SELECT league_id, ?, role, status, joined_at
+                  FROM f1_league_memberships WHERE driver_id = ?
+                  ON CONFLICT(league_id, driver_id) DO UPDATE SET
+                    status = CASE WHEN excluded.status = 'active' THEN 'active' ELSE f1_league_memberships.status END,
+                    role = CASE
+                        WHEN excluded.role = 'owner' OR f1_league_memberships.role = 'owner' THEN 'owner'
+                        WHEN excluded.role = 'admin' OR f1_league_memberships.role = 'admin' THEN 'admin'
+                        ELSE 'player'
+                    END`,
+            args: [target.id, source.id]
+        });
+        await tx.execute({
+            sql: `INSERT INTO f1_player_profiles
+                    (driver_id, bio, location, favorite_driver, favorite_constructor, avatar_url, updated_at)
+                  SELECT ?, bio, location, favorite_driver, favorite_constructor, avatar_url, updated_at
+                  FROM f1_player_profiles WHERE driver_id = ?
+                  ON CONFLICT(driver_id) DO UPDATE SET
+                    bio = CASE WHEN f1_player_profiles.bio = '' THEN excluded.bio ELSE f1_player_profiles.bio END,
+                    location = CASE WHEN f1_player_profiles.location = '' THEN excluded.location ELSE f1_player_profiles.location END,
+                    favorite_driver = CASE WHEN f1_player_profiles.favorite_driver = '' THEN excluded.favorite_driver ELSE f1_player_profiles.favorite_driver END,
+                    favorite_constructor = CASE WHEN f1_player_profiles.favorite_constructor = '' THEN excluded.favorite_constructor ELSE f1_player_profiles.favorite_constructor END,
+                    avatar_url = CASE WHEN f1_player_profiles.avatar_url = '' THEN excluded.avatar_url ELSE f1_player_profiles.avatar_url END,
+                    updated_at = excluded.updated_at`,
+            args: [target.id, source.id]
+        });
+        await tx.execute({ sql: 'DELETE FROM f1_league_memberships WHERE driver_id = ?', args: [source.id] });
+        await tx.execute({ sql: 'DELETE FROM f1_player_profiles WHERE driver_id = ?', args: [source.id] });
         await tx.execute({
             sql: "DELETE FROM f1_drivers WHERE name = ?",
             args: [sourceName]
@@ -3515,7 +4011,7 @@ app.get('/api/paddock-news', async (_, res) => {
 });
 
 // SSE proxy: pipes live timing stream from own API to client
-app.get('/api/live/stream', authenticateToken, (req, res) => {
+app.get('/api/live/stream', authenticateToken, requireActiveLeagueMember, (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

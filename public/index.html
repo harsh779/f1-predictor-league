@@ -488,6 +488,40 @@
         }
         .btn-auth-google:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-2px); }
 
+        .header-sign-in { background: var(--red); color: #fff; border: 0; border-radius: 999px; padding: 9px 16px; font: 800 0.82rem var(--font-base); text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+        .auth-close { position: absolute; right: 14px; top: 10px; border: 0; background: transparent; color: #aaa; font-size: 1.8rem; cursor: pointer; z-index: 2; }
+        .auth-guest-note { color: #aaa; margin: 18px 0 0; font-size: 0.88rem; line-height: 1.45; }
+        .guest-welcome { display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #15151e; color: #fff; padding: 24px 28px; border-radius: 14px; margin-bottom: 20px; border-left: 5px solid var(--red); }
+        .guest-welcome h2 { margin: 0 0 4px; font-size: 1.45rem; }
+        .guest-welcome p { margin: 0; color: #b9b9c4; }
+        .profile-shell { display: grid; grid-template-columns: minmax(250px, 0.75fr) minmax(0, 2fr); gap: 20px; }
+        .profile-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; box-shadow: 0 6px 22px rgba(0,0,0,.04); }
+        .profile-identity { text-align: center; }
+        .profile-avatar { width: 104px; height: 104px; margin: 0 auto 14px; border-radius: 50%; display: grid; place-items: center; background: #15151e; color: #fff; border: 4px solid var(--red); font-size: 2rem; font-weight: 900; overflow: hidden; }
+        .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-name { margin: 0; font-size: 1.6rem; }
+        .profile-league { color: var(--text-muted); margin: 5px 0 16px; }
+        .profile-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .profile-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+        .profile-stat span { display: block; color: var(--text-muted); text-transform: uppercase; font-size: .75rem; font-weight: 800; }
+        .profile-stat strong { font-size: 1.6rem; }
+        .profile-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .profile-form label { color: var(--text-muted); font-size: .8rem; font-weight: 800; text-transform: uppercase; }
+        .profile-form input, .profile-form textarea { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-inner); color: var(--text-main); font: 1rem var(--font-base); }
+        .profile-form .full { grid-column: 1 / -1; }
+        .profile-history { display: grid; gap: 9px; }
+        .profile-history-row { display: grid; grid-template-columns: 55px 1fr 70px; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: center; }
+        .player-link { color: inherit; border: 0; padding: 0; background: transparent; font: inherit; font-weight: 800; cursor: pointer; text-align: left; }
+        .player-link:hover { color: var(--red); text-decoration: underline; }
+        .membership-notice { padding: 18px; border-radius: 10px; background: rgba(197,155,39,.1); border: 1px solid rgba(197,155,39,.35); color: #765b12; margin-bottom: 20px; }
+        @media (max-width: 760px) {
+            .guest-welcome { align-items: flex-start; flex-direction: column; }
+            .profile-shell { grid-template-columns: 1fr; }
+            .profile-stats { grid-template-columns: 1fr 1fr; }
+            .profile-form { grid-template-columns: 1fr; }
+            .profile-form .full { grid-column: auto; }
+        }
+
         /* ── Live Timing Tab ──────────────────────────────────────────── */
 
         /* Desktop: full table visible, cards hidden */
@@ -818,21 +852,24 @@
     <h1><span>F1</span> 2026 LEAGUE</h1>
 
     <nav id="main-nav">
-        <button onclick="tab('home', this)" class="active-nav">Home</button>
-        <button onclick="tab('predict', this)">Predict</button>
-        <button onclick="tab('live', this)">Picks</button>
-        <button onclick="tab('timing', this)">Live</button>
-        <button onclick="tab('standings', this)">Standings</button>
-        <button onclick="tab('calendar', this)">Calendar</button>
-        <button onclick="tab('grid', this)">Grid</button>
-        <button onclick="tab('rules', this)">Rules</button>
-        <button onclick="tab('archive', this)">Archive</button>
+        <button data-access="public" onclick="tab('home', this)" class="active-nav">Home</button>
+        <button data-access="player" onclick="tab('predict', this)">Predict</button>
+        <button data-access="player" onclick="tab('live', this)">Picks</button>
+        <button data-access="player" onclick="tab('timing', this)">Live</button>
+        <button data-access="public" onclick="tab('standings', this)">Standings</button>
+        <button data-access="public" onclick="tab('calendar', this)">Calendar</button>
+        <button data-access="public" onclick="tab('grid', this)">Grid</button>
+        <button data-access="public" onclick="tab('rules', this)">Rules</button>
+        <button data-access="public" onclick="tab('archive', this)">Archive</button>
+        <button id="profile-nav" data-access="authenticated" onclick="tab('profile', this)">Profile</button>
         <button id="install-btn" class="hidden" onclick="installApp()">App</button>
     </nav>
 
+    <button id="sign-in-btn" class="header-sign-in hidden" onclick="openAuthModal()">Sign in</button>
     <div id="user-menu" class="user-dropdown hidden" onclick="toggleUserMenu()">
         <span id="logged-in-name" style="color: var(--red);"></span>
         <div id="user-dropdown-content" class="user-dropdown-content">
+            <button onclick="event.stopPropagation(); tab('profile'); toggleUserMenu();">Profile</button>
             <button onclick="logout()">Logout</button>
         </div>
     </div>
@@ -840,6 +877,13 @@
 
 <main>
     <div id="home" class="tab active">
+        <div id="guest-welcome" class="guest-welcome hidden">
+            <div>
+                <h2>Welcome to the paddock</h2>
+                <p>Explore the public league, player form and race weekends. Sign in to compete if you are an active league member.</p>
+            </div>
+            <button class="btn" onclick="openAuthModal()">Sign in to compete</button>
+        </div>
         <!-- Race Hero Card -->
         <div class="race-hero-card">
             <div class="race-hero-left">
@@ -860,7 +904,7 @@
                     <div class="race-kpi"><span class="race-kpi-label">First GP</span><span class="race-kpi-value skeleton" style="width:50px;height:20px;display:inline-block;">&nbsp;</span></div>
                     <div class="race-kpi race-kpi-wide"><span class="race-kpi-label">Lap Record</span><span class="race-kpi-value skeleton" style="width:80px;height:20px;display:inline-block;">&nbsp;</span></div>
                 </div>
-                <button onclick="tab('predict', document.querySelectorAll('#main-nav button')[1])" class="btn" style="padding: 14px 30px; font-size: 1.1rem; margin-top: 15px;">Lock Strategy</button>
+                <button id="home-strategy-btn" onclick="openCompetitionArea()" class="btn" style="padding: 14px 30px; font-size: 1.1rem; margin-top: 15px;">Lock Strategy</button>
             </div>
         </div>
 
@@ -1187,6 +1231,49 @@
         </div>
     </div>
 
+    <div id="profile" class="tab">
+        <h2 class="section-title">Player Profile</h2>
+        <div id="profile-membership-notice" class="membership-notice hidden"></div>
+        <div id="profile-loading" class="profile-card">Loading profile…</div>
+        <div id="profile-content" class="hidden">
+            <div class="profile-shell">
+                <aside class="profile-card profile-identity">
+                    <div id="profile-avatar" class="profile-avatar"></div>
+                    <h3 id="profile-name" class="profile-name"></h3>
+                    <p id="profile-league" class="profile-league"></p>
+                    <p id="profile-bio-view" style="line-height:1.55;"></p>
+                    <p id="profile-social-view" style="color:var(--text-muted);line-height:1.7;"></p>
+                </aside>
+                <section>
+                    <div class="profile-stats">
+                        <div class="profile-stat"><span>League rank</span><strong id="profile-rank">—</strong></div>
+                        <div class="profile-stat"><span>Total points</span><strong id="profile-score">—</strong></div>
+                        <div class="profile-stat"><span>Rounds</span><strong id="profile-rounds">—</strong></div>
+                        <div class="profile-stat"><span>Best round</span><strong id="profile-best">—</strong></div>
+                    </div>
+                    <div id="profile-edit-card" class="profile-card hidden" style="margin-bottom:20px;">
+                        <h3 style="margin-top:0;">Edit profile</h3>
+                        <form id="profile-form" class="profile-form" onsubmit="saveProfile(event)">
+                            <label class="full">Bio<textarea id="profile-bio" maxlength="240" rows="3" placeholder="Your approach to the prediction league"></textarea></label>
+                            <label>Location<input id="profile-location" maxlength="80" placeholder="City or country"></label>
+                            <label>Avatar URL<input id="profile-avatar-url" maxlength="500" type="url" placeholder="https://..."></label>
+                            <label>Favorite driver<input id="profile-favorite-driver" maxlength="80" list="profile-driver-list"></label>
+                            <label>Favorite constructor<input id="profile-favorite-constructor" maxlength="80" list="profile-team-list"></label>
+                            <div class="full"><button class="btn" type="submit">Save profile</button></div>
+                        </form>
+                        <datalist id="profile-driver-list"></datalist>
+                        <datalist id="profile-team-list"></datalist>
+                    </div>
+                    <div class="profile-card">
+                        <h3 style="margin-top:0;">Performance</h3>
+                        <p id="profile-performance-summary" style="color:var(--text-muted);"></p>
+                        <div id="profile-history" class="profile-history"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <div id="calendar" class="tab">
         <h2 class="section-title">2026 Season Calendar</h2>
         <p style="color: var(--text-muted); margin-bottom: 20px; line-height: 1.7;">
@@ -1305,6 +1392,7 @@
 
 <div id="auth" class="auth-backdrop" style="display: none;">
     <div class="auth-card">
+        <button class="auth-close" onclick="closeAuthModal()" aria-label="Continue as guest">&times;</button>
         <div class="auth-header">
             <h1><span>F1</span> 2026</h1>
             <p>Paddock Pass Required</p>
@@ -1314,6 +1402,7 @@
             <svg width="24" height="24" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             Sign in with Google
         </a>
+        <p class="auth-guest-note">You can continue as a guest to view the public league, standings, profiles and calendar.</p>
     </div>
 </div>
 
@@ -1342,6 +1431,16 @@
     let f1_name = localStorage.getItem('f1_name');
     let f1_is_admin = false; // never persisted — re-fetched from server on each load
     let raceLock = null;
+    let selectedProfileId = null;
+    let appSession = {
+        authenticated: false,
+        user: null,
+        memberships: [],
+        activeLeague: null,
+        entitlements: { publicLeague: true, compete: false, live: false, profileEdit: false, admin: false }
+    };
+    const publicTabs = new Set(['home', 'standings', 'calendar', 'grid', 'rules', 'archive', 'profile']);
+    const playerTabs = new Set(['predict', 'live', 'timing']);
 
     function getAuthHeaders(extra = {}) {
         return { ...extra };
@@ -1379,39 +1478,75 @@
         start();
     });
 
-    async function start() { 
-        const hasSession = await loadCurrentUser();
-        if (!hasSession) {
-            document.getElementById('auth').style.display = 'flex';
-            return;
-        }
-        checkAdm(); 
-        loadHomeData(); 
-        buildGridTab(); 
-        loadSeasonPicks();
-        
+    async function start() {
+        await loadCurrentUser();
+        applyAccessState();
+        checkAdm();
+        loadHomeData();
+        buildGridTab();
+        if (appSession.entitlements.compete) loadSeasonPicks();
+
         const savedTab = localStorage.getItem('f1_active_tab') || 'home';
-        tab(savedTab); 
+        tab(canAccessTab(savedTab) ? savedTab : 'home');
     }
 
     async function loadCurrentUser() {
         try {
-            const resp = await authFetch('/api/me?t=' + Date.now());
-            if (!resp.ok) throw new Error('Unauthorized');
-            const me = await resp.json();
-            f1_name = me.name || f1_name;
-            f1_is_admin = !!me.isAdmin;
-            localStorage.setItem('f1_name', f1_name);
-            document.getElementById('logged-in-name').innerText = f1_name;
-            document.getElementById('user-menu').classList.remove('hidden');
-            document.getElementById('auth').style.display = 'none';
-            return true;
+            const resp = await authFetch('/api/session?t=' + Date.now());
+            if (!resp.ok) throw new Error('Session unavailable');
+            appSession = await resp.json();
+            f1_name = appSession.user?.name || null;
+            f1_is_admin = !!appSession.user?.isAdmin;
+            if (f1_name) localStorage.setItem('f1_name', f1_name);
+            else localStorage.removeItem('f1_name');
+            return appSession.authenticated;
         } catch (e) {
             localStorage.removeItem('f1_name');
             f1_name = null;
             f1_is_admin = false;
+            appSession.authenticated = false;
             return false;
         }
+    }
+
+    function canAccessTab(tabName) {
+        if (publicTabs.has(tabName)) return true;
+        if (playerTabs.has(tabName)) return !!appSession.entitlements.compete;
+        return false;
+    }
+
+    function applyAccessState() {
+        document.querySelectorAll('#main-nav [data-access="player"]').forEach(button => {
+            button.classList.toggle('hidden', !appSession.entitlements.compete);
+        });
+        document.querySelectorAll('#main-nav [data-access="authenticated"]').forEach(button => {
+            button.classList.toggle('hidden', !appSession.authenticated);
+        });
+        document.getElementById('user-menu').classList.toggle('hidden', !appSession.authenticated);
+        document.getElementById('sign-in-btn').classList.toggle('hidden', appSession.authenticated);
+        document.getElementById('guest-welcome').classList.toggle('hidden', appSession.authenticated);
+        if (appSession.authenticated) document.getElementById('logged-in-name').innerText = f1_name;
+        const strategyButton = document.getElementById('home-strategy-btn');
+        if (!appSession.authenticated) strategyButton.innerText = 'Sign in to compete';
+        else if (!appSession.entitlements.compete) strategyButton.innerText = 'League access pending';
+        else strategyButton.innerText = 'Lock Strategy';
+    }
+
+    function openAuthModal() {
+        document.getElementById('auth').style.display = 'flex';
+    }
+
+    function closeAuthModal() {
+        document.getElementById('auth').style.display = 'none';
+    }
+
+    function openCompetitionArea() {
+        if (!appSession.authenticated) return openAuthModal();
+        if (!appSession.entitlements.compete) {
+            showToast('Your account is signed in, but it is not an active member of an ongoing league.', 'error');
+            return tab('profile');
+        }
+        tab('predict');
     }
 
     function toggleUserMenu() {
@@ -3278,7 +3413,7 @@
                 podiumUI.innerHTML = top5.map((x, i) => `
                     <div class="podium-item ${i < 3 ? 'podium-'+(i+1) : ''}">
                         <span class="pos">${i+1}.</span>
-                        <span class="pname">${escapeHtml(formatDisplayName(x.name))}</span>
+                        <button class="pname player-link" onclick="openPlayerProfile(${Number(x.id)})">${escapeHtml(formatDisplayName(x.name))}</button>
                         <span class="ppts">${escapeHtml(x.total_score)} pts</span>
                     </div>
                 `).join('');
@@ -3302,6 +3437,12 @@
     }
 
     function tab(t, btnElement) {
+        if (!canAccessTab(t)) {
+            if (!appSession.authenticated) openAuthModal();
+            else showToast('This area is available to active league players.', 'error');
+            t = 'home';
+            btnElement = null;
+        }
         document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
         document.querySelectorAll('#main-nav button').forEach(b => b.classList.remove('active-nav'));
         
@@ -3321,6 +3462,7 @@
         if(t==='standings') loadBoard();
         if(t==='calendar') loadCalendar();
         if(t==='predict') loadMyPrediction();
+        if(t==='profile') loadProfile(selectedProfileId);
 
         if(t==='timing') {
             loadTimingTab();
@@ -3334,6 +3476,118 @@
             stopLiveSSE();
         }
     }
+
+    function openPlayerProfile(driverId) {
+        selectedProfileId = Number(driverId);
+        tab('profile');
+    }
+
+    function profileInitials(name = '') {
+        return String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'F1';
+    }
+
+    async function loadProfile(driverId = null) {
+        const loading = document.getElementById('profile-loading');
+        const content = document.getElementById('profile-content');
+        const notice = document.getElementById('profile-membership-notice');
+        loading.classList.remove('hidden');
+        content.classList.add('hidden');
+        notice.classList.add('hidden');
+
+        const isOwn = appSession.authenticated && (!driverId || Number(driverId) === Number(appSession.user?.id));
+        if (!driverId && !appSession.authenticated) {
+            loading.innerHTML = 'Choose a player from the public standings to view their profile, or sign in to manage your own.';
+            return;
+        }
+
+        try {
+            const endpoint = isOwn ? '/api/profile' : `/api/players/${Number(driverId)}/profile`;
+            const response = await authFetch(endpoint + '?t=' + Date.now());
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Profile unavailable');
+            const player = data.player || {};
+            const performance = data.performance || {};
+            const league = data.league;
+
+            document.getElementById('profile-name').innerText = formatDisplayName(player.name || 'Player');
+            document.getElementById('profile-league').innerText = league ? `${league.name} · ${league.role}` : 'Registered account · no active league';
+            document.getElementById('profile-bio-view').innerText = player.bio || 'No bio added yet.';
+            const socials = [
+                player.location && `📍 ${player.location}`,
+                player.favorite_driver && `Favorite driver: ${player.favorite_driver}`,
+                player.favorite_constructor && `Favorite team: ${player.favorite_constructor}`
+            ].filter(Boolean);
+            document.getElementById('profile-social-view').innerText = socials.join('\n') || 'Social details not added yet.';
+
+            const avatar = document.getElementById('profile-avatar');
+            avatar.replaceChildren();
+            if (player.avatar_url) {
+                const image = document.createElement('img');
+                image.src = player.avatar_url;
+                image.alt = `${player.name || 'Player'} avatar`;
+                image.onerror = () => { avatar.replaceChildren(document.createTextNode(profileInitials(player.name))); };
+                avatar.appendChild(image);
+            } else {
+                avatar.innerText = profileInitials(player.name);
+            }
+
+            document.getElementById('profile-rank').innerText = performance.rank ? `#${performance.rank}/${performance.memberCount}` : '—';
+            document.getElementById('profile-score').innerText = player.total_score ?? '—';
+            document.getElementById('profile-rounds').innerText = performance.roundsPlayed ?? 0;
+            document.getElementById('profile-best').innerText = performance.bestRound ?? '—';
+            const average = performance.averageScore == null ? '—' : performance.averageScore;
+            const form = (performance.recentForm || []).map(score => `${score > 0 ? '+' : ''}${score}`).join(' · ') || 'No scored rounds yet';
+            document.getElementById('profile-performance-summary').innerText = `Average: ${average} points · Recent form: ${form}`;
+            document.getElementById('profile-history').innerHTML = (data.history || []).slice(0, 12).map(row => `
+                <div class="profile-history-row">
+                    <strong>${escapeHtml(row.round)}</strong>
+                    <span>${escapeHtml(row.race_name)}</span>
+                    <strong style="text-align:right;color:${Number(row.score) > 0 ? '#009940' : Number(row.score) < 0 ? 'var(--red)' : 'var(--text-main)'}">${Number(row.score) > 0 ? '+' : ''}${escapeHtml(row.score)}</strong>
+                </div>`).join('') || '<p style="color:var(--text-muted);">No race history yet.</p>';
+
+            const editCard = document.getElementById('profile-edit-card');
+            editCard.classList.toggle('hidden', !data.editable);
+            if (data.editable) {
+                document.getElementById('profile-bio').value = player.bio || '';
+                document.getElementById('profile-location').value = player.location || '';
+                document.getElementById('profile-avatar-url').value = player.avatar_url || '';
+                document.getElementById('profile-favorite-driver').value = player.favorite_driver || '';
+                document.getElementById('profile-favorite-constructor').value = player.favorite_constructor || '';
+            }
+            if (isOwn && !league) {
+                notice.innerText = 'Your profile is active, but competition pages remain locked until an administrator adds you to an ongoing league.';
+                notice.classList.remove('hidden');
+            }
+            loading.classList.add('hidden');
+            content.classList.remove('hidden');
+        } catch (e) {
+            loading.innerText = e.message;
+        }
+    }
+
+    async function saveProfile(event) {
+        event.preventDefault();
+        const payload = {
+            bio: document.getElementById('profile-bio').value,
+            location: document.getElementById('profile-location').value,
+            avatar_url: document.getElementById('profile-avatar-url').value,
+            favorite_driver: document.getElementById('profile-favorite-driver').value,
+            favorite_constructor: document.getElementById('profile-favorite-constructor').value
+        };
+        const response = await authFetch('/api/profile', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) return showToast(result.error || 'Profile could not be saved.', 'error');
+        showToast('Profile saved.', 'success');
+        selectedProfileId = appSession.user?.id || null;
+        loadProfile(selectedProfileId);
+    }
+
+    document.getElementById('profile-driver-list').innerHTML = detailedDrivers.map(driver => `<option value="${escapeHtml(driver.name)}"></option>`).join('');
+    document.getElementById('profile-team-list').innerHTML = detailedTeams.map(team => `<option value="${escapeHtml(team.name)}"></option>`).join('');
 
     async function loadSeasonPicks() {
         try {
@@ -3461,7 +3715,9 @@
 
         const [d, roundScores] = await Promise.all([
             fetch('/api/season-leaderboard?t=' + Date.now()).then(r=>r.json()),
-            roundScoresCache || fetch('/api/round-scores?t=' + Date.now()).then(r=>r.json())
+            appSession.entitlements.compete
+                ? (roundScoresCache || authFetch('/api/round-scores?t=' + Date.now()).then(r => r.ok ? r.json() : []))
+                : Promise.resolve([])
         ]);
         roundScoresCache = roundScores;
 
@@ -3497,7 +3753,7 @@
 
                 return `<tr style="cursor:pointer;" onclick="document.getElementById('${historyId}').style.display = document.getElementById('${historyId}').style.display === 'none' ? 'table-row' : 'none'; this.querySelector('.expand-arrow').classList.toggle('open');">
                     <td style="text-align: center; font-weight: 900; color: ${posColor}; vertical-align: middle;">${i+1}</td>
-                    <td>${nameHtml}${seasonPicks}</td>
+                    <td><button class="player-link" onclick="event.stopPropagation(); openPlayerProfile(${Number(x.id)})">${nameHtml}</button>${seasonPicks}</td>
                     <td style="text-align: right; vertical-align: middle;"><b style="font-size:1.2rem; font-weight: 900; color: var(--text-main);">${x.total_score}</b><span class="expand-arrow">&#9654;</span></td>
                 </tr>
                 <tr id="${historyId}" class="race-history-row" style="display:none;">

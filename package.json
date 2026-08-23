@@ -5,11 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --check server.js && node --check public/sw.js && node scripts/prediction-safety-check.js",
+    "test": "node --check server.js && node --check public/sw.js && node scripts/prediction-safety-check.js && node scripts/profile-access-check.js",
     "test:syntax": "node --check server.js && node --check public/sw.js",
     "test:safety": "node scripts/prediction-safety-check.js",
+    "test:profiles": "node scripts/profile-access-check.js",
     "test:smoke": "node scripts/smoke.js",
-    "test:all": "node --check server.js && node --check public/sw.js && node scripts/prediction-safety-check.js && node scripts/smoke.js"
+    "test:all": "node --check server.js && node --check public/sw.js && node scripts/prediction-safety-check.js && node scripts/profile-access-check.js && node scripts/smoke.js"
   },
   "keywords": [],
   "author": "",
